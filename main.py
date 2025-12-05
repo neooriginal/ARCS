@@ -33,8 +33,9 @@ def init_controller():
     """Initialize the servo controller with wheels, head, and arm."""
     print(f"🔧 Connecting servos ({WHEEL_USB}, {HEAD_USB})...", end=" ", flush=True)
     
-    # Get calibration path
-    cal_path = os.path.join(os.path.dirname(__file__), ARM_CALIBRATION_PATH)
+    # Get calibration path (absolute)
+    cal_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ARM_CALIBRATION_PATH))
+    print(f"\n   Calibration: {cal_path}", end=" ", flush=True)
     
     try:
         # Initialize with arm enabled - arm uses same bus as wheels (IDs 1-6)
