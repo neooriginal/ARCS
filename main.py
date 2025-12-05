@@ -50,11 +50,11 @@ def init_controller():
             state.head_yaw = 0
             state.head_pitch = 35
         
-        # Check arm status
-        if state.controller.arm_enabled:
+        # Check arm status (use getattr for compatibility with older versions)
+        if getattr(state.controller, 'arm_enabled', False):
             print("🦾 Arm control enabled ✓")
         else:
-            print("🦾 Arm control disabled (no calibration)")
+            print("🦾 Arm control not available")
         
         return True
     except Exception as e:
