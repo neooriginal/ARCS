@@ -19,10 +19,10 @@ ARM_CALIBRATION_PATH = os.path.join(_CONFIG_DIR, "RoboCrew", "calibrations", "ro
 WEB_PORT = 5000
 
 # Camera settings
-CAMERA_WIDTH = 640
-CAMERA_HEIGHT = 480
+CAMERA_WIDTH = 1920
+CAMERA_HEIGHT = 1080
+JPEG_QUALITY = 80
 CAMERA_BUFFER_SIZE = 1
-JPEG_QUALITY = 50
 
 # Control settings
 MOVEMENT_LOOP_INTERVAL = 0.05  # 50ms between movement updates
