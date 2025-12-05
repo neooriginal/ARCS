@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RoboCrew Control</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="connection-dot" id="connection-dot"></div>
+            <h1>RoboCrew Control</h1>
+        </div>
+        
+        <div class="video-wrapper">
+            <div class="video-container" id="video-container">
+                <img id="video-feed" src="/video_feed" alt="Robot Camera Feed">
+                <div class="video-overlay"></div>
+                
+                <div class="crosshair">
+                    <div class="crosshair-ring">
+                        <div class="crosshair-dot"></div>
+                    </div>
+                    <div class="crosshair-line h left"></div>
+                    <div class="crosshair-line h right"></div>
+                    <div class="crosshair-line v top"></div>
+                    <div class="crosshair-line v bottom"></div>
+                </div>
+                
+                <div class="click-prompt">
+                    <h2>🖱️ Click to Control</h2>
+                    <p>Mouse controls head • WASD moves robot</p>
+                </div>
+                
+                <!-- Body direction compass -->
+                <div class="body-compass">
+                    <div class="compass-ring">
+                        <span class="compass-n">▲</span>
+                        <div class="compass-arrow" id="compass-arrow"></div>
+                        <div class="compass-center"></div>
+                    </div>
+                    <span class="compass-label">Body →</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls-panel">
+            <div class="control-group">
+                <span class="control-label">Yaw</span>
+                <span class="control-value" id="yaw-value">--</span>
+            </div>
+            <div class="control-group">
+                <span class="control-label">Pitch</span>
+                <span class="control-value" id="pitch-value">--</span>
+            </div>
+            <div class="control-group">
+                <span class="control-label">Status</span>
+                <div class="status-indicator">
+                    <div class="status-dot" id="status-dot"></div>
+                    <span class="control-value" id="status-text" style="font-size: 1rem;">Loading...</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="keys-display">
+            <div class="key empty"></div>
+            <div class="key" id="key-w">W</div>
+            <div class="key empty"></div>
+            <div class="key" id="key-a">A</div>
+            <div class="key" id="key-s">S</div>
+            <div class="key" id="key-d">D</div>
+        </div>
+        
+        <div class="help-text">
+            <kbd>ESC</kbd> to release mouse • <kbd>WASD</kbd> to move • Move mouse to look around
+        </div>
+        
+        <div class="debug-panel" id="debug-panel"></div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
