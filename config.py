@@ -24,8 +24,8 @@ MOVEMENT_LOOP_INTERVAL = 0.05  # 50ms between movement updates
 HEAD_UPDATE_INTERVAL = 33  # ~30 updates/sec for smooth control
 ARM_UPDATE_INTERVAL = 50  # ~20 updates/sec for arm control
 
-# Arm control sensitivity
-ARM_XY_SENSITIVITY = 0.5  # Degrees per pixel of mouse movement
-ARM_WRIST_SENSITIVITY = 2.0  # Degrees per scroll unit
-ARM_SHOULDER_PAN_STEP = 5.0  # Degrees per keypress
-ARM_WRIST_FLEX_STEP = 5.0  # Degrees per keypress
+# Arm control sensitivity (LOWER = slower movement)
+ARM_XY_SENSITIVITY = 0.1  # Degrees per pixel of mouse movement (was 0.5)
+ARM_WRIST_SENSITIVITY = 1.0  # Degrees per scroll unit (was 2.0)
+ARM_SHOULDER_PAN_STEP = 2.0  # Degrees per keypress (was 5.0)
+ARM_WRIST_FLEX_STEP = 2.0  # Degrees per keypress (was 5.0)

@@ -133,7 +133,7 @@ class ArmController:
         Args:
             closed: True to close gripper, False to open
         """
-        self.targets['gripper'] = 0 if closed else 90
+        self.targets['gripper'] = 2 if closed else 90  # 2 = closed, 90 = open
         return self.targets['gripper']
     
     def get_targets(self):
