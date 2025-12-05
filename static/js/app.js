@@ -4,15 +4,13 @@
 
 // DOM Elements
 const videoContainer = document.getElementById('video-container');
-const yawDisplay = document.getElementById('yaw-value');
-const pitchDisplay = document.getElementById('pitch-value');
 const statusDot = document.getElementById('status-dot');
 const statusText = document.getElementById('status-text');
 const connectionDot = document.getElementById('connection-dot');
 const debugPanel = document.getElementById('debug-panel');
 const compassArrow = document.getElementById('compass-arrow');
 
-// State - will be set from server on init
+// State
 let mouseLocked = false;
 let currentYaw = null;
 let currentPitch = null;
@@ -21,13 +19,13 @@ let lastHeadUpdate = 0;
 let headUpdatePending = false;
 let controllerConnected = false;
 let initialized = false;
-let baselineYaw = 0;  // Calibration: yaw value when body is straight
+let baselineYaw = 0;
 
-// Settings - optimized for low latency
+// Settings
 const MOUSE_SENS = 0.15;
 const YAW_MIN = -180, YAW_MAX = 180;
 const PITCH_MIN = -180, PITCH_MAX = 180;
-const HEAD_UPDATE_INTERVAL = 33; // ~30 updates/sec for smooth control
+const HEAD_UPDATE_INTERVAL = 33;
 
 function showDebug(msg) {
     debugPanel.textContent = msg;
@@ -39,18 +37,8 @@ function hideDebug() {
     debugPanel.classList.remove('show');
 }
 
-function updateDisplay() {
-    if (currentYaw !== null) {
-        yawDisplay.textContent = currentYaw.toFixed(1) + '°';
-        updateCompass();
-    }
-    if (currentPitch !== null) {
-        pitchDisplay.textContent = currentPitch.toFixed(1) + '°';
-    }
-}
-
 function updateCompass() {
-    // Arrow shows where body is facing relative to camera
+    if (currentYaw === null) return;
     const relativeYaw = currentYaw - baselineYaw;
     compassArrow.style.transform = `translate(-50%, -100%) rotate(${-relativeYaw}deg)`;
 }
@@ -60,39 +48,34 @@ function updateStatus(text, state) {
     statusDot.className = 'status-dot' + (state ? ' ' + state : '');
 }
 
-// Initialize - read current head position from robot
+// Initialize
 async function init() {
     updateStatus('Connecting...', '');
-    
+
     try {
         const res = await fetch('/head_position');
         const data = await res.json();
-        
+
         if (data.error) {
             showDebug('Head position error: ' + data.error);
             connectionDot.classList.add('error');
             updateStatus('Error', 'error');
             return;
         }
-        
-        // Use actual robot position as starting point
+
         currentYaw = data.yaw;
         currentPitch = data.pitch;
-        baselineYaw = data.yaw;  // This is our "straight ahead" calibration
+        baselineYaw = data.yaw;
         controllerConnected = true;
         initialized = true;
-        
-        updateDisplay();
+
+        updateCompass();
         connectionDot.classList.remove('error');
         updateStatus('Ready', 'active');
-        
-        showDebug('Robot position: Yaw=' + currentYaw + ', Pitch=' + currentPitch);
+
         console.log('Initialized with robot position:', currentYaw, currentPitch);
-        
-        // Auto-hide debug after 3 seconds
-        setTimeout(hideDebug, 3000);
-        
-    } catch(e) {
+
+    } catch (e) {
         showDebug('Connection error: ' + e.message);
         connectionDot.classList.add('error');
         updateStatus('Offline', 'error');
@@ -101,7 +84,7 @@ async function init() {
 
 init();
 
-// Pointer Lock for FPS-style mouse control
+// Pointer Lock
 videoContainer.addEventListener('click', () => {
     if (!mouseLocked && initialized) {
         videoContainer.requestPointerLock();
@@ -118,15 +101,15 @@ document.addEventListener('pointerlockchange', () => {
     }
 });
 
-// Throttled head position update with request cancellation
+// Head position updates
 let headAbortController = null;
 
 function scheduleHeadUpdate() {
     if (!initialized) return;
-    
+
     const now = Date.now();
     const timeSinceLastUpdate = now - lastHeadUpdate;
-    
+
     if (timeSinceLastUpdate >= HEAD_UPDATE_INTERVAL) {
         sendHeadUpdate();
     } else if (!headUpdatePending) {
@@ -140,13 +123,12 @@ function scheduleHeadUpdate() {
 
 async function sendHeadUpdate() {
     if (currentYaw === null || currentPitch === null) return;
-    
-    // Cancel any pending request
+
     if (headAbortController) {
         headAbortController.abort();
     }
     headAbortController = new AbortController();
-    
+
     lastHeadUpdate = Date.now();
     try {
         await fetch('/head', {
@@ -155,39 +137,31 @@ async function sendHeadUpdate() {
             body: JSON.stringify({ yaw: currentYaw, pitch: currentPitch }),
             signal: headAbortController.signal
         });
-        // Don't wait for response parsing - fire and forget for speed
-    } catch(e) {
+    } catch (e) {
         if (e.name !== 'AbortError') {
             console.log('Head update error:', e.message);
         }
     }
 }
 
-// Mouse movement handler
+// Mouse movement
 document.addEventListener('mousemove', (e) => {
     if (!mouseLocked || !initialized) return;
-    
+
     const deltaYaw = e.movementX * MOUSE_SENS;
     const deltaPitch = e.movementY * MOUSE_SENS;
-    
+
     currentYaw = Math.max(YAW_MIN, Math.min(YAW_MAX, currentYaw + deltaYaw));
     currentPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, currentPitch + deltaPitch));
-    
-    updateDisplay();
+
+    updateCompass();
     scheduleHeadUpdate();
 });
 
-// Keyboard controls (WASD only)
-function updateKeyDisplay() {
-    ['w', 'a', 's', 'd'].forEach(key => {
-        const el = document.getElementById('key-' + key);
-        if (el) el.classList.toggle('active', keysPressed[key]);
-    });
-}
-
+// Keyboard controls
 async function sendMovement() {
     const isMoving = Object.values(keysPressed).some(v => v);
-    
+
     if (isMoving) {
         updateStatus('Moving', 'moving');
     } else if (mouseLocked) {
@@ -195,7 +169,7 @@ async function sendMovement() {
     } else {
         updateStatus('Ready', 'active');
     }
-    
+
     try {
         const res = await fetch('/move', {
             method: 'POST',
@@ -212,7 +186,7 @@ async function sendMovement() {
             showDebug('Move error: ' + data.error);
             updateStatus('Error', 'error');
         }
-    } catch(e) {
+    } catch (e) {
         showDebug('Move request failed: ' + e.message);
     }
 }
@@ -222,7 +196,6 @@ document.addEventListener('keydown', (e) => {
     const key = e.key.toLowerCase();
     if (['w', 'a', 's', 'd'].includes(key) && !keysPressed[key]) {
         keysPressed[key] = true;
-        updateKeyDisplay();
         sendMovement();
     }
 });
@@ -231,14 +204,12 @@ document.addEventListener('keyup', (e) => {
     const key = e.key.toLowerCase();
     if (['w', 'a', 's', 'd'].includes(key)) {
         keysPressed[key] = false;
-        updateKeyDisplay();
         sendMovement();
     }
 });
 
-// Handle window blur - stop movement
+// Stop movement on window blur
 window.addEventListener('blur', () => {
     keysPressed = { w: false, a: false, s: false, d: false };
-    updateKeyDisplay();
     sendMovement();
 });

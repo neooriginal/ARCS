@@ -59,8 +59,17 @@ h1 {
 }
 
 @keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.7; transform: scale(1.1); }
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.7;
+        transform: scale(1.1);
+    }
 }
 
 /* Video section */
@@ -70,10 +79,10 @@ h1 {
     max-width: 960px;
     border-radius: 20px;
     overflow: hidden;
-    box-shadow: 
+    box-shadow:
         0 25px 60px rgba(0, 0, 0, 0.5),
         0 0 100px rgba(0, 212, 255, 0.1),
-        inset 0 0 0 1px rgba(255,255,255,0.1);
+        inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
 .video-container {
@@ -102,7 +111,7 @@ h1 {
     right: 0;
     bottom: 0;
     pointer-events: none;
-    background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.4) 100%);
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.4) 100%);
 }
 
 /* Crosshair */
@@ -159,10 +168,66 @@ h1 {
     transform: translateX(-50%);
 }
 
-.crosshair-line.left { left: -20px; }
-.crosshair-line.right { right: -20px; }
-.crosshair-line.top { top: -20px; }
-.crosshair-line.bottom { bottom: -20px; }
+.crosshair-line.left {
+    left: -20px;
+}
+
+.crosshair-line.right {
+    right: -20px;
+}
+
+.crosshair-line.top {
+    top: -20px;
+}
+
+.crosshair-line.bottom {
+    bottom: -20px;
+}
+
+/* Status overlay (top-left of video) */
+.status-overlay {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 20px;
+    backdrop-filter: blur(8px);
+    pointer-events: none;
+    z-index: 10;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #666;
+    transition: all 0.2s;
+}
+
+.status-dot.active {
+    background: #00ff88;
+    box-shadow: 0 0 8px #00ff88;
+}
+
+.status-dot.moving {
+    background: #ffaa00;
+    box-shadow: 0 0 8px #ffaa00;
+}
+
+.status-dot.error {
+    background: #ff4444;
+    box-shadow: 0 0 8px #ff4444;
+}
+
+.status-text {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 500;
+}
 
 /* Body direction compass */
 .body-compass {
@@ -227,7 +292,7 @@ h1 {
     font-size: 0.7rem;
     color: #ffaa00;
     white-space: nowrap;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
 .compass-n {
@@ -236,7 +301,7 @@ h1 {
     left: 50%;
     transform: translateX(-50%);
     font-size: 0.6rem;
-    color: rgba(255,255,255,0.5);
+    color: rgba(255, 255, 255, 0.5);
     font-weight: bold;
 }
 
@@ -246,7 +311,7 @@ h1 {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: rgba(0,0,0,0.8);
+    background: rgba(0, 0, 0, 0.8);
     padding: 20px 40px;
     border-radius: 12px;
     text-align: center;
@@ -270,130 +335,11 @@ h1 {
     font-size: 0.9rem;
 }
 
-/* Controls panel */
-.controls-panel {
-    display: flex;
-    gap: 40px;
-    margin-top: 25px;
-    padding: 20px 40px;
-    background: rgba(255,255,255,0.03);
-    border-radius: 16px;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,0.08);
-}
-
-.control-group {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-}
-
-.control-label {
-    font-size: 0.7rem;
-    color: #666;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-}
-
-.control-value {
-    font-size: 1.4rem;
-    font-weight: 600;
-    color: #00d4ff;
-    font-family: 'Courier New', monospace;
-}
-
-/* Status indicator */
-.status-indicator {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #666;
-    transition: all 0.2s;
-}
-
-.status-dot.active {
-    background: #00ff88;
-    box-shadow: 0 0 12px #00ff88;
-}
-
-.status-dot.moving {
-    background: #ffaa00;
-    box-shadow: 0 0 12px #ffaa00;
-}
-
-.status-dot.error {
-    background: #ff4444;
-    box-shadow: 0 0 12px #ff4444;
-}
-
-/* Keyboard display */
-.keys-display {
-    display: grid;
-    grid-template-columns: repeat(3, 48px);
-    grid-template-rows: repeat(2, 48px);
-    gap: 6px;
-    margin-top: 20px;
-}
-
-.key {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 48px;
-    height: 48px;
-    background: rgba(255,255,255,0.05);
-    border-radius: 10px;
-    font-weight: 700;
-    font-size: 1.1rem;
-    border: 1px solid rgba(255,255,255,0.1);
-    transition: all 0.15s;
-    color: #888;
-}
-
-.key:nth-child(2) {
-    grid-column: 2;
-}
-
-.key.active {
-    background: rgba(0, 212, 255, 0.25);
-    border-color: #00d4ff;
-    color: #00d4ff;
-    box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
-    transform: scale(0.95);
-}
-
-.key.empty {
-    visibility: hidden;
-}
-
-/* Help text */
-.help-text {
-    margin-top: 20px;
-    font-size: 0.85rem;
-    color: #555;
-    text-align: center;
-}
-
-.help-text kbd {
-    background: rgba(255,255,255,0.1);
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-family: inherit;
-    border: 1px solid rgba(255,255,255,0.15);
-}
-
 /* Debug panel */
 .debug-panel {
     margin-top: 15px;
     padding: 10px 20px;
-    background: rgba(255,0,0,0.1);
+    background: rgba(255, 0, 0, 0.1);
     border-radius: 8px;
     font-size: 0.8rem;
     color: #ff8888;
