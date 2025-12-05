@@ -9,8 +9,8 @@ _CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Hardware ports
 CAMERA_PORT = "/dev/video0"
-WHEEL_USB = "/dev/robot_acm0"
-HEAD_USB = "/dev/robot_acm1"
+WHEEL_USB = "/dev/ttyACM1"
+HEAD_USB = "/dev/ttyACM0"
 
 # Arm calibration file (in RoboCrew/calibrations)
 ARM_CALIBRATION_PATH = os.path.join(_CONFIG_DIR, "RoboCrew", "calibrations", "robot_arms.json")
