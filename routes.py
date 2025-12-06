@@ -230,3 +230,52 @@ def arm_home():
         return jsonify({'status': 'ok', 'positions': result})
     except Exception as e:
         return jsonify({'status': 'error', 'error': str(e)})
+
+
+# AI Routes
+
+@bp.route('/ai/start', methods=['POST'])
+def ai_start():
+    if not state.agent:
+        return jsonify({'status': 'error', 'error': 'AI Agent not initialized'})
+    state.ai_enabled = True
+    state.add_ai_log("AI Started")
+    return jsonify({'status': 'ok'})
+
+@bp.route('/ai/stop', methods=['POST'])
+def ai_stop():
+    state.ai_enabled = False
+    state.add_ai_log("AI Stopped")
+    return jsonify({'status': 'ok'})
+
+@bp.route('/ai/task', methods=['POST'])
+def ai_task():
+    if not state.agent:
+        return jsonify({'status': 'error', 'error': 'AI Agent not initialized'})
+    data = request.json
+    task = data.get('task', '')
+    if task:
+        state.agent.set_task(task)
+        state.add_ai_log(f"New Task: {task}")
+    return jsonify({'status': 'ok'})
+
+@bp.route('/ai/status')
+def ai_status():
+    return jsonify({
+        'enabled': state.ai_enabled,
+        'status': state.ai_status,
+        'logs': state.ai_logs
+    })
+
+@bp.route('/emergency_stop', methods=['POST'])
+def emergency_stop():
+    state.ai_enabled = False
+    state.stop_all_movement()
+    if state.robot_system:
+        state.robot_system.emergency_stop()
+    state.add_ai_log("EMERGENCY STOP TRIGGERED")
+    return jsonify({'status': 'ok'})
+
+@bp.route('/ai')
+def ai_page():
+    return render_template('ai_control.html')

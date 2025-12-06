@@ -40,6 +40,13 @@ class RobotState:
             'gripper': 90  # Open by default
         }
         self.gripper_closed = False
+        
+        # AI State
+        self.ai_enabled = False
+        self.ai_status = "Idle"
+        self.ai_logs = []
+        self.robot_system = None
+        self.agent = None
     
     def update_movement(self, data):
         """Update movement state from request data."""
@@ -90,6 +97,18 @@ class RobotState:
         """Get a copy of current arm positions."""
         with self.lock:
             return self.arm_positions.copy()
+
+    def add_ai_log(self, message: str):
+        """Add a log message to AI logs."""
+        with self.lock:
+            import datetime
+            timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+            self.ai_logs.append(f"[{timestamp}] {message}")
+            # Keep last 100 logs
+            if len(self.ai_logs) > 100:
+                self.ai_logs.pop(0)
+            self.ai_status = message  # Update status to latest log
+
 
 
 # Global state instance

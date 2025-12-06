@@ -1,101 +1,111 @@
-"""RoboCrew Web Control"""
+"""RoboCrew Web Control & AI Agent"""
 
 import signal
 import sys
 import threading
+import time
 import os
+import logging
 
-# Add local RoboCrew source to path (use local instead of pip-installed module)
+# Add local RoboCrew source to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'RoboCrew', 'src'))
 
 from flask import Flask
 
-from config import WEB_PORT, WHEEL_USB, HEAD_USB
+from config import WEB_PORT
 from state import state
-from camera import init_camera, release_camera
 from movement import movement_loop, stop_movement
-from arm import arm_controller
 from routes import bp
-from robocrew.robots.XLeRobot.servo_controls import ServoControler
 
+from robocrew.core.robot_system import RobotSystem
+from robocrew.core.navigation_agent import NavigationAgent
+from robocrew.robots.XLeRobot.tools import (
+    create_move_forward, 
+    create_move_backward, 
+    create_turn_left, 
+    create_turn_right, 
+    create_look_around
+)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def create_app():
     app = Flask(__name__)
     app.register_blueprint(bp)
     return app
 
-
-def init_controller():
-    print(f"🔧 Connecting servos ({WHEEL_USB}, {HEAD_USB})...", end=" ", flush=True)
-    
-    try:
-        state.controller = ServoControler(
-            WHEEL_USB, 
-            HEAD_USB,
-            enable_arm=True,
-        )
-        print("✓")
-        
-        if state.controller.arm_enabled:
-            print("🦾 Arm connected ✓")
-            state.arm_connected = True
+def agent_loop():
+    """Background thread for AI Agent."""
+    logger.info("AI Agent loop started")
+    while state.running:
+        if state.ai_enabled and state.agent:
             try:
-                pos = state.controller.get_arm_position()
-                state.update_arm_positions(pos)
-                arm_controller.set_from_current(pos)
+                status = state.agent.step()
+                state.add_ai_log(status)
             except Exception as e:
-                print(f"⚠ Could not read arm: {e}")
-        
-        print("📡 Reading head position...", end=" ", flush=True)
-        try:
-            pos = state.controller.get_head_position()
-            state.head_yaw = round(pos.get(7, 0), 1)
-            state.head_pitch = round(pos.get(8, 0), 1)
-            print(f"✓ (Yaw: {state.head_yaw}°, Pitch: {state.head_pitch}°)")
-        except Exception as e:
-            print(f"⚠ {e}")
-            state.head_yaw = 0
-            state.head_pitch = 35
-        
-        return True
-    except Exception as e:
-        print(f"✗ Failed: {e}")
-        state.controller = None
-        state.last_error = str(e)
-        return False
-
+                logger.error(f"Agent step error: {e}")
+                state.add_ai_log(f"Error: {e}")
+                state.ai_enabled = False # Safety disable
+        time.sleep(0.1)
 
 def cleanup(signum=None, frame=None):
     print("\n🛑 Shutting down...")
     state.running = False
     
-    if state.controller:
-        try:
-            stop_movement()
-            state.controller.disconnect()
-            print("✓ Disconnected")
-        except Exception as e:
-            print(f"✗ {e}")
+    if state.robot_system:
+        state.robot_system.cleanup()
     
-    release_camera()
     sys.exit(0)
-
 
 def main():
     print("=" * 50)
-    print("🤖 RoboCrew Web Control")
+    print("🤖 RoboCrew System Starting")
     print("=" * 50)
     
     signal.signal(signal.SIGINT, cleanup)
     signal.signal(signal.SIGTERM, cleanup)
     
-    init_camera()
-    init_controller()
+    # 1. Initialize Robot System
+    print("🔧 Initializing Robot System...")
+    robot = RobotSystem()
+    state.robot_system = robot
     
-    print("🔄 Starting movement thread...", end=" ", flush=True)
+    # 2. Initialize AI Agent
+    if robot.controller:
+        print("🧠 Initializing AI Agent...")
+        tools = [
+            create_move_forward(robot.controller),
+            create_move_backward(robot.controller),
+            create_turn_left(robot.controller),
+            create_turn_right(robot.controller),
+            create_look_around(robot.controller, robot.camera)
+        ]
+        
+        # Use a good model for navigation
+        model_name = "gemini-2.0-flash-exp" 
+        
+        try:
+            agent = NavigationAgent(robot, model_name, tools)
+            state.agent = agent
+            print("✓ AI Agent ready")
+        except Exception as e:
+            print(f"⚠ AI Agent init failed: {e}")
+    else:
+        print("⚠ Robot controller not ready, AI disabled")
+
+    # 3. Start Threads
+    print("🔄 Starting background threads...", end=" ", flush=True)
+    
+    # Movement thread (manual control)
     threading.Thread(target=movement_loop, daemon=True).start()
+    
+    # AI Agent thread
+    threading.Thread(target=agent_loop, daemon=True).start()
     print("✓")
     
+    # 4. Start Web Server
     app = create_app()
     
     print()
@@ -107,7 +117,6 @@ def main():
         app.run(host='0.0.0.0', port=WEB_PORT, threaded=True, use_reloader=False, debug=False)
     except KeyboardInterrupt:
         cleanup()
-
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RoboCrew AI Agent</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        .ai-container {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 20px;
+            padding: 20px;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .video-section {
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .video-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .controls-section {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .log-window {
+            flex-grow: 1;
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #0f0;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            border-bottom: 1px solid #111;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: #222;
+            border-radius: 8px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #555;
+        }
+
+        .status-dot.active {
+            background: #0f0;
+            box-shadow: 0 0 10px #0f0;
+        }
+
+        .status-dot.error {
+            background: #f00;
+            box-shadow: 0 0 10px #f00;
+        }
+
+        .task-input {
+            width: 100%;
+            padding: 10px;
+            background: #333;
+            border: 1px solid #444;
+            color: #fff;
+            border-radius: 6px;
+        }
+
+        .btn {
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .btn-start {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-start:hover {
+            background: #218838;
+        }
+
+        .btn-stop {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-stop:hover {
+            background: #c82333;
+        }
+
+        .btn-estop {
+            background: #ff0000;
+            color: white;
+            font-size: 1.2em;
+            padding: 20px;
+            margin-top: auto;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(255, 0, 0, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 0, 0, 0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="ai-container">
+        <div class="video-section">
+            <img src="/video_feed" class="video-feed" alt="Robot View">
+            <div
+                style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 4px;">
+                <a href="/" style="color: white; text-decoration: none;">← Back to Manual</a>
+            </div>
+        </div>
+
+        <div class="controls-section">
+            <h2>🤖 AI Agent</h2>
+
+            <div class="status-indicator">
+                <div id="ai-status-dot" class="status-dot"></div>
+                <span id="ai-status-text">Idle</span>
+            </div>
+
+            <textarea id="task-input" class="task-input" rows="3" placeholder="Enter task for robot..."></textarea>
+            <button onclick="setTask()" class="btn" style="background: #444; color: white;">Set Task</button>
+
+            <div style="display: flex; gap: 10px;">
+                <button onclick="startAI()" class="btn btn-start" style="flex: 1;">Start AI</button>
+                <button onclick="stopAI()" class="btn btn-stop" style="flex: 1;">Pause AI</button>
+            </div>
+
+            <div class="log-window" id="log-window">
+                <!-- Logs will appear here -->
+            </div>
+
+            <button onclick="emergencyStop()" class="btn btn-estop">EMERGENCY STOP</button>
+        </div>
+    </div>
+
+    <script>
+        function updateStatus() {
+            fetch('/ai/status')
+                .then(r => r.json())
+    .then(data => {
+                t dot = document.getElementById('ai-status-dot');
+                    const text = document.getElementById('ai-status-text');
+                    const logs = document.getElementById('log-window');
+                    
+                    if (data.enabled) {
+                        dot.className = 'status-dot active';
+                        text.textContent = "Running: " + data.status          } else {
+                        dot.className = 'status-dot';
+                        text.textContent = "Stopped: " + data.status;
+                    }
+                    
+        // Update logs
+                    logs.innerHTML = data.logs.map(l => `<div class="log-entry">${l}</div>`).join('');
+                    logs.scrollTop = logs.scrollHeight;
+                });
+        }
+        
+        function startAI() {
+            fetch('/ai/start', {method: 'POST'});
+        }
+        
+        function stopAI() {
+            fetch('/ai/stop', {method: 'POST'});
+        }
+        
+        function setTask() {
+            const task = document.getElementById('task-input').value;
+            fetch('/ai/task', {
+                method              headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({task: task})
+            });
+        }
+        
+        function emergencyStop() {
+            fetch('/emergency_stop', {method: 'POST'});
+            alert("EMERGENCY STOP TRIGGERED");
+        }
+        
+        // Poll s500ms
+        setInterval(updateStatus, 500);
+    </script>
+</body>
+
+</html>
