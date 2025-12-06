@@ -5,9 +5,6 @@ CAMERA_PORT = "/dev/video0"
 WHEEL_USB = "/dev/robot_acm0"
 HEAD_USB = "/dev/robot_acm1"
 
-# Arm calibration
-ARM_CALIBRATION_PATH = "RoboCrew/calibrations/robot_arms.json"
-
 # Web server
 WEB_PORT = 5000
 

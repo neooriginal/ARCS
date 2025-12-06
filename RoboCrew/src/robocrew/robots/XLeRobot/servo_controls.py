@@ -46,6 +46,9 @@ ARM_LIMITS = {
 class ServoControler:
     """Controller for wheels (7-9), head (7-8), and arm (1-6)."""
 
+    # Default lerobot calibration directory
+    LEROBOT_CALIBRATION_DIR = Path.home() / ".cache" / "huggingface" / "lerobot" / "calibration" / "robots"
+
     def __init__(
         self,
         right_arm_wheel_usb: str = None,
@@ -54,7 +57,7 @@ class ServoControler:
         speed: int = DEFAULT_SPEED,
         action_map: Optional[Mapping[str, Mapping[int, int]]] = None,
         enable_arm: bool = False,
-        arm_calibration_path: str = None,
+        arm_calibration_id: str = "xlerobot_arm",
     ) -> None:
         self.right_arm_wheel_usb = right_arm_wheel_usb
         self.left_arm_head_usb = left_arm_head_usb
@@ -79,15 +82,22 @@ class ServoControler:
             calibration = None
             arm_ready = False
             
-            if enable_arm and arm_calibration_path:
-                cal_path = Path(arm_calibration_path)
+            if enable_arm:
+                # Try to load calibration from lerobot's cache directory
+                # lerobot-calibrate saves to: ~/.cache/.../robots/so101_follower/{robot_id}.json
+                cal_path = self.LEROBOT_CALIBRATION_DIR / "so101_follower" / f"{arm_calibration_id}.json"
+                
                 if cal_path.exists():
                     try:
                         with open(cal_path) as f:
                             cal_data = json.load(f)
+                        
                         arm_calibration = {}
-                        for joint_name, cal in cal_data.items():
-                            motor_id = cal["id"]
+                        # lerobot calibration format: {motor_name: {id, drive_mode, homing_offset, range_min, range_max}}
+                        for motor_name, cal in cal_data.items():
+                            motor_id = cal.get("id") or cal.get("motor_id")
+                            if motor_id is None:
+                                continue
                             arm_calibration[motor_id] = MotorCalibration(
                                 id=motor_id,
                                 drive_mode=cal.get("drive_mode", 0),
@@ -96,15 +106,17 @@ class ServoControler:
                                 range_max=cal.get("range_max", 4095),
                             )
                         
-                        for joint_name, motor_id in ARM_SERVO_MAP.items():
-                            motors[motor_id] = Motor(motor_id, "sts3215", MotorNormMode.DEGREES)
-                        calibration = arm_calibration
-                        arm_ready = True
-                        print(f"[ARM] Loaded calibration for {len(arm_calibration)} motors")
+                        if arm_calibration:
+                            for motor_id in arm_calibration:
+                                motors[motor_id] = Motor(motor_id, "sts3215", MotorNormMode.DEGREES)
+                            calibration = arm_calibration
+                            arm_ready = True
+                            print(f"[ARM] Loaded calibration from {cal_path} ({len(arm_calibration)} motors)")
                     except Exception as e:
                         print(f"[ARM] Failed to load calibration: {e}")
                 else:
-                    print(f"[ARM] Calibration not found: {cal_path}")
+                    print(f"[ARM] No calibration found at {cal_path}")
+                    print(f"[ARM] Run: lerobot-calibrate --robot.type=so101_follower --robot.port={right_arm_wheel_usb} --robot.id={arm_calibration_id}")
             
             self.wheel_bus = FeetechMotorsBus(
                 port=right_arm_wheel_usb,

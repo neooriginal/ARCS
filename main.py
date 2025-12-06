@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'RoboCrew', 'src'))
 
 from flask import Flask
 
-from config import WEB_PORT, WHEEL_USB, HEAD_USB, ARM_CALIBRATION_PATH
+from config import WEB_PORT, WHEEL_USB, HEAD_USB
 from state import state
 from camera import init_camera, release_camera
 from movement import movement_loop, stop_movement
@@ -28,14 +28,11 @@ def create_app():
 def init_controller():
     print(f"🔧 Connecting servos ({WHEEL_USB}, {HEAD_USB})...", end=" ", flush=True)
     
-    cal_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ARM_CALIBRATION_PATH))
-    
     try:
         state.controller = ServoControler(
             WHEEL_USB, 
             HEAD_USB,
             enable_arm=True,
-            arm_calibration_path=cal_path
         )
         print("✓")
         
