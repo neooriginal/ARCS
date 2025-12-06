@@ -5,6 +5,9 @@ import sys
 import threading
 import os
 
+# Add local RoboCrew source to path (use local instead of pip-installed module)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'RoboCrew', 'src'))
+
 from flask import Flask
 
 from config import WEB_PORT, WHEEL_USB, HEAD_USB, ARM_CALIBRATION_PATH
