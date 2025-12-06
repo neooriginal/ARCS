@@ -10,19 +10,22 @@ from robocrew.core.utils import capture_image
 import time
 import threading
 
+from state import state as robot_state
 
 def create_move_forward(servo_controller):
     @tool
     def move_forward(distance_meters: float) -> str:
-        """Drives the robot forward (or backward) for a specific distance."""
+        """Drives the robot forward for a specific distance."""
         distance = float(distance_meters)
-        print(f"[TOOL] move_forward({distance}) - calling servo_controller")
-        if distance >= 0:
-            result = servo_controller.go_forward(distance)
-        else:
-            result = servo_controller.go_backward(-distance)
-        print(f"[TOOL] move_forward result: {result}")
-        return f"Moved {'forward' if distance >= 0 else 'backward'} {abs(distance):.2f} meters."
+        duration = abs(distance) / 0.15  # Approx speed in m/s
+        print(f"[TOOL] move_forward({distance}) for {duration:.1f}s")
+        
+        # Use the same mechanism as manual control
+        robot_state.movement = {'forward': True, 'backward': False, 'left': False, 'right': False}
+        time.sleep(duration)
+        robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
+        
+        return f"Moved forward {distance:.2f} meters."
 
     return move_forward
 
@@ -31,9 +34,13 @@ def create_move_backward(servo_controller):
     def move_backward(distance_meters: float) -> str:
         """Drives the robot backward for a specific distance."""
         distance = float(distance_meters)
-        print(f"[TOOL] move_backward({distance}) - calling servo_controller")
-        result = servo_controller.go_backward(distance)
-        print(f"[TOOL] move_backward result: {result}")
+        duration = abs(distance) / 0.15
+        print(f"[TOOL] move_backward({distance}) for {duration:.1f}s")
+        
+        robot_state.movement = {'forward': False, 'backward': True, 'left': False, 'right': False}
+        time.sleep(duration)
+        robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
+        
         return f"Moved backward {distance:.2f} meters."
 
     return move_backward
@@ -44,10 +51,13 @@ def create_turn_right(servo_controller):
     def turn_right(angle_degrees: float) -> str:
         """Turns the robot right by angle in degrees."""
         angle = float(angle_degrees)
-        print(f"[TOOL] turn_right({angle}) - calling servo_controller")
-        result = servo_controller.turn_right(angle)
-        print(f"[TOOL] turn_right result: {result}")
-        time.sleep(0.4)
+        duration = abs(angle) / 60  # Approx 60 deg/s
+        print(f"[TOOL] turn_right({angle}) for {duration:.1f}s")
+        
+        robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': True}
+        time.sleep(duration)
+        robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
+        
         return f"Turned right by {angle} degrees."
 
     return turn_right
@@ -58,10 +68,13 @@ def create_turn_left(servo_controller):
     def turn_left(angle_degrees: float) -> str:
         """Turns the robot left by angle in degrees."""
         angle = float(angle_degrees)
-        print(f"[TOOL] turn_left({angle}) - calling servo_controller")
-        result = servo_controller.turn_left(angle)
-        print(f"[TOOL] turn_left result: {result}")
-        time.sleep(0.4)
+        duration = abs(angle) / 60
+        print(f"[TOOL] turn_left({angle}) for {duration:.1f}s")
+        
+        robot_state.movement = {'forward': False, 'backward': False, 'left': True, 'right': False}
+        time.sleep(duration)
+        robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
+        
         return f"Turned left by {angle} degrees."
 
     return turn_left
