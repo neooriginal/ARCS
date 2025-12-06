@@ -333,6 +333,25 @@ def generate_cv_frames():
             task_text = state.ai_status[:40] if len(state.ai_status) > 40 else state.ai_status
             cv2.putText(overlay, task_text, (10, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
             
+            # Draw navigation arrows (left/right/forward)
+            arrow_color = (255, 255, 255)
+            center_x, center_y = w // 2, h // 2
+            
+            # Left arrow
+            pts_left = np.array([[30, center_y], [60, center_y - 20], [60, center_y + 20]], np.int32)
+            cv2.polylines(overlay, [pts_left], True, arrow_color, 2)
+            cv2.putText(overlay, "L", (35, center_y + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, arrow_color, 1)
+            
+            # Right arrow  
+            pts_right = np.array([[w - 30, center_y], [w - 60, center_y - 20], [w - 60, center_y + 20]], np.int32)
+            cv2.polylines(overlay, [pts_right], True, arrow_color, 2)
+            cv2.putText(overlay, "R", (w - 50, center_y + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, arrow_color, 1)
+            
+            # Forward arrow (top center)
+            pts_fwd = np.array([[center_x, 80], [center_x - 15, 110], [center_x + 15, 110]], np.int32)
+            cv2.polylines(overlay, [pts_fwd], True, arrow_color, 2)
+            cv2.putText(overlay, "FWD", (center_x - 15, 125), cv2.FONT_HERSHEY_SIMPLEX, 0.4, arrow_color, 1)
+            
             _, buffer = cv2.imencode('.jpg', overlay, [cv2.IMWRITE_JPEG_QUALITY, 70])
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')

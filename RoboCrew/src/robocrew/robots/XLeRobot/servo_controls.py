@@ -229,8 +229,14 @@ class ServoControler:
     # Arm control
 
     def _apply_arm_modes(self) -> None:
+        # Disable torque before changing modes
+        for motor_id in self._arm_ids:
+            self.wheel_bus.write("Torque_Enable", motor_id, 0)
+        # Set arm to position mode
         for motor_id in self._arm_ids:
             self.wheel_bus.write("Operating_Mode", motor_id, OperatingMode.POSITION.value)
+        # Re-enable torque for all motors on the bus
+        self.wheel_bus.enable_torque()
 
     def get_arm_position(self) -> Dict[str, float]:
         if not self._arm_enabled:
