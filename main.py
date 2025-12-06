@@ -101,7 +101,7 @@ def main():
             create_end_task()
         ]
 
-        model_name = os.getenv("AI_MODEL", "openai/gpt-5.1") 
+        model_name = os.getenv("AI_MODEL", "openai/gpt-5") 
         
         try:
             agent = NavigationAgent(robot, model_name, tools)

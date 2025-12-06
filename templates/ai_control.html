@@ -179,6 +179,8 @@
     </div>
 
     <script>
+        console.log('AI Control Script Loaded');
+
         function updateStatus() {
             fetch('/ai/status')
                 .then(function (r) { return r.json(); })
@@ -201,27 +203,36 @@
                     }
                     logs.innerHTML = html;
                     logs.scrollTop = logs.scrollHeight;
-                });
+                })
+                .catch(function (e) { console.error('Status error:', e); });
         }
 
         document.getElementById('btn-start').addEventListener('click', function () {
-            fetch('/ai/start', { method: 'POST' });
+            console.log('Start AI clicked');
+            fetch('/ai/start', { method: 'POST' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) { console.log('Start resp:', d); });
         });
 
         document.getElementById('btn-stop').addEventListener('click', function () {
+            console.log('Stop AI clicked');
             fetch('/ai/stop', { method: 'POST' });
         });
 
         document.getElementById('btn-set-task').addEventListener('click', function () {
             var task = document.getElementById('task-input').value;
+            console.log('Set Task clicked:', task);
             fetch('/ai/task', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ task: task })
-            });
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (d) { console.log('Task resp:', d); });
         });
 
         document.getElementById('btn-estop').addEventListener('click', function () {
+            console.log('ESTOP clicked');
             fetch('/emergency_stop', { method: 'POST' });
             alert('EMERGENCY STOP TRIGGERED');
         });
