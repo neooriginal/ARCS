@@ -30,9 +30,12 @@ from robocrew.robots.XLeRobot.tools import (
     create_look_around
 )
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure logging - reduce verbosity
+logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.getLogger('werkzeug').setLevel(logging.ERROR)
+logging.getLogger('urllib3').setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 def create_app():
     app = Flask(__name__)
@@ -86,8 +89,9 @@ def main():
             create_look_around(robot.controller, robot.camera)
         ]
         
-        # Use Gemini 2.5 Flash for navigation (requires GOOGLE_API_KEY in .env)
-        model_name = os.getenv("AI_MODEL", "google_genai/gemini-2.5-flash-preview") 
+        # Use Gemini 2.0 Flash for navigation (requires GOOGLE_API_KEY in .env)
+        # Available models: gemini-2.0-flash, gemini-1.5-pro, gemini-1.5-flash
+        model_name = os.getenv("AI_MODEL", "google_genai/gemini-2.0-flash") 
         
         try:
             agent = NavigationAgent(robot, model_name, tools)
