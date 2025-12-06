@@ -3,9 +3,13 @@ import base64
 import numpy as np
 import logging
 import time
+import os
 from typing import List, Optional, Dict, Any
+from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain.chat_models import init_chat_model
+
+load_dotenv()
 
 from robocrew.core.robot_system import RobotSystem
 from robocrew.core.utils import capture_image

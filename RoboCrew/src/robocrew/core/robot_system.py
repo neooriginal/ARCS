@@ -37,9 +37,11 @@ class RobotSystem:
                 self.camera = None
             else:
                 logger.info(f"Camera initialized on {CAMERA_PORT}")
+            state.camera = self.camera
         except Exception as e:
             logger.error(f"Camera init error: {e}")
             self.camera = None
+            state.camera = None
 
     def _init_servos(self):
         """Initialize servo controller."""

@@ -91,6 +91,7 @@
             border: 1px solid #444;
             color: #fff;
             border-radius: 6px;
+            box-sizing: border-box;
         }
 
         .btn {
@@ -164,66 +165,69 @@
             </div>
 
             <textarea id="task-input" class="task-input" rows="3" placeholder="Enter task for robot..."></textarea>
-            <button onclick="setTask()" class="btn" style="background: #444; color: white;">Set Task</button>
+            <button id="btn-set-task" class="btn" style="background: #444; color: white;">Set Task</button>
 
             <div style="display: flex; gap: 10px;">
-                <button onclick="startAI()" class="btn btn-start" style="flex: 1;">Start AI</button>
-                <button onclick="stopAI()" class="btn btn-stop" style="flex: 1;">Pause AI</button>
+                <button id="btn-start" class="btn btn-start" style="flex: 1;">Start AI</button>
+                <button id="btn-stop" class="btn btn-stop" style="flex: 1;">Pause AI</button>
             </div>
 
-            <div class="log-window" id="log-window">
-                <!-- Logs will appear here -->
-            </div>
+            <div class="log-window" id="log-window"></div>
 
-            <button onclick="emergencyStop()" class="btn btn-estop">EMERGENCY STOP</button>
+            <button id="btn-estop" class="btn btn-estop">EMERGENCY STOP</button>
         </div>
     </div>
 
     <script>
         function updateStatus() {
             fetch('/ai/status')
-                .then(r => r.json())
-    .then(data => {
-                t dot = document.getElementById('ai-status-dot');
-                    const text = document.getElementById('ai-status-text');
-                    const logs = document.getElementById('log-window');
-                    
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    var dot = document.getElementById('ai-status-dot');
+                    var text = document.getElementById('ai-status-text');
+                    var logs = document.getElementById('log-window');
+
                     if (data.enabled) {
                         dot.className = 'status-dot active';
-                        text.textContent = "Running: " + data.status          } else {
+                        text.textContent = 'Running: ' + data.status;
+                    } else {
                         dot.className = 'status-dot';
-                        text.textContent = "Stopped: " + data.status;
+                        text.textContent = 'Stopped: ' + data.status;
                     }
-                    
-        // Update logs
-                    logs.innerHTML = data.logs.map(l => `<div class="log-entry">${l}</div>`).join('');
+
+                    var html = '';
+                    for (var i = 0; i < data.logs.length; i++) {
+                        html += '<div class="log-entry">' + data.logs[i] + '</div>';
+                    }
+                    logs.innerHTML = html;
                     logs.scrollTop = logs.scrollHeight;
                 });
         }
-        
-        function startAI() {
-            fetch('/ai/start', {method: 'POST'});
-        }
-        
-        function stopAI() {
-            fetch('/ai/stop', {method: 'POST'});
-        }
-        
-        function setTask() {
-            const task = document.getElementById('task-input').value;
+
+        document.getElementById('btn-start').addEventListener('click', function () {
+            fetch('/ai/start', { method: 'POST' });
+        });
+
+        document.getElementById('btn-stop').addEventListener('click', function () {
+            fetch('/ai/stop', { method: 'POST' });
+        });
+
+        document.getElementById('btn-set-task').addEventListener('click', function () {
+            var task = document.getElementById('task-input').value;
             fetch('/ai/task', {
-                method              headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({task: task})
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ task: task })
             });
-        }
-        
-        function emergencyStop() {
-            fetch('/emergency_stop', {method: 'POST'});
-            alert("EMERGENCY STOP TRIGGERED");
-        }
-        
-        // Poll s500ms
+        });
+
+        document.getElementById('btn-estop').addEventListener('click', function () {
+            fetch('/emergency_stop', { method: 'POST' });
+            alert('EMERGENCY STOP TRIGGERED');
+        });
+
         setInterval(updateStatus, 500);
+        updateStatus();
     </script>
 </body>
 

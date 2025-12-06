@@ -6,6 +6,9 @@ import threading
 import time
 import os
 import logging
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Add local RoboCrew source to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'RoboCrew', 'src'))
@@ -83,8 +86,8 @@ def main():
             create_look_around(robot.controller, robot.camera)
         ]
         
-        # Use a good model for navigation
-        model_name = "gemini-2.0-flash-exp" 
+        # Use Gemini 2.5 Flash for navigation (requires GOOGLE_API_KEY in .env)
+        model_name = os.getenv("AI_MODEL", "google_genai/gemini-3-pro-preview") 
         
         try:
             agent = NavigationAgent(robot, model_name, tools)
