@@ -87,7 +87,7 @@ def main():
         ]
         
         # Use Gemini 2.5 Flash for navigation (requires GOOGLE_API_KEY in .env)
-        model_name = os.getenv("AI_MODEL", "google_genai/gemini-3-pro-preview") 
+        model_name = os.getenv("AI_MODEL", "google_genai/gemini-2.5-flash-preview") 
         
         try:
             agent = NavigationAgent(robot, model_name, tools)
