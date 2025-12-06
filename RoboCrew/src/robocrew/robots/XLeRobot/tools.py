@@ -24,19 +24,34 @@ def create_end_task():
         return f"Task ended. Reason: {reason}. AI has been paused."
     return end_task
 
+
+def _interruptible_sleep(duration: float, check_interval: float = 0.1):
+    """Sleep that can be interrupted by emergency stop."""
+    elapsed = 0
+    while elapsed < duration:
+        if not robot_state.ai_enabled:
+            # Emergency stop - clear movement and exit
+            robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
+            return False
+        time.sleep(min(check_interval, duration - elapsed))
+        elapsed += check_interval
+    return True
+
+
 def create_move_forward(servo_controller):
     @tool
     def move_forward(distance_meters: float) -> str:
         """Drives the robot forward for a specific distance."""
         distance = float(distance_meters)
-        duration = abs(distance) / 0.15  # Approx speed in m/s
+        duration = abs(distance) / 0.15
         print(f"[TOOL] move_forward({distance}) for {duration:.1f}s")
         
-        # Use the same mechanism as manual control
         robot_state.movement = {'forward': True, 'backward': False, 'left': False, 'right': False}
-        time.sleep(duration)
+        completed = _interruptible_sleep(duration)
         robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
         
+        if not completed:
+            return "EMERGENCY STOP - Movement cancelled."
         return f"Moved forward {distance:.2f} meters."
 
     return move_forward
@@ -50,9 +65,11 @@ def create_move_backward(servo_controller):
         print(f"[TOOL] move_backward({distance}) for {duration:.1f}s")
         
         robot_state.movement = {'forward': False, 'backward': True, 'left': False, 'right': False}
-        time.sleep(duration)
+        completed = _interruptible_sleep(duration)
         robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
         
+        if not completed:
+            return "EMERGENCY STOP - Movement cancelled."
         return f"Moved backward {distance:.2f} meters."
 
     return move_backward
@@ -63,13 +80,15 @@ def create_turn_right(servo_controller):
     def turn_right(angle_degrees: float) -> str:
         """Turns the robot right by angle in degrees."""
         angle = float(angle_degrees)
-        duration = abs(angle) / 60  # Approx 60 deg/s
+        duration = abs(angle) / 60
         print(f"[TOOL] turn_right({angle}) for {duration:.1f}s")
         
         robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': True}
-        time.sleep(duration)
+        completed = _interruptible_sleep(duration)
         robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
         
+        if not completed:
+            return "EMERGENCY STOP - Movement cancelled."
         return f"Turned right by {angle} degrees."
 
     return turn_right
@@ -84,9 +103,11 @@ def create_turn_left(servo_controller):
         print(f"[TOOL] turn_left({angle}) for {duration:.1f}s")
         
         robot_state.movement = {'forward': False, 'backward': False, 'left': True, 'right': False}
-        time.sleep(duration)
+        completed = _interruptible_sleep(duration)
         robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
         
+        if not completed:
+            return "EMERGENCY STOP - Movement cancelled."
         return f"Turned left by {angle} degrees."
 
     return turn_left
