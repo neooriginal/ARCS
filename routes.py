@@ -65,11 +65,15 @@ def set_head():
     pitch = float(data.get('pitch', state.head_pitch))
     
     try:
-        state.controller.turn_head_yaw(yaw)
-        state.controller.turn_head_pitch(pitch)
-        state.head_yaw = yaw
-        state.head_pitch = pitch
-        return jsonify({'status': 'ok', 'yaw': yaw, 'pitch': pitch})
+        # Controller clamps values to safe limits and returns actual position
+        yaw_result = state.controller.turn_head_yaw(yaw)
+        pitch_result = state.controller.turn_head_pitch(pitch)
+        # Use the actual clamped values
+        actual_yaw = list(yaw_result.values())[0] if yaw_result else yaw
+        actual_pitch = list(pitch_result.values())[0] if pitch_result else pitch
+        state.head_yaw = actual_yaw
+        state.head_pitch = actual_pitch
+        return jsonify({'status': 'ok', 'yaw': actual_yaw, 'pitch': actual_pitch})
     except Exception as e:
         state.last_error = str(e)
         return jsonify({'status': 'error', 'error': str(e)})
@@ -298,30 +302,54 @@ def generate_cv_frames():
                 time.sleep(0.02)
                 continue
             
-            # CV Processing - show what AI safety check sees
+            # CV Processing - improved obstacle detection
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             h, w = gray.shape
             
-            # Highlight bottom area (safety zone)
-            bottom_area = gray[int(h*0.7):, :]
-            variance = np.var(bottom_area)
+            # Analyze center region for obstacles
+            center_region = gray[int(h*0.3):int(h*0.8), int(w*0.3):int(w*0.7)]
+            left_region = gray[int(h*0.3):int(h*0.8), :int(w*0.3)]
+            right_region = gray[int(h*0.3):int(h*0.8), int(w*0.7):]
             
-            # Draw safety zone overlay
+            # Edge detection for wall detection
+            edges_center = cv2.Canny(center_region, 50, 150)
+            edges_left = cv2.Canny(left_region, 50, 150)
+            edges_right = cv2.Canny(right_region, 50, 150)
+            
+            edge_count_center = np.sum(edges_center > 0)
+            edge_count_left = np.sum(edges_left > 0)
+            edge_count_right = np.sum(edges_right > 0)
+            
+            # Determine status based on edge density
             overlay = frame.copy()
-            cv2.rectangle(overlay, (0, int(h*0.7)), (w, h), (0, 255, 255), 2)
             
-            # Safety status indicator (for human reference only - unreliable)
-            if variance < 50:
-                status_color = (0, 0, 255)  # Red
-                status_text = f"CV: {variance:.0f} (unreliable)"
-            elif variance < 200:
-                status_color = (0, 165, 255)  # Orange
-                status_text = f"CV: {variance:.0f} (unreliable)"
+            # Draw detection zones
+            cv2.rectangle(overlay, (int(w*0.3), int(h*0.3)), (int(w*0.7), int(h*0.8)), (255, 255, 0), 1)  # Center zone
+            
+            # Calculate danger level
+            center_danger = edge_count_center > 3000
+            left_danger = edge_count_left > 2000
+            right_danger = edge_count_right > 2000
+            
+            status_parts = []
+            if center_danger:
+                status_parts.append("AHEAD")
+                cv2.rectangle(overlay, (int(w*0.3), int(h*0.3)), (int(w*0.7), int(h*0.8)), (0, 0, 255), 3)
+            if left_danger:
+                status_parts.append("LEFT")
+                cv2.rectangle(overlay, (0, int(h*0.3)), (int(w*0.3), int(h*0.8)), (0, 165, 255), 2)
+            if right_danger:
+                status_parts.append("RIGHT")
+                cv2.rectangle(overlay, (int(w*0.7), int(h*0.3)), (w, int(h*0.8)), (0, 165, 255), 2)
+            
+            if status_parts:
+                status_color = (0, 0, 255) if center_danger else (0, 165, 255)
+                status_text = "OBSTACLE: " + ", ".join(status_parts)
             else:
-                status_color = (128, 128, 128)  # Gray - don't show green as it misleads
-                status_text = f"CV: {variance:.0f} (unreliable)"
+                status_color = (0, 255, 0)
+                status_text = "Path looks clear"
             
-            cv2.putText(overlay, status_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, status_color, 1)
+            cv2.putText(overlay, status_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, status_color, 2)
             
             # Add AI status
             if state.ai_enabled:
