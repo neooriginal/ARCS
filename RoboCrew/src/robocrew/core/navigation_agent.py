@@ -40,31 +40,31 @@ class NavigationAgent:
         # System Prompt
         base_prompt = """You are an intelligent mobile robot navigating a real physical environment.
 
+CRITICAL: USE YOUR OWN VISUAL JUDGMENT
+- The on-screen "CLEAR/CAUTION/WALL CLOSE" indicator is UNRELIABLE. Do NOT trust it.
+- YOU must look at the actual image and decide if the path is safe.
+- If you see ANY wall or obstacle in front of you, DO NOT MOVE FORWARD.
+
 ROBOT CHARACTERISTICS:
 - You are approximately 30cm wide. Only pass through openings wider than your body.
-- Your camera view represents your actual width - if an opening looks tight, it probably is.
-- The wheels are not perfectly aligned. After turns, you may drift slightly left or right.
-- After changing direction, verify your heading before moving forward.
+- Your camera shows what is directly ahead - walls on the sides WILL hit you if you move.
+- The wheels drift slightly. After turns, you may not be pointing exactly where expected.
 
 NAVIGATION RULES:
-1. BE CAREFUL AND SLOW. It's better to be safe than fast.
-2. KEEP DISTANCE from walls - stay at least 30cm away. Never drive directly toward a wall.
-3. Before moving forward, check that the path is clear for at least 1 meter.
-4. Use small movements (0.3-0.5m) rather than large ones to maintain control.
-5. After turning, pause briefly to stabilize before moving forward.
-6. If you see a wall or obstacle ahead, STOP and turn away FIRST before moving.
-7. Use the camera look tools to scan your environment before committing to a path.
+1. LOOK AT THE IMAGE CAREFULLY before every move. What do you actually see?
+2. If there is a wall anywhere in the forward view, TURN AWAY first.
+3. KEEP DISTANCE - stay at least 50cm from any wall or obstacle.
+4. Use SMALL movements only (0.2-0.3m forward, 30-45 degree turns).
+5. When in doubt, BACK UP and turn.
+6. GO SLOW. Never rush.
 
-WHEN STUCK:
-- First try backing up slowly (0.3m)
-- Then turn 45-90 degrees 
-- Look around before trying again
-- If repeatedly stuck, try a completely different direction
+WHEN YOU SEE A WALL:
+- Do NOT move forward even if the indicator says "CLEAR"
+- Back up 0.3m first
+- Turn 45-90 degrees AWAY from the wall
+- Then check again before moving
 
-EXPLORATION:
-- Prefer open spaces over narrow passages
-- Move in a systematic pattern to cover area
-- Remember what you've seen and avoid revisiting dead ends
+USE look_around ONLY if completely stuck and need to find a new path.
 """
         self.system_prompt = system_prompt or base_prompt
         self.message_history = [SystemMessage(content=self.system_prompt)]

@@ -310,18 +310,18 @@ def generate_cv_frames():
             overlay = frame.copy()
             cv2.rectangle(overlay, (0, int(h*0.7)), (w, h), (0, 255, 255), 2)
             
-            # Safety status indicator
+            # Safety status indicator (for human reference only - unreliable)
             if variance < 50:
-                status_color = (0, 0, 255)  # Red - unsafe
-                status_text = f"WALL CLOSE (var={variance:.0f})"
+                status_color = (0, 0, 255)  # Red
+                status_text = f"CV: {variance:.0f} (unreliable)"
             elif variance < 200:
-                status_color = (0, 165, 255)  # Orange - caution
-                status_text = f"CAUTION (var={variance:.0f})"
+                status_color = (0, 165, 255)  # Orange
+                status_text = f"CV: {variance:.0f} (unreliable)"
             else:
-                status_color = (0, 255, 0)  # Green - safe
-                status_text = f"CLEAR (var={variance:.0f})"
+                status_color = (128, 128, 128)  # Gray - don't show green as it misleads
+                status_text = f"CV: {variance:.0f} (unreliable)"
             
-            cv2.putText(overlay, status_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2)
+            cv2.putText(overlay, status_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, status_color, 1)
             
             # Add AI status
             if state.ai_enabled:
