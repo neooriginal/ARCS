@@ -47,6 +47,9 @@ class RobotState:
         self.ai_logs = []
         self.robot_system = None
         self.agent = None
+        
+        # Remote control tracking
+        self.last_remote_activity = 0  # timestamp of last remote input
     
     def update_movement(self, data):
         """Update movement state from request data."""

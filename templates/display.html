@@ -10,6 +10,12 @@
 
 <body>
     <div class="display-container" id="display-container">
+        <!-- Control Mode Badge -->
+        <div class="control-mode-badge" id="control-mode-badge">
+            <span class="mode-emoji" id="mode-emoji">😴</span>
+            <span class="mode-text" id="mode-text">Idle</span>
+        </div>
+
         <!-- Eyes Container -->
         <div class="eyes-container">
             <div class="eye left-eye" id="left-eye">
@@ -44,14 +50,24 @@
             <div class="task-display" id="task-display">Ready to help!</div>
         </div>
 
-        <!-- Touch Prompt (initial) -->
-        <div class="touch-prompt" id="touch-prompt">
-            <span>👆 Tap for fullscreen</span>
-        </div>
-
-        <!-- Connection indicator -->
-        <div class="connection-badge" id="connection-badge">
-            <div class="connection-dot"></div>
+        <!-- System Status Panel -->
+        <div class="system-status-panel" id="system-status-panel">
+            <div class="system-item" id="system-controller">
+                <div class="system-dot"></div>
+                <span class="system-label">Controller</span>
+            </div>
+            <div class="system-item" id="system-camera">
+                <div class="system-dot"></div>
+                <span class="system-label">Camera</span>
+            </div>
+            <div class="system-item" id="system-arm">
+                <div class="system-dot"></div>
+                <span class="system-label">Arm</span>
+            </div>
+            <div class="system-item" id="system-ai">
+                <div class="system-dot"></div>
+                <span class="system-label">AI</span>
+            </div>
         </div>
     </div>
 

@@ -12,11 +12,20 @@ class RoboDisplay {
         this.statusDot = document.getElementById('status-dot');
         this.statusLabel = document.getElementById('status-label');
         this.taskDisplay = document.getElementById('task-display');
-        this.touchPrompt = document.getElementById('touch-prompt');
-        this.connectionBadge = document.getElementById('connection-badge');
-        this.container = document.getElementById('display-container');
+
+        // Control mode elements
+        this.controlModeBadge = document.getElementById('control-mode-badge');
+        this.modeEmoji = document.getElementById('mode-emoji');
+        this.modeText = document.getElementById('mode-text');
+
+        // System status elements
+        this.systemController = document.getElementById('system-controller');
+        this.systemCamera = document.getElementById('system-camera');
+        this.systemArm = document.getElementById('system-arm');
+        this.systemAI = document.getElementById('system-ai');
 
         this.currentExpression = 'idle';
+        this.currentControlMode = 'idle';
         this.isBlinking = false;
         this.lookTarget = { x: 0, y: 0 };
         this.currentLook = { x: 0, y: 0 };
@@ -25,50 +34,24 @@ class RoboDisplay {
     }
 
     init() {
-        // Fullscreen on click/touch
-        this.container.addEventListener('click', () => this.toggleFullscreen());
-        this.container.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            this.toggleFullscreen();
-        });
-
         // Start animations
         this.startBlinkLoop();
         this.startLookAroundLoop();
         this.startStatusPolling();
         this.animate();
-
-        // Hide touch prompt after entering fullscreen
-        document.addEventListener('fullscreenchange', () => {
-            if (document.fullscreenElement) {
-                this.touchPrompt.classList.add('hidden');
-            }
-        });
-    }
-
-    toggleFullscreen() {
-        if (!document.fullscreenElement) {
-            this.container.requestFullscreen().catch(err => {
-                console.log('Fullscreen not available:', err);
-            });
-        } else {
-            document.exitFullscreen();
-        }
     }
 
     // Eye movement
     setLookTarget(x, y) {
-        // x, y should be in range -1 to 1
         this.lookTarget.x = Math.max(-1, Math.min(1, x));
         this.lookTarget.y = Math.max(-1, Math.min(1, y));
     }
 
     updateEyePosition() {
-        // Smooth interpolation
         this.currentLook.x += (this.lookTarget.x - this.currentLook.x) * 0.1;
         this.currentLook.y += (this.lookTarget.y - this.currentLook.y) * 0.1;
 
-        const maxOffset = 25; // pixels
+        const maxOffset = 25;
         const offsetX = this.currentLook.x * maxOffset;
         const offsetY = this.currentLook.y * maxOffset;
 
@@ -96,7 +79,6 @@ class RoboDisplay {
             if (this.currentExpression !== 'happy') {
                 this.blink();
             }
-            // Random interval between 2-6 seconds
             const nextBlink = 2000 + Math.random() * 4000;
             setTimeout(doBlink, nextBlink);
         };
@@ -107,12 +89,10 @@ class RoboDisplay {
     startLookAroundLoop() {
         const lookAround = () => {
             if (this.currentExpression === 'idle' || this.currentExpression === 'active') {
-                // Random look direction
                 const x = (Math.random() - 0.5) * 1.5;
                 const y = (Math.random() - 0.5) * 0.8;
                 this.setLookTarget(x, y);
             }
-            // Random interval between 1-4 seconds
             const nextLook = 1000 + Math.random() * 3000;
             setTimeout(lookAround, nextLook);
         };
@@ -123,14 +103,12 @@ class RoboDisplay {
     setExpression(expression) {
         if (this.currentExpression === expression) return;
 
-        // Remove old expression classes
         const expressions = ['happy', 'thinking', 'error'];
         expressions.forEach(exp => {
             this.leftEye.classList.remove(exp);
             this.rightEye.classList.remove(exp);
         });
 
-        // Apply new expression
         if (expressions.includes(expression)) {
             this.leftEye.classList.add(expression);
             this.rightEye.classList.add(expression);
@@ -138,13 +116,76 @@ class RoboDisplay {
 
         this.currentExpression = expression;
 
-        // Special behaviors for expressions
         if (expression === 'happy') {
-            // Look center when happy
             this.setLookTarget(0, 0);
         } else if (expression === 'thinking') {
-            // Look up when thinking
             this.setLookTarget(0.3, -0.5);
+        }
+    }
+
+    // Control mode update
+    updateControlMode(mode) {
+        if (this.currentControlMode === mode) return;
+        this.currentControlMode = mode;
+
+        // Remove old mode classes
+        this.controlModeBadge.classList.remove('idle', 'remote', 'ai');
+        this.controlModeBadge.classList.add(mode);
+
+        // Update emoji and text
+        switch (mode) {
+            case 'remote':
+                this.modeEmoji.textContent = '🎮';
+                this.modeText.textContent = 'Remote Control';
+                break;
+            case 'ai':
+                this.modeEmoji.textContent = '🤖';
+                this.modeText.textContent = 'AI Driving';
+                break;
+            case 'idle':
+            default:
+                this.modeEmoji.textContent = '😴';
+                this.modeText.textContent = 'Idle';
+                break;
+        }
+    }
+
+    // Update system status indicators
+    updateSystemStatus(data) {
+        // Controller
+        if (data.controller_connected) {
+            this.systemController.classList.add('operational');
+            this.systemController.classList.remove('offline');
+        } else {
+            this.systemController.classList.add('offline');
+            this.systemController.classList.remove('operational');
+        }
+
+        // Camera
+        if (data.camera_connected) {
+            this.systemCamera.classList.add('operational');
+            this.systemCamera.classList.remove('offline');
+        } else {
+            this.systemCamera.classList.add('offline');
+            this.systemCamera.classList.remove('operational');
+        }
+
+        // Arm
+        if (data.arm_connected) {
+            this.systemArm.classList.add('operational');
+            this.systemArm.classList.remove('offline');
+        } else {
+            this.systemArm.classList.add('offline');
+            this.systemArm.classList.remove('operational');
+        }
+
+        // AI
+        if (data.ai_enabled) {
+            this.systemAI.classList.add('operational');
+            this.systemAI.classList.remove('offline');
+        } else {
+            this.systemAI.classList.add('offline');
+            this.systemAI.classList.remove('operational');
         }
     }
 
@@ -156,12 +197,15 @@ class RoboDisplay {
                 if (response.ok) {
                     const data = await response.json();
                     this.updateFromState(data);
-                    this.connectionBadge.classList.remove('disconnected');
-                } else {
-                    this.connectionBadge.classList.add('disconnected');
+                    this.updateSystemStatus(data);
+                    this.updateControlMode(data.control_mode || 'idle');
                 }
             } catch (error) {
-                this.connectionBadge.classList.add('disconnected');
+                // Connection lost
+                this.systemController.classList.add('offline');
+                this.systemCamera.classList.add('offline');
+                this.systemArm.classList.add('offline');
+                this.systemAI.classList.add('offline');
             }
             setTimeout(poll, 500);
         };
@@ -169,7 +213,6 @@ class RoboDisplay {
     }
 
     updateFromState(data) {
-        // Update status indicator
         this.statusDot.className = 'status-dot';
 
         if (data.ai_enabled) {
@@ -201,7 +244,6 @@ class RoboDisplay {
                 this.setExpression('thinking');
             } else if (status.includes('complete') || status.includes('success') || status.includes('done')) {
                 this.setExpression('happy');
-                // Reset to idle after 3 seconds
                 setTimeout(() => {
                     if (this.currentExpression === 'happy') {
                         this.setExpression('idle');

@@ -51,6 +51,48 @@ body {
     }
 }
 
+/* Control Mode Badge */
+.control-mode-badge {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+    padding: 12px 20px;
+    border-radius: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.control-mode-badge.idle {
+    border-color: rgba(100, 100, 100, 0.3);
+}
+
+.control-mode-badge.remote {
+    border-color: rgba(96, 165, 250, 0.5);
+    background: rgba(96, 165, 250, 0.15);
+}
+
+.control-mode-badge.ai {
+    border-color: rgba(168, 85, 247, 0.5);
+    background: rgba(168, 85, 247, 0.15);
+}
+
+.mode-emoji {
+    font-size: 1.8rem;
+    line-height: 1;
+}
+
+.mode-text {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    letter-spacing: 0.5px;
+}
+
 /* Eyes Container */
 .eyes-container {
     display: flex;
@@ -253,61 +295,50 @@ body {
     padding: 0 20px;
 }
 
-/* Touch Prompt */
-.touch-prompt {
-    position: absolute;
-    top: 30px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    padding: 12px 25px;
-    border-radius: 25px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 1rem;
-    animation: fadeInOut 3s ease-in-out infinite;
-    transition: opacity 0.3s;
-}
-
-.touch-prompt.hidden {
-    opacity: 0;
-    pointer-events: none;
-}
-
-@keyframes fadeInOut {
-
-    0%,
-    100% {
-        opacity: 0.5;
-    }
-
-    50% {
-        opacity: 1;
-    }
-}
-
-/* Connection Badge */
-.connection-badge {
+/* System Status Panel */
+.system-status-panel {
     position: absolute;
     top: 20px;
     right: 20px;
-    padding: 8px;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+    padding: 15px 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.connection-badge .connection-dot {
+.system-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.system-item .system-dot {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: #4ade80;
-    box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+    background: #666;
+    transition: background 0.3s, box-shadow 0.3s;
 }
 
-.connection-badge.disconnected .connection-dot {
+.system-item.operational .system-dot {
+    background: #4ade80;
+    box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+}
+
+.system-item.offline .system-dot {
     background: #f87171;
-    box-shadow: 0 0 10px rgba(248, 113, 113, 0.5);
+    box-shadow: 0 0 8px rgba(248, 113, 113, 0.5);
+}
+
+.system-label {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 500;
+    min-width: 70px;
 }
 
 /* Responsive adjustments */

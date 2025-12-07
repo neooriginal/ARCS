@@ -2,6 +2,7 @@
 """RoboCrew Flask Routes"""
 
 import cv2
+import time
 import numpy as np
 from flask import Blueprint, Response, jsonify, request, render_template
 
@@ -73,6 +74,7 @@ def set_head():
         actual_pitch = list(pitch_result.values())[0] if pitch_result else pitch
         state.head_yaw = actual_yaw
         state.head_pitch = actual_pitch
+        state.last_remote_activity = time.time()
         return jsonify({'status': 'ok', 'yaw': actual_yaw, 'pitch': actual_pitch})
     except Exception as e:
         state.last_error = str(e)
@@ -89,6 +91,9 @@ def move():
     
     movement = state.get_movement()
     success = execute_movement(movement)
+    
+    if any(movement.values()):
+        state.last_remote_activity = time.time()
     
     return jsonify({'status': 'ok' if success else 'error'})
 
@@ -296,12 +301,23 @@ def display_page():
 @bp.route('/display/state')
 def display_state():
     """API endpoint for display to poll current robot state."""
+    # Determine control mode: remote, ai, or idle
+    is_remote = (time.time() - state.last_remote_activity) < 3  # Active within 3 seconds
+    if state.ai_enabled:
+        control_mode = 'ai'
+    elif is_remote:
+        control_mode = 'remote'
+    else:
+        control_mode = 'idle'
+    
     return jsonify({
         'ai_enabled': state.ai_enabled,
         'ai_status': state.ai_status,
         'current_task': state.agent.current_task if state.agent and hasattr(state.agent, 'current_task') else None,
         'controller_connected': state.controller is not None,
-        'camera_connected': state.camera is not None and state.camera.isOpened() if state.camera else False
+        'camera_connected': state.camera is not None and state.camera.isOpened() if state.camera else False,
+        'arm_connected': state.arm_connected,
+        'control_mode': control_mode
     })
 
 

@@ -42,24 +42,7 @@ ARM_LIMITS = {
     "gripper": (2, 90),
 }
 
-# Default head limits (conservative) - will be overridden by head_limits.json if exists
-HEAD_LIMITS = {
-    "yaw_min": -45,
-    "yaw_max": 45,
-    "pitch_min": 10,
-    "pitch_max": 60,
-}
 
-# Load head limits from calibration file if exists
-HEAD_LIMITS_FILE = Path(__file__).parent.parent.parent.parent.parent / "head_limits.json"
-if HEAD_LIMITS_FILE.exists():
-    try:
-        with open(HEAD_LIMITS_FILE, 'r') as f:
-            loaded = json.load(f)
-            HEAD_LIMITS.update(loaded)
-            print(f"[HEAD] Loaded limits from {HEAD_LIMITS_FILE}")
-    except Exception as e:
-        print(f"[HEAD] Could not load limits: {e}")
 
 
 class ServoControler:
@@ -223,17 +206,13 @@ class ServoControler:
         self.head_bus.enable_torque()
 
     def turn_head_yaw(self, degrees: float) -> Dict[int, float]:
-        # Clamp to safe limits
-        degrees = max(HEAD_LIMITS["yaw_min"], min(HEAD_LIMITS["yaw_max"], float(degrees)))
-        payload = {HEAD_SERVO_MAP["yaw"]: degrees}
+        payload = {HEAD_SERVO_MAP["yaw"]: float(degrees)}
         self.head_bus.sync_write("Goal_Position", payload)
         self._head_positions.update(payload)
         return payload
 
     def turn_head_pitch(self, degrees: float) -> Dict[int, float]:
-        # Clamp to safe limits
-        degrees = max(HEAD_LIMITS["pitch_min"], min(HEAD_LIMITS["pitch_max"], float(degrees)))
-        payload = {HEAD_SERVO_MAP["pitch"]: degrees}
+        payload = {HEAD_SERVO_MAP["pitch"]: float(degrees)}
         self.head_bus.sync_write("Goal_Position", payload)
         self._head_positions.update(payload)
         return payload
