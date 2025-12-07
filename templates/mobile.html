@@ -347,8 +347,6 @@
 
                 this.currentMovement = { forward: false, backward: false, left: false, right: false };
                 this.headPosition = { yaw: 0, pitch: 35 };
-                this.headTarget = { yaw: 0, pitch: 35 };  // Target for smooth interpolation
-                this.headSmoothing = 2;  // Max degrees per update (slow movement)
 
                 this.init();
             }
@@ -375,9 +373,6 @@
 
                 // Send commands at regular intervals
                 setInterval(() => this.sendMovement(), 100);
-
-                // Head smoothing - move slowly towards target
-                setInterval(() => this.updateHeadSmooth(), 50);
 
                 // Status polling
                 this.pollStatus();
@@ -466,37 +461,16 @@
                 // Update indicator position
                 this.headIndicator.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
 
-                // Map to head angles - set as target for smooth movement
+                // Map to head angles
                 const yaw = (dx / maxOffset) * 60;  // -60 to 60 degrees
                 const pitch = 35 + (dy / maxOffset) * 25;  // 10 to 60 degrees
 
-                this.headTarget = { yaw, pitch };
+                this.headPosition = { yaw, pitch };
+                this.sendHeadPosition();
             }
 
             onHeadEnd() {
                 this.headActive = false;
-            }
-
-            // Smooth head movement - interpolate slowly towards target
-            updateHeadSmooth() {
-                const maxStep = this.headSmoothing;  // Max degrees per update
-
-                // Interpolate yaw
-                const yawDiff = this.headTarget.yaw - this.headPosition.yaw;
-                if (Math.abs(yawDiff) > 0.5) {
-                    this.headPosition.yaw += Math.sign(yawDiff) * Math.min(maxStep, Math.abs(yawDiff));
-                }
-
-                // Interpolate pitch
-                const pitchDiff = this.headTarget.pitch - this.headPosition.pitch;
-                if (Math.abs(pitchDiff) > 0.5) {
-                    this.headPosition.pitch += Math.sign(pitchDiff) * Math.min(maxStep, Math.abs(pitchDiff));
-                }
-
-                // Send if changed
-                if (Math.abs(yawDiff) > 0.5 || Math.abs(pitchDiff) > 0.5) {
-                    this.sendHeadPosition();
-                }
             }
 
             async sendMovement() {
@@ -579,17 +553,6 @@
                     this.statusDot.classList.toggle('connected', data.controller_connected);
                     this.statusDot.classList.toggle('disconnected', !data.controller_connected);
                     this.statusText.textContent = data.controller_connected ? 'Connected' : 'Disconnected';
-
-                    // Update mode display from server
-                    const modeDisplay = document.getElementById('mode-display');
-                    const modeBtn = document.getElementById('mode-btn');
-                    if (data.control_mode === 'arm') {
-                        modeDisplay.textContent = '🦾 Arm Mode';
-                        modeBtn.textContent = '🦾';
-                    } else {
-                        modeDisplay.textContent = '🚗 Drive Mode';
-                        modeBtn.textContent = '🚗';
-                    }
                 } catch (e) {
                     this.statusDot.classList.add('disconnected');
                     this.statusText.textContent = 'Offline';

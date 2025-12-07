@@ -136,6 +136,11 @@ class ServoControler:
                 except Exception as e:
                     print(f"[ARM] Could not read position: {e}")
         
+        head_calibration = {
+            7: MotorCalibration(id=7, drive_mode=0, homing_offset=0, range_min=0, range_max=4095),
+            8: MotorCalibration(id=8, drive_mode=0, homing_offset=0, range_min=0, range_max=4095),
+        }
+        
         if left_arm_head_usb:
             self.head_bus = FeetechMotorsBus(
                 port=left_arm_head_usb,
@@ -143,11 +148,13 @@ class ServoControler:
                     HEAD_SERVO_MAP["yaw"]: Motor(HEAD_SERVO_MAP["yaw"], "sts3215", MotorNormMode.DEGREES),
                     HEAD_SERVO_MAP["pitch"]: Motor(HEAD_SERVO_MAP["pitch"], "sts3215", MotorNormMode.DEGREES),
                 },
-                calibration=None,  # No calibration - use raw control
+                calibration=head_calibration,
             )
             self.head_bus.connect()
             self.apply_head_modes()
             self._head_positions = self.get_head_position()
+            for sid in self._head_ids:
+                self._head_positions.setdefault(sid, 2048)
 
     @property
     def arm_enabled(self) -> bool:
