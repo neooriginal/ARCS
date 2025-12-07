@@ -95,9 +95,6 @@ def move():
     data = request.json
     state.update_movement(data)
     
-    # Update movement command timestamp (for dead man's switch safety)
-    state.last_movement_command = time.time()
-    
     movement = state.get_movement()
     success = execute_movement(movement)
     

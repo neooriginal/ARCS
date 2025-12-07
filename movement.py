@@ -7,9 +7,6 @@ import time
 from config import MOVEMENT_LOOP_INTERVAL
 from state import state
 
-# Safety timeout - stop if no movement command received within this time (seconds)
-MOVEMENT_TIMEOUT = 0.5
-
 
 def execute_movement(movement):
     """
@@ -40,7 +37,6 @@ def movement_loop():
     """
     Continuous movement control thread.
     Keeps wheels moving while key is held.
-    Includes dead man's switch - auto-stops if no command received within timeout.
     """
     while state.running:
         if state.controller is None:
@@ -48,15 +44,6 @@ def movement_loop():
             continue
         
         movement = state.get_movement()
-        
-        # Safety timeout: if any movement is active but we haven't received
-        # a command recently, stop everything (dead man's switch)
-        if any(movement.values()):
-            time_since_command = time.time() - state.last_movement_command
-            if time_since_command > MOVEMENT_TIMEOUT:
-                # Connection lost or key release missed - stop immediately
-                state.stop_all_movement()
-                movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
         
         try:
             execute_movement(movement)
