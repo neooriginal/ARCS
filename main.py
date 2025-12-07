@@ -6,7 +6,7 @@ import threading
 import time
 import os
 import logging
-import webbrowser
+import subprocess
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -123,9 +123,32 @@ def main():
     print("Press Ctrl+C to stop")
     print("-" * 50)
     
-    # Auto-open display if configured
+    # Auto-open display on Raspberry Pi's physical screen (works over SSH)
     if os.getenv('AUTO_OPEN_DISPLAY', 'true').lower() == 'true':
-        webbrowser.open(f'http://localhost:{WEB_PORT}/display')
+        def open_display():
+            import time
+            time.sleep(2)  # Wait for server to start
+            display_url = f'http://localhost:{WEB_PORT}/display'
+            env = os.environ.copy()
+            env['DISPLAY'] = ':0'  # Target the main display
+            try:
+                # Try chromium-browser first (common on Raspberry Pi)
+                subprocess.Popen(
+                    ['chromium-browser', '--kiosk', '--noerrdialogs', '--disable-infobars', display_url],
+                    env=env,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+                print("📺 Display opened on main screen")
+            except FileNotFoundError:
+                try:
+                    # Fallback to firefox
+                    subprocess.Popen(['firefox', '--kiosk', display_url], env=env,
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    print("📺 Display opened on main screen")
+                except FileNotFoundError:
+                    print("⚠ Could not auto-open display (no browser found)")
+        threading.Thread(target=open_display, daemon=True).start()
     
     try:
         app.run(host='0.0.0.0', port=WEB_PORT, threaded=True, use_reloader=False, debug=False)
