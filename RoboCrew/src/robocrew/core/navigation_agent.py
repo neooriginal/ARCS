@@ -64,8 +64,8 @@ DOORWAYS AND TIGHT OPENINGS:
 NAVIGATION RULES:
 1. LOOK AT THE IMAGE before every move. What do you actually see?
 2. If there is a wall in the view, TURN AWAY first.
-3. Use TINY movements: 0.1-0.2m forward, 15-30 degree turns.
-4. When in doubt, BACK UP and turn.
+3. Start with small moves (0.3m). If clear, you can go further (up to 1.0m).
+4. The safety system will STOP you if you miss an obstacle. Trust it.
 5. Prefer open spaces. Avoid narrow passages.
 
 WHEN YOU SEE A WALL:

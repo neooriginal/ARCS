@@ -329,14 +329,14 @@ def generate_cv_frames():
     detector = state.get_detector()
     
     while state.running:
-        if state.camera is None or not state.camera.isOpened():
+        if state.robot_system is None:
             time.sleep(0.1)
             continue
         
         try:
-            state.camera.grab()
-            ret, frame = state.camera.retrieve()
-            if not ret:
+            # Thread-safe frame capture
+            frame = state.robot_system.get_frame()
+            if frame is None:
                 time.sleep(0.02)
                 continue
             

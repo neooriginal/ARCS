@@ -25,6 +25,8 @@ class RobotSystem:
         self._init_camera()
         self._init_servos()
         
+        state.robot_system = self
+        
     def _init_camera(self):
         """Initialize the camera."""
         try:

@@ -25,9 +25,15 @@ def create_end_task():
     return end_task
 
 
-def _interruptible_sleep(duration: float, check_interval: float = 0.1):
-    """Sleep that can be interrupted by emergency stop."""
+def _interruptible_sleep(duration: float, check_interval: float = 0.1, check_safety: bool = False, movement_type: str = None):
+    """
+    Sleep that can be interrupted by emergency stop or SAFETY REFLEX.
+    check_safety: If True, continuously checks ObstacleDetector.
+    movement_type: 'FORWARD', 'BACKWARD', 'LEFT', 'RIGHT' for validation.
+    """
     elapsed = 0
+    # Safety Check Throttling (Don't check every 0.1s if not needed, but 10Hz is fine)
+    
     while elapsed < duration:
         if not robot_state.ai_enabled:
             # Emergency stop - clear movement and exit
@@ -37,6 +43,24 @@ def _interruptible_sleep(duration: float, check_interval: float = 0.1):
         # Update heartbeat to prevent watchdog from killing the movement
         robot_state.last_movement_activity = time.time()
         
+        # --- CONTINUOUS SAFETY MONITORING ---
+        if check_safety and movement_type == 'FORWARD' and robot_state.robot_system:
+            try:
+                # 1. Get Frame (Thread Safe)
+                frame = robot_state.robot_system.get_frame()
+                if frame is not None:
+                    # 2. Check Detector (Shared History)
+                    detector = robot_state.get_detector()
+                    if detector:
+                        safe_actions, _, _ = detector.process(frame)
+                        if "FORWARD" not in safe_actions:
+                            print("[SAFETY] EMERGENCY BRAKE: Obstacle appeared!")
+                            robot_state.add_ai_log("SAFETY REFLEX: EMERGENCY STOP (Obstacle appeared)")
+                            robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
+                            return False
+            except Exception as e:
+                print(f"[SAFETY] Error during check: {e}")
+
         time.sleep(min(check_interval, duration - elapsed))
         elapsed += check_interval
     return True
@@ -51,7 +75,8 @@ def create_move_forward(servo_controller):
         print(f"[TOOL] move_forward({distance}) for {duration:.1f}s")
         
         robot_state.movement = {'forward': True, 'backward': False, 'left': False, 'right': False}
-        completed = _interruptible_sleep(duration)
+        # Enable Continuous Safety Monitoring for forward movement
+        completed = _interruptible_sleep(duration, check_safety=True, movement_type='FORWARD')
         robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
         
         if not completed:
