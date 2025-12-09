@@ -93,6 +93,8 @@ def move():
     
     if any(movement.values()):
         state.last_remote_activity = time.time()
+        state.last_movement_activity = time.time()
+
     
     return jsonify({'status': 'ok' if success else 'error'})
 

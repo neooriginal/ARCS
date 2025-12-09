@@ -446,3 +446,10 @@ window.addEventListener('blur', () => {
     sendMovement();
     setGripper(false);
 });
+
+// Heartbeat for drive mode: prevent safety timeout while holding keys
+setInterval(() => {
+    if (currentMode === 'drive' && Object.values(keysPressed).some(v => v)) {
+        sendMovement();
+    }
+}, 200);

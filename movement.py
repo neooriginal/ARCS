@@ -4,7 +4,7 @@ Handles wheel movement commands and the continuous movement loop.
 """
 
 import time
-from config import MOVEMENT_LOOP_INTERVAL
+from config import MOVEMENT_LOOP_INTERVAL, REMOTE_TIMEOUT
 from state import state
 
 
@@ -53,6 +53,13 @@ def movement_loop():
             continue
         
         movement = state.get_movement()
+
+        # Safety: Stop if connection lags while moving
+        if any(movement.values()) and (time.time() - state.last_movement_activity > REMOTE_TIMEOUT):
+            state.stop_all_movement()
+            movement = state.get_movement()  # Reset local movement to stop immediately
+
+
         
         try:
             execute_movement(movement)
