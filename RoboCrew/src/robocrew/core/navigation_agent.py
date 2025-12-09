@@ -118,13 +118,15 @@ BACKWARD MOVEMENT SAFETY:
             # Use shared detector
             self.detector = state.get_detector()
                 
-            safe_actions, overlay, _ = self.detector.process(image)
-            return safe_actions, overlay
+            safe_actions, overlay, metrics = self.detector.process(image)
+            guidance = metrics.get('guidance', '')
+            return safe_actions, overlay, guidance
                 
         except Exception as e:
             logger.error(f"Obstacle detection failed: {e}")
             # Fallback to safe
-            return ["FORWARD", "LEFT", "RIGHT", "BACKWARD"], image
+            # Fallback to safe
+            return ["FORWARD", "LEFT", "RIGHT", "BACKWARD"], image, ""
 
     def step(self) -> str:
         """
@@ -140,7 +142,7 @@ BACKWARD MOVEMENT SAFETY:
             return "Camera error"
             
         # 2. Safety Check & Processing
-        safe_actions, overlay = self._check_safety(frame)
+        safe_actions, overlay, guidance = self._check_safety(frame)
         
         # Use overlay if available, otherwise raw frame
         display_frame = overlay if overlay is not None else frame
@@ -157,7 +159,7 @@ BACKWARD MOVEMENT SAFETY:
         # Inject Allowed Actions
         content.append({
              "type": "text", 
-             "text": f"REFLEX SYSTEM: Allowed actions are {safe_actions}. Green Marked Paths are SAFE. Red Marked Areas are BLOCKED."
+             "text": f"REFLEX SYSTEM: Allowed actions are {safe_actions}. Green Marked Paths are SAFE. Red Marked Areas are BLOCKED.\nVISUAL GUIDANCE: {guidance}"
         })
             
         self.message_history.append(HumanMessage(content=content))

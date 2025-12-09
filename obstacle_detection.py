@@ -144,12 +144,70 @@ class ObstacleDetector:
         alpha = 0.4
         cv2.addWeighted(shapes, alpha, overlay, 1 - alpha, 0, overlay)
         
-        # Text Info
-        status_text = "SAFE: " + " ".join([a[0] for a in safe_actions if a != "BACKWARD"])
-        cv2.putText(overlay, status_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-        cv2.putText(overlay, f"L:{int(c_left)} C:{int(c_fwd)} R:{int(c_right)}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
+        # 6. Gap Detection (Tight Space Navigation)
+        # Find the "Center of Safety" to guide the robot
+        # We classify columns as "Passable" if their obstacle is far away (e.g. Y < 350)
+        passable_indices = []
+        for x, y in edge_points:
+            # y is the lowest edge (closest obstacle). If 0, no edge found.
+            # If y < 350, the obstacle is >1 meter away (roughly). Passable.
+            # If y > 350, it's getting close.
+            if y < 350: 
+                passable_indices.append(x)
+                
+        guidance = "Look for open space."
+        best_center_x = w // 2 # Default to center
+        
+        if passable_indices:
+            # Find the largest contiguous segment of passable columns
+            # But edge_points is sparse (step 5). 
+            # We can simplify: just find the mean X of all passable points?
+            # No, that might put us between two doors.
+            # We need the widest gap.
+            
+            # Group into clusters
+            # Since step is 5, if diff > 10, it's a break.
+            clusters = []
+            if passable_indices:
+                current_cluster = [passable_indices[0]]
+                for i in range(1, len(passable_indices)):
+                    if passable_indices[i] - passable_indices[i-1] <= 10:
+                        current_cluster.append(passable_indices[i])
+                    else:
+                        clusters.append(current_cluster)
+                        current_cluster = [passable_indices[i]]
+                clusters.append(current_cluster)
+                
+            # Find widest cluster
+            widest_cluster = max(clusters, key=len)
+            
+            # Calculate center of widest gap
+            if widest_cluster:
+                start_x = widest_cluster[0]
+                end_x = widest_cluster[-1]
+                gap_center = (start_x + end_x) // 2
+                best_center_x = gap_center
+                
+                # Draw Gap Target
+                cv2.line(overlay, (gap_center, h//2), (gap_center, h), (255, 255, 0), 2)
+                cv2.putText(overlay, "TARGET", (gap_center - 20, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+                
+                # Calculate simple guidance
+                center_offset = gap_center - (w // 2)
+                # > 0 means Target is Right. < 0 means Target is Left.
+                
+                if abs(center_offset) < 40:
+                    guidance = "ALIGNMENT: PERFECT. Go straight."
+                elif center_offset < 0:
+                    guidance = f"ALIGNMENT: Gap is LEFT. Turn LEFT slightly."
+                else:
+                    guidance = f"ALIGNMENT: Gap is RIGHT. Turn RIGHT slightly."
+        
+        # Draw Guidance Text
+        cv2.putText(overlay, guidance, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
         return safe_actions, overlay, {
-            'c_left': c_left, 'c_fwd': c_fwd, 'c_right': c_right, 'edges': total_edge_pixels
+            'c_left': c_left, 'c_fwd': c_fwd, 'c_right': c_right, 'edges': total_edge_pixels,
+            'guidance': guidance
         }
 
