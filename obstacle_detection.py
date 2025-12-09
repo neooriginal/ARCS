@@ -73,44 +73,59 @@ class ObstacleDetector:
         
         threshold = self.obstacle_threshold_y
         
-        # Check Center for Forward
-        # If Center is blocked -> No Forward
-        if c_fwd <= threshold:
-            safe_actions.append("FORWARD")
-        else:
-             # Draw Red Box on Center
-             cv2.rectangle(shapes, (int(w*0.33), int(h*0.5)), (int(w*0.66), h), (0, 0, 255), -1)
-             
-        # Check Sides?
-        # Actually, for "Turn Left", we check if the path we turn INTO is clear?
-        # Or do we just check if we have space to turn?
-        # Usually rotating in place (skid steer) is safe unless tight.
-        # But if Left is blocked, turning Left might hit the corner.
-        # Let's say: Safe to turn if that side isn't IMMEDIATELY in our face.
+        # --- BLINDNESS CHECK ---
+        # If robot is face-to-face with a smooth wall, Canny sees NO edges.
+        # We check the total number of edge pixels.
+        # A normal scene with floor/furniture should have thousands of edge pixels.
+        # A blank wall might have < 100.
         
-        side_threshold = threshold + 50 # Allow being slightly closer to sides before disabling turn
+        total_edge_pixels = np.count_nonzero(edges)
+        # Threshold: Experimentally, 500 pixels is very low for 640x480 resolution (which has 300k pixels)
+        # Even a simple horizon line is ~640 pixels.
+        min_edge_pixels = 200 
         
-        if c_left <= side_threshold:
+        is_blind = total_edge_pixels < min_edge_pixels
+        
+        if is_blind:
+            # We are likely staring at a blank wall or in darkness.
+            # Block Forward.
+            cv2.rectangle(shapes, (int(w*0.2), int(h*0.2)), (int(w*0.8), int(h*0.8)), (0, 0, 255), -1)
+            cv2.putText(overlay, "BLOCKED (NO VISUALS)", (int(w*0.3), int(h*0.5)), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            # Safe actions only backward (maybe turn? but we don't know what's there)
+            # Let's allow turning just in case we need to unstick.
             safe_actions.append("LEFT")
-            # Draw Green Arrow/Zone Left
-            pts = np.array([[0, h], [0, h//2], [w//3, h//2], [0, h]], np.int32)
-            # cv2.fillPoly(shapes, [pts], (0, 255, 0)) # Too much clutter maybe?
-        else:
-            # Blocked Left
-            cv2.rectangle(shapes, (0, int(h*0.5)), (int(w*0.33), h), (0, 0, 255), -1)
-            
-        if c_right <= side_threshold:
             safe_actions.append("RIGHT")
-        else:
-            # Blocked Right
-            cv2.rectangle(shapes, (int(w*0.66), int(h*0.5)), (w, h), (0, 0, 255), -1)
             
-        # Draw "Safe Paths" (Green Zones)
-        if "FORWARD" in safe_actions:
-             # Draw Green Trapezoid for forward path
-             pts = np.array([[int(w*0.3), h], [int(w*0.7), h], [int(w*0.6), int(h*0.4)], [int(w*0.4), int(h*0.4)]], np.int32)
-             cv2.fillPoly(shapes, [pts], (0, 255, 0))
-             cv2.putText(overlay, "FWD OK", (int(w*0.45), int(h*0.8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+        else:
+            # Standard Logic
+            
+            # Check Center for Forward
+            # If Center is blocked -> No Forward
+            if c_fwd <= threshold:
+                safe_actions.append("FORWARD")
+            else:
+                 # Draw Red Box on Center
+                 cv2.rectangle(shapes, (int(w*0.33), int(h*0.5)), (int(w*0.66), h), (0, 0, 255), -1)
+                 
+            # Check Sides
+            side_threshold = threshold + 50 
+            
+            if c_left <= side_threshold:
+                safe_actions.append("LEFT")
+                pts = np.array([[0, h], [0, h//2], [w//3, h//2], [0, h]], np.int32)
+            else:
+                cv2.rectangle(shapes, (0, int(h*0.5)), (int(w*0.33), h), (0, 0, 255), -1)
+                
+            if c_right <= side_threshold:
+                safe_actions.append("RIGHT")
+            else:
+                cv2.rectangle(shapes, (int(w*0.66), int(h*0.5)), (w, h), (0, 0, 255), -1)
+                
+            # Draw "Safe Paths" (Green Zones)
+            if "FORWARD" in safe_actions:
+                 pts = np.array([[int(w*0.3), h], [int(w*0.7), h], [int(w*0.6), int(h*0.4)], [int(w*0.4), int(h*0.4)]], np.int32)
+                 cv2.fillPoly(shapes, [pts], (0, 255, 0))
+                 cv2.putText(overlay, "FWD OK", (int(w*0.45), int(h*0.8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
              
         # Blend overlay
         alpha = 0.4
@@ -122,6 +137,6 @@ class ObstacleDetector:
         cv2.putText(overlay, f"L:{int(c_left)} C:{int(c_fwd)} R:{int(c_right)}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
 
         return safe_actions, overlay, {
-            'c_left': c_left, 'c_fwd': c_fwd, 'c_right': c_right
+            'c_left': c_left, 'c_fwd': c_fwd, 'c_right': c_right, 'edges': total_edge_pixels
         }
 
