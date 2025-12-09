@@ -13,6 +13,13 @@ class ObstacleDetector:
         self.obstacle_threshold_y = 420
         self.center_x_threshold = 310
         
+        # Hysteresis / Flicker Safety
+        # Store recent "Blocked" states.
+        # If an action was blocked recently, we keep it blocked for a bit.
+        from collections import deque
+        self.history_len = 12 # Approx 0.5-1.0s depending on FPS
+        self.block_history = deque(maxlen=self.history_len) # Stores set of BLOCKED actions
+        
     def process(self, frame):
         """
         Process the frame to detect obstacles and determine navigation command.
@@ -69,63 +76,64 @@ class ObstacleDetector:
         c_right = get_avg_y(right_chunk)
 
         # 5. Safety Logic (The "Prohibit" Logic)
-        safe_actions = ["BACKWARD"] # Backward is mostly always safe in this context (blind luck)
         
+        # Determine INSTANT blocked actions
+        instant_blocked = set()
         threshold = self.obstacle_threshold_y
         
         # --- BLINDNESS CHECK ---
-        # If robot is face-to-face with a smooth wall, Canny sees NO edges.
-        # We check the total number of edge pixels.
-        # A normal scene with floor/furniture should have thousands of edge pixels.
-        # A blank wall might have < 100.
-        
         total_edge_pixels = np.count_nonzero(edges)
-        # Threshold: Experimentally, 500 pixels is very low for 640x480 resolution (which has 300k pixels)
-        # Even a simple horizon line is ~640 pixels.
         min_edge_pixels = 200 
-        
         is_blind = total_edge_pixels < min_edge_pixels
         
         if is_blind:
-            # We are likely staring at a blank wall or in darkness.
-            # Block Forward.
+            instant_blocked.add("FORWARD")
             cv2.rectangle(shapes, (int(w*0.2), int(h*0.2)), (int(w*0.8), int(h*0.8)), (0, 0, 255), -1)
             cv2.putText(overlay, "BLOCKED (NO VISUALS)", (int(w*0.3), int(h*0.5)), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            # Safe actions only backward (maybe turn? but we don't know what's there)
-            # Let's allow turning just in case we need to unstick.
-            safe_actions.append("LEFT")
-            safe_actions.append("RIGHT")
-            
         else:
-            # Standard Logic
+            if c_fwd > threshold:
+                instant_blocked.add("FORWARD")
+                cv2.rectangle(shapes, (int(w*0.33), int(h*0.5)), (int(w*0.66), h), (0, 0, 255), -1)
             
-            # Check Center for Forward
-            # If Center is blocked -> No Forward
-            if c_fwd <= threshold:
-                safe_actions.append("FORWARD")
-            else:
-                 # Draw Red Box on Center
-                 cv2.rectangle(shapes, (int(w*0.33), int(h*0.5)), (int(w*0.66), h), (0, 0, 255), -1)
-                 
-            # Check Sides
-            side_threshold = threshold + 50 
-            
-            if c_left <= side_threshold:
-                safe_actions.append("LEFT")
-                pts = np.array([[0, h], [0, h//2], [w//3, h//2], [0, h]], np.int32)
-            else:
+            side_threshold = threshold + 50
+            if c_left > side_threshold:
+                instant_blocked.add("LEFT")
                 cv2.rectangle(shapes, (0, int(h*0.5)), (int(w*0.33), h), (0, 0, 255), -1)
-                
-            if c_right <= side_threshold:
-                safe_actions.append("RIGHT")
-            else:
+            
+            if c_right > side_threshold:
+                instant_blocked.add("RIGHT")
                 cv2.rectangle(shapes, (int(w*0.66), int(h*0.5)), (w, h), (0, 0, 255), -1)
-                
-            # Draw "Safe Paths" (Green Zones)
-            if "FORWARD" in safe_actions:
+
+        # Update History
+        self.block_history.append(instant_blocked)
+        
+        # Calculate PERSISTENT blocked actions
+        # If an action was blocked in ANY of the recent frames, it remains blocked.
+        persistent_blocked = set()
+        for b_set in self.block_history:
+            persistent_blocked.update(b_set)
+            
+        # Determine Safe Actions
+        safe_actions = ["BACKWARD"]
+        
+        if "FORWARD" not in persistent_blocked:
+             safe_actions.append("FORWARD")
+             if not is_blind:
                  pts = np.array([[int(w*0.3), h], [int(w*0.7), h], [int(w*0.6), int(h*0.4)], [int(w*0.4), int(h*0.4)]], np.int32)
                  cv2.fillPoly(shapes, [pts], (0, 255, 0))
                  cv2.putText(overlay, "FWD OK", (int(w*0.45), int(h*0.8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+                 
+        if "LEFT" not in persistent_blocked:
+            safe_actions.append("LEFT")
+            if not is_blind:
+                 pts = np.array([[0, h], [0, h//2], [w//3, h//2], [0, h]], np.int32)
+                 # cv2.fillPoly for left zone if desired
+                 
+        if "RIGHT" not in persistent_blocked:
+            safe_actions.append("RIGHT")
+            
+        # Status Text (Instant vs Persistent?)
+        # Let's show the final active result
              
         # Blend overlay
         alpha = 0.4
