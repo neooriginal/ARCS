@@ -136,3 +136,4 @@ dist
 .pnp.*
 /__pycache__
 /RoboCrew/src/robocrew/core/__pycache__
+/RoboCrew/src/robocrew/robots/XLeRobot/__pycache__
