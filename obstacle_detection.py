@@ -67,13 +67,28 @@ class ObstacleDetector:
         center_chunk = edge_points[chunk_size:2*chunk_size]
         right_chunk = edge_points[2*chunk_size:]
         
-        def get_avg_y(chunk):
+        def get_top_average(chunk, top_n=2):
+            """
+            Get the average of the Top N closest points.
+            Robustly detects thin obstacles (like cables with 2 edges)
+            while filtering single-line noise.
+            If Top N is [450, 450] (Cable) -> Avg 450 -> Blocked.
+            If Top N is [450, 0] (Noise) -> Avg 225 -> Safe.
+            """
             if not chunk: return 0
-            return sum(p[1] for p in chunk) / len(chunk)
+            # Extract Y values
+            ys = sorted([p[1] for p in chunk], reverse=True) # Descending (Closest first)
             
-        c_left = get_avg_y(left_chunk)
-        c_fwd = get_avg_y(center_chunk)
-        c_right = get_avg_y(right_chunk)
+            # Take top N
+            top_values = ys[:top_n]
+            if not top_values: return 0
+            
+            # If we don't have enough values (unlikely), average what we have
+            return sum(top_values) / len(top_values)
+            
+        c_left = get_top_average(left_chunk)
+        c_fwd = get_top_average(center_chunk)
+        c_right = get_top_average(right_chunk)
 
         # 5. Safety Logic (The "Prohibit" Logic)
         
