@@ -33,6 +33,10 @@ def _interruptible_sleep(duration: float, check_interval: float = 0.1):
             # Emergency stop - clear movement and exit
             robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
             return False
+            
+        # Update heartbeat to prevent watchdog from killing the movement
+        robot_state.last_movement_activity = time.time()
+        
         time.sleep(min(check_interval, duration - elapsed))
         elapsed += check_interval
     return True
