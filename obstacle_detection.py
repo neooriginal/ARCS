@@ -60,12 +60,20 @@ class ObstacleDetector:
                 cv2.circle(overlay, (x, detected_y), 2, (0, 0, 255), -1)
 
         # 4. Chunking & Metics
+        # 4. Chunking & Metics
         num_points = len(edge_points)
-        chunk_size = num_points // 3
+        # Narrower Forward Zone for Doors (1/5th instead of 1/3rd)
+        center_width = num_points // 5
+        side_width = (num_points - center_width) // 2
         
-        left_chunk = edge_points[:chunk_size]
-        center_chunk = edge_points[chunk_size:2*chunk_size]
-        right_chunk = edge_points[2*chunk_size:]
+        left_chunk = edge_points[:side_width]
+        center_chunk = edge_points[side_width : side_width + center_width]
+        right_chunk = edge_points[side_width + center_width:]
+        
+        # Grid Visualization
+        center_x_start = side_width * 5
+        center_x_end = (side_width + center_width) * 5
+        cv2.rectangle(shapes, (center_x_start, 0), (center_x_end, h), (50, 50, 50), 1)
         
         def get_top_average(chunk, top_n=2):
             """
@@ -155,7 +163,7 @@ class ObstacleDetector:
             if y < 350: 
                 passable_indices.append(x)
                 
-        guidance = "Look for open space."
+        guidance = "" # Default to empty if no gap found
         best_center_x = w // 2 # Default to center
         
         if passable_indices:
@@ -203,8 +211,8 @@ class ObstacleDetector:
                 else:
                     guidance = f"ALIGNMENT: Gap is RIGHT. Turn RIGHT slightly."
         
-        # Draw Guidance Text
-        cv2.putText(overlay, guidance, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+        if guidance:
+             cv2.putText(overlay, guidance, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
         return safe_actions, overlay, {
             'c_left': c_left, 'c_fwd': c_fwd, 'c_right': c_right, 'edges': total_edge_pixels,
