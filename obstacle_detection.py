@@ -62,8 +62,8 @@ class ObstacleDetector:
         # 4. Chunking & Metics
         # 4. Chunking & Metics
         num_points = len(edge_points)
-        # Narrower Forward Zone for Doors (1/5th instead of 1/3rd)
-        center_width = num_points // 5
+        # Narrower Forward Zone for Doors (1/6th instead of 1/5th)
+        center_width = num_points // 6
         side_width = (num_points - center_width) // 2
         
         left_chunk = edge_points[:side_width]
@@ -155,12 +155,21 @@ class ObstacleDetector:
         # 6. Gap Detection (Tight Space Navigation)
         # Find the "Center of Safety" to guide the robot
         # We classify columns as "Passable" if their obstacle is far away (e.g. Y < 350)
+        # We classify columns as "Passable" if their obstacle is far away (e.g. Y < 350)
+        # Smoothing: Filter out single-column noise spikes by checking neighbors
+        raw_ys = [p[1] for p in edge_points]
+        smoothed_ys = []
+        for i in range(len(raw_ys)):
+            # Median of 3 neighbors
+            prev_y = raw_ys[i-1] if i > 0 else raw_ys[i]
+            next_y = raw_ys[i+1] if i < len(raw_ys)-1 else raw_ys[i]
+            curr_y = raw_ys[i]
+            smoothed_ys.append(sorted([prev_y, curr_y, next_y])[1])
+
         passable_indices = []
-        for x, y in edge_points:
-            # y is the lowest edge (closest obstacle). If 0, no edge found.
-            # If y < 350, the obstacle is >1 meter away (roughly). Passable.
-            # If y > 350, it's getting close.
-            if y < 350: 
+        for i, (x, _) in enumerate(edge_points):
+            # Use smoothed Y for check
+            if smoothed_ys[i] < 350: 
                 passable_indices.append(x)
                 
         guidance = "" # Default to empty if no gap found
@@ -179,7 +188,9 @@ class ObstacleDetector:
             if passable_indices:
                 current_cluster = [passable_indices[0]]
                 for i in range(1, len(passable_indices)):
-                    if passable_indices[i] - passable_indices[i-1] <= 10:
+                    # Tolerant of single noise pixel (5) or double noise pixels (10). 
+                    # Step is 5. Adjacent is 5. Gap of 1 is 10. Gap of 2 is 15.
+                    if passable_indices[i] - passable_indices[i-1] <= 15:
                         current_cluster.append(passable_indices[i])
                     else:
                         clusters.append(current_cluster)
