@@ -58,6 +58,40 @@ def agent_loop():
                 state.ai_enabled = False # Safety disable
         time.sleep(0.1)
 
+def slam_loop():
+    """Background thread for SLAM operation."""
+    logger.info("SLAM loop started")
+    
+    # Lazy init SLAM
+    from slam import SimpleSLAM
+    if state.slam is None:
+        state.slam = SimpleSLAM()
+        
+    while state.running:
+        try:
+            # We need the frame
+            frame = None
+            if state.robot_system:
+                frame = state.robot_system.get_frame()
+                
+            if frame is not None:
+                # Get latest movement intent
+                move_cmd = state.get_movement()
+                
+                # Process SLAM
+                state.slam.process(frame, move_cmd)
+                
+                # Update shared State Pose
+                state.pose['x'] = state.slam.x
+                state.pose['y'] = state.slam.y
+                state.pose['theta'] = state.slam.theta
+            
+            time.sleep(0.05) # ~20 FPS max for SLAM
+            
+        except Exception as e:
+            logger.error(f"SLAM loop error: {e}")
+            time.sleep(1)
+
 def cleanup(signum=None, frame=None):
     print("\n🛑 Shutting down...")
     state.running = False
@@ -112,6 +146,9 @@ def main():
     
     # AI Agent thread
     threading.Thread(target=agent_loop, daemon=True).start()
+    
+    # SLAM thread
+    threading.Thread(target=slam_loop, daemon=True).start()
     print("✓")
     
     # 4. Start Web Server

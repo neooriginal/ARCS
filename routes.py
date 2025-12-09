@@ -370,3 +370,17 @@ def generate_cv_frames():
 def ai_video_feed():
     return Response(generate_cv_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+@bp.route('/map')
+def get_map():
+    if not state.slam:
+        return jsonify({'error': 'SLAM not initialized'})
+    
+    vis_map = state.slam.get_map_overlay()
+    _, buffer = cv2.imencode('.jpg', vis_map)
+    return Response(buffer.tobytes(), mimetype='image/jpeg')
+
+@bp.route('/pose')
+def get_pose():
+    if not state.slam:
+        return jsonify({'error': 'SLAM not initialized'})
+    return jsonify(state.pose)

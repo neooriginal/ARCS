@@ -54,6 +54,10 @@ class RobotState:
         
         # Shared Obstacle Detector
         self.detector = None
+        
+        # SLAM
+        self.slam = None
+        self.pose = {'x': 0.0, 'y': 0.0, 'theta': 0.0}
 
     
     def update_movement(self, data):
