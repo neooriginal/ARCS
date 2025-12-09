@@ -13,6 +13,7 @@ load_dotenv()
 
 from robocrew.core.robot_system import RobotSystem
 from robocrew.core.utils import capture_image
+from state import state
 
 logger = logging.getLogger(__name__)
 
@@ -104,8 +105,10 @@ WHEN YOU SEE A WALL:
                 sys.path.append(os.getcwd())
             from obstacle_detection import ObstacleDetector
             
-            if not hasattr(self, 'detector'):
-                self.detector = ObstacleDetector()
+            from obstacle_detection import ObstacleDetector
+            
+            # Use shared detector
+            self.detector = state.get_detector()
                 
             safe_actions, overlay, _ = self.detector.process(image)
             return safe_actions, overlay

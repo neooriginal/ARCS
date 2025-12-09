@@ -325,10 +325,8 @@ def display_state():
 def generate_cv_frames():
     """Generate CV-processed frames showing what the AI sees with Obstacle Detection."""
     import time
-    from obstacle_detection import ObstacleDetector
-    
-    # Initialize detector
-    detector = ObstacleDetector()
+    # Initialize detector (Shared)
+    detector = state.get_detector()
     
     while state.running:
         if state.camera is None or not state.camera.isOpened():

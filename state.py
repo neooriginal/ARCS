@@ -51,6 +51,9 @@ class RobotState:
         # Remote control tracking
         self.last_remote_activity = 0  # timestamp of last remote input
         self.last_movement_activity = 0 # timestamp of last movement command
+        
+        # Shared Obstacle Detector
+        self.detector = None
 
     
     def update_movement(self, data):
@@ -102,6 +105,22 @@ class RobotState:
         """Get a copy of current arm positions."""
         with self.lock:
             return self.arm_positions.copy()
+
+    def get_detector(self):
+        """Get or create shared ObstacleDetector instance."""
+        with self.lock:
+            if self.detector is None:
+                try:
+                    # Import here to avoid circular dependencies
+                    import sys, os
+                    if os.getcwd() not in sys.path:
+                        sys.path.append(os.getcwd())
+                    from obstacle_detection import ObstacleDetector
+                    self.detector = ObstacleDetector()
+                except Exception as e:
+                    print(f"Error creating detector: {e}")
+                    return None
+            return self.detector
 
     def add_ai_log(self, message: str):
         """Add a log message to AI logs."""

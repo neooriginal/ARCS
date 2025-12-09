@@ -17,8 +17,10 @@ class ObstacleDetector:
         # Store recent "Blocked" states.
         # If an action was blocked recently, we keep it blocked for a bit.
         from collections import deque
+        import threading
         self.history_len = 12 # Approx 0.5-1.0s depending on FPS
         self.block_history = deque(maxlen=self.history_len) # Stores set of BLOCKED actions
+        self.lock = threading.Lock()
         
     def process(self, frame):
         """
@@ -42,8 +44,6 @@ class ObstacleDetector:
         
         # Visualization setup
         overlay = frame.copy()
-        
-        # Create a separate layer for semi-transparent shapes
         shapes = frame.copy()
         
         # 3. Column Scan
@@ -72,18 +72,11 @@ class ObstacleDetector:
             Get the average of the Top N closest points.
             Robustly detects thin obstacles (like cables with 2 edges)
             while filtering single-line noise.
-            If Top N is [450, 450] (Cable) -> Avg 450 -> Blocked.
-            If Top N is [450, 0] (Noise) -> Avg 225 -> Safe.
             """
             if not chunk: return 0
-            # Extract Y values
             ys = sorted([p[1] for p in chunk], reverse=True) # Descending (Closest first)
-            
-            # Take top N
             top_values = ys[:top_n]
             if not top_values: return 0
-            
-            # If we don't have enough values (unlikely), average what we have
             return sum(top_values) / len(top_values)
             
         c_left = get_top_average(left_chunk)
@@ -119,24 +112,24 @@ class ObstacleDetector:
                 instant_blocked.add("RIGHT")
                 cv2.rectangle(shapes, (int(w*0.66), int(h*0.5)), (w, h), (0, 0, 255), -1)
 
-        # Update History
-        self.block_history.append(instant_blocked)
-        
-        # Calculate PERSISTENT blocked actions
-        # If an action was blocked in ANY of the recent frames, it remains blocked.
-        persistent_blocked = set()
-        for b_set in self.block_history:
-            persistent_blocked.update(b_set)
+        # Update History (Thread Safe)
+        with self.lock:
+            self.block_history.append(instant_blocked)
             
-        # Determine Safe Actions
+            # Calculate PERSISTENT blocked actions
+            persistent_blocked = set()
+            for b_set in self.block_history:
+                persistent_blocked.update(b_set)
+            
+        # Determine Safe Actions based on persistent_blocked
         safe_actions = ["BACKWARD"]
         
         if "FORWARD" not in persistent_blocked:
              safe_actions.append("FORWARD")
              if not is_blind:
-                 pts = np.array([[int(w*0.3), h], [int(w*0.7), h], [int(w*0.6), int(h*0.4)], [int(w*0.4), int(h*0.4)]], np.int32)
-                 cv2.fillPoly(shapes, [pts], (0, 255, 0))
-                 cv2.putText(overlay, "FWD OK", (int(w*0.45), int(h*0.8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+                  pts = np.array([[int(w*0.3), h], [int(w*0.7), h], [int(w*0.6), int(h*0.4)], [int(w*0.4), int(h*0.4)]], np.int32)
+                  cv2.fillPoly(shapes, [pts], (0, 255, 0))
+                  cv2.putText(overlay, "FWD OK", (int(w*0.45), int(h*0.8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
                  
         if "LEFT" not in persistent_blocked:
             safe_actions.append("LEFT")
@@ -147,9 +140,6 @@ class ObstacleDetector:
         if "RIGHT" not in persistent_blocked:
             safe_actions.append("RIGHT")
             
-        # Status Text (Instant vs Persistent?)
-        # Let's show the final active result
-             
         # Blend overlay
         alpha = 0.4
         cv2.addWeighted(shapes, alpha, overlay, 1 - alpha, 0, overlay)
