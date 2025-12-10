@@ -98,11 +98,20 @@ class ObstacleDetector:
         c_right = get_top_average(right_chunk)
 
         # Safety Logic
-        
         # Determine INSTANT blocked actions
         instant_blocked = set()
+        
+        # Access state for Precision Mode
+        from state import state
+        
+        # Dynamic Thresholds
         threshold = self.obstacle_threshold_y
         
+        if state.precision_mode:
+             # Relax threshold for precision mode to allow getting closer to doors/walls
+             # Original 420. +30 = 450 (Closer). 
+             threshold += 30
+             
         # --- BLINDNESS CHECK ---
         total_edge_pixels = np.count_nonzero(edges)
         min_edge_pixels = 200 
@@ -117,7 +126,12 @@ class ObstacleDetector:
                 instant_blocked.add("FORWARD")
                 cv2.rectangle(shapes, (int(w*0.33), int(h*0.5)), (int(w*0.66), h), (0, 0, 255), -1)
             
+            # Side thresholds - tricky. 
+            # In precision mode, we might want TIGHTER side thresholds or LOOSER?
+            # We want to allow passing through narrow gaps, so we need to tolerate side obstacles being close.
+            # So we increase the threshold there too.
             side_threshold = threshold + 50
+            
             if c_left > side_threshold:
                 instant_blocked.add("LEFT")
                 cv2.rectangle(shapes, (0, int(h*0.5)), (int(w*0.33), h), (0, 0, 255), -1)
@@ -233,12 +247,18 @@ class ObstacleDetector:
                     center_offset = gap_center - (w // 2)
                     # > 0 means Target is Right. < 0 means Target is Left.
                     
-                    if abs(center_offset) < 40:
-                        guidance = "ALIGNMENT: PERFECT. Go straight."
+                    if abs(center_offset) < 20:
+                        guidance = "ALIGNMENT: PERFECT. ACTION: Move FORWARD."
+                        # Draw green "GO" line
+                        cv2.line(overlay, (gap_center, h//2), (gap_center, h), (0, 255, 0), 3)
                     elif center_offset < 0:
-                        guidance = f"ALIGNMENT: Gap is LEFT. Turn LEFT slightly."
+                        guidance = "ALIGNMENT: OFF-CENTER (Left). ACTION: STOP. Turn LEFT."
+                        # Draw red target line
+                        cv2.line(overlay, (gap_center, h//2), (gap_center, h), (0, 0, 255), 2)
                     else:
-                        guidance = f"ALIGNMENT: Gap is RIGHT. Turn RIGHT slightly."
+                        guidance = "ALIGNMENT: OFF-CENTER (Right). ACTION: STOP. Turn RIGHT."
+                        # Draw red target line
+                        cv2.line(overlay, (gap_center, h//2), (gap_center, h), (0, 0, 255), 2)
             
             if guidance:
                  cv2.putText(overlay, guidance, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)

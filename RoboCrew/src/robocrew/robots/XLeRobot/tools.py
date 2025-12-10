@@ -195,60 +195,6 @@ def create_look_around(servo_controller, main_camera):
     return look_around
 
 
-def create_look_left(servo_controller):
-    @tool
-    def look_left() -> str:
-        """Turn camera to look left (without moving the robot body)."""
-        print("[TOOL] look_left - turning head left")
-        servo_controller.turn_head_yaw(-60)
-        time.sleep(0.5)
-        return "Camera is now looking left. Use this view to check for openings or obstacles on your left side."
-    return look_left
-
-
-def create_look_right(servo_controller):
-    @tool
-    def look_right() -> str:
-        """Turn camera to look right (without moving the robot body)."""
-        print("[TOOL] look_right - turning head right")
-        servo_controller.turn_head_yaw(60)
-        time.sleep(0.5)
-        return "Camera is now looking right. Use this view to check for openings or obstacles on your right side."
-    return look_right
-
-
-def create_look_center(servo_controller):
-    @tool
-    def look_center() -> str:
-        """Reset camera to look straight ahead."""
-        print("[TOOL] look_center - resetting head position")
-        servo_controller.turn_head_yaw(0)
-        servo_controller.turn_head_pitch(35)
-        time.sleep(0.3)
-        return "Camera is now looking straight ahead."
-    return look_center
-
-
-def create_look_down(servo_controller):
-    @tool
-    def look_down() -> str:
-        """Tilt camera slightly down to see the ground closer to you."""
-        print("[TOOL] look_down - tilting head down slightly")
-        servo_controller.turn_head_pitch(50)
-        time.sleep(0.3)
-        return "Camera tilted down slightly. Check for obstacles on the ground ahead."
-    return look_down
-
-
-def create_look_up(servo_controller):
-    @tool
-    def look_up() -> str:
-        """Tilt camera slightly up to see further ahead."""
-        print("[TOOL] look_up - tilting head up slightly")
-        servo_controller.turn_head_pitch(25)
-        time.sleep(0.3)
-        return "Camera tilted up slightly. You can now see further ahead."
-    return look_up
 
 
 def create_vla_single_arm_manipulation(

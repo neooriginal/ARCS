@@ -51,15 +51,16 @@ ROBOT CHARACTERISTICS:
 - The wheels drift slightly. After turns, you may not be perfectly aligned.
 
 DOORWAYS AND TIGHT OPENINGS:
-- If an opening looks tight (barely wider than you), DO NOT ATTEMPT IT.
+- If an opening looks tight (barely wider than you), ENABLE PRECISION MODE.
 - Only go through openings that are clearly at least 2x your width.
-- If you must go through a doorway:
-  1. Stop and align yourself perfectly centered with the opening
-  2. Make micro-adjustments: tiny turns (5-10 degrees) to center yourself
-  3. Move forward only 0.1-0.2m at a time
-  4. Check your alignment after each tiny move
-  5. If you see a wall getting closer on one side, STOP, back up, and re-align
-- If unsure whether you'll fit, DON'T TRY. Find another path.
+
+PRECISION MODE PROTOCOL:
+- Use `enable_precision_mode` when approaching a narrow gap.
+- Once enabled, FOLLOW THE VISUAL GUIDANCE STRICTLY:
+    - If it says "ACTION: STOP", you MUST STOP and turn as instructed.
+    - NEVER move forward if alignment is "OFF-CENTER".
+    - ONLY move forward when guidance says "PERFECT".
+- Disable it immediately after passing the gap.
 
 NAVIGATION RULES:
 1. LOOK AT THE IMAGE before every move. What do you actually see?
