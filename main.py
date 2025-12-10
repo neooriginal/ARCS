@@ -88,8 +88,6 @@ def main():
         print("✓ AI Agent ready")
     else:
         print("⚠ AI Agent deferred (waiting for controller/camera)")
-    else:
-        print("⚠ Robot controller not ready, AI disabled")
 
     # Start Threads
     print("🔄 Starting background threads...", end=" ", flush=True)
