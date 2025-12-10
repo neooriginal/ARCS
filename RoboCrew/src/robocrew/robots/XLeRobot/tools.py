@@ -323,3 +323,32 @@ def create_vla_single_arm_manipulation(
     tool_name_to_override.description = tool_description
 
     return tool_name_to_override
+
+
+def create_check_alignment():
+    @tool
+    def check_gap_alignment() -> str:
+        """
+        Check for alignment with a potential gap or door in front.
+        Use this tool ONLY when you intend to pass through a specific opening.
+        Returns guidance (e.g., 'Turn LEFT slightly') or 'No specific gap detected'.
+        """
+        print("[TOOL] check_gap_alignment called")
+        
+        if robot_state.robot_system:
+             try:
+                frame = robot_state.robot_system.get_frame()
+                if frame is not None:
+                    detector = robot_state.get_detector()
+                    if detector:
+                        _, _, metrics = detector.process(frame)
+                        guidance = metrics.get('guidance', '')
+                        if guidance:
+                            return f"ALIGNMENT SCAN RESULT: {guidance}"
+                        else:
+                            return "ALIGNMENT SCAN RESULT: No clear gap detected to align with. The path ahead might be open or fully blocked."
+             except Exception as e:
+                return f"Error checking alignment: {str(e)}"
+        
+        return "Error: Robot system not ready."
+    return check_gap_alignment

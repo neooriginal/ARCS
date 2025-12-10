@@ -54,12 +54,11 @@ DOORWAYS AND TIGHT OPENINGS:
 - If an opening looks tight (barely wider than you), DO NOT ATTEMPT IT.
 - Only go through openings that are clearly at least 2x your width.
 - If you must go through a doorway:
-  1. Stop and align yourself perfectly centered with the opening
-  2. Make micro-adjustments: tiny turns (5-10 degrees) to center yourself
-  3. Move forward only 0.1-0.2m at a time
-  4. Check your alignment after each tiny move
-  5. If you see a wall getting closer on one side, STOP, back up, and re-align
-- If unsure whether you'll fit, DON'T TRY. Find another path.
+  1. Use the `check_gap_alignment` tool to help you align with the opening.
+  2. Implement the guidance returned by the tool (e.g., turn left/right).
+  3. Move forward only 0.1-0.2m at a time.
+  4. Check alignment again if needed.
+- ONLY use `check_gap_alignment` if you intend to pass through a specific narrow opening. Do not use it for general exploration.
 
 NAVIGATION RULES:
 1. LOOK AT THE IMAGE before every move. What do you actually see?
@@ -178,7 +177,7 @@ BACKWARD MOVEMENT SAFETY:
         ]
         
         # Inject Allowed Actions & Warnings
-        reflex_msg = f"REFLEX SYSTEM: Allowed actions are {safe_actions}. Green Marked Paths are SAFE. Red Marked Areas are BLOCKED.\nVISUAL GUIDANCE: {guidance}"
+        reflex_msg = f"REFLEX SYSTEM: Allowed actions are {safe_actions}. Green Marked Paths are SAFE. Red Marked Areas are BLOCKED."
         
         if self.stuck_counter > 0:
             reflex_msg += f"\nWARNING: You have been blocked {self.stuck_counter} times recently. You are likely STUCK. Do NOT try the same action again. Turn around or find a new path."
