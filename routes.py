@@ -318,8 +318,7 @@ def display_state():
         'controller_connected': state.controller is not None,
         'camera_connected': state.camera is not None and state.camera.isOpened() if state.camera else False,
         'arm_connected': state.arm_connected,
-        'control_mode': control_mode,
-        'obstacles': state.detector.current_status if state.detector else {}
+        'control_mode': control_mode
     })
 
 
@@ -356,9 +355,35 @@ def generate_cv_frames():
                 task_text = state.agent.current_task[:40] if len(state.agent.current_task) > 40 else state.agent.current_task
                 cv2.putText(overlay, task_text, (10, frame.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
             
-            # Display Safe Actions cleanly
+            # Display Safe Actions with modern visualization
+            h, w = overlay.shape[:2]
+            
+            # 1. Front Blocked (Big Red X or STOP)
             if "FORWARD" not in safe_actions:
-                 cv2.putText(overlay, "BLOCKED AHEAD", (overlay.shape[1]//2 - 80, overlay.shape[0]//2), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                # Draw semi-transparent red overlay in center
+                center_overlay = overlay.copy()
+                cv2.rectangle(center_overlay, (w//3, h//4), (2*w//3, 3*h//4), (0, 0, 255), -1)
+                cv2.addWeighted(center_overlay, 0.3, overlay, 0.7, 0, overlay)
+                
+                # Draw STOP text
+                cv2.putText(overlay, "BLOCKED", (w//2 - 60, h//2), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                cv2.putText(overlay, "FORWARD", (w//2 - 60, h//2 + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+
+            # 2. Left Blocked (Red Bar on Left)
+            if "LEFT" not in safe_actions:
+                # Draw red strip on left edge
+                left_overlay = overlay.copy()
+                cv2.rectangle(left_overlay, (0, 0), (40, h), (0, 0, 255), -1)
+                cv2.addWeighted(left_overlay, 0.5, overlay, 0.5, 0, overlay)
+                # Chevron pointing right (indicating you can't go left)
+                # cv2.arrowedLine(overlay, (10, h//2), (30, h//2), (255, 255, 255), 2)
+
+            # 3. Right Blocked (Red Bar on Right)
+            if "RIGHT" not in safe_actions:
+                # Draw red strip on right edge
+                right_overlay = overlay.copy()
+                cv2.rectangle(right_overlay, (w-40, 0), (w, h), (0, 0, 255), -1)
+                cv2.addWeighted(right_overlay, 0.5, overlay, 0.5, 0, overlay)
 
             _, buffer = cv2.imencode('.jpg', overlay, [cv2.IMWRITE_JPEG_QUALITY, 70])
             yield (b'--frame\r\n'

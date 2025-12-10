@@ -22,13 +22,6 @@ class ObstacleDetector:
         self.block_history = deque(maxlen=self.history_len) # Stores set of BLOCKED actions
         self.lock = threading.Lock()
         
-        # Current status for display
-        self.current_status = {
-            'blocked_front': False,
-            'blocked_left': False,
-            'blocked_right': False
-        }
-        
     def process(self, frame):
         """
         Process the frame to detect obstacles and determine navigation command.
@@ -134,13 +127,6 @@ class ObstacleDetector:
             persistent_blocked = set()
             for b_set in self.block_history:
                 persistent_blocked.update(b_set)
-            
-            # Update public status (Thread Safe)
-            self.current_status = {
-                'blocked_front': "FORWARD" in persistent_blocked,
-                'blocked_left': "LEFT" in persistent_blocked,
-                'blocked_right': "RIGHT" in persistent_blocked
-            }
             
         # Determine Safe Actions based on persistent_blocked
         safe_actions = ["BACKWARD"]

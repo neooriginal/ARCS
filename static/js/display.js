@@ -179,7 +179,7 @@ class RoboDisplay {
     setExpression(expression) {
         if (this.currentExpression === expression) return;
 
-        const expressions = ['happy', 'thinking', 'error', 'excited', 'cross-eyed', 'worry'];
+        const expressions = ['happy', 'thinking', 'error', 'excited'];
         expressions.forEach(exp => {
             this.leftEye.classList.remove(exp);
             this.rightEye.classList.remove(exp);
@@ -211,13 +211,6 @@ class RoboDisplay {
                 break;
             case 'error':
                 // Shake handled by CSS
-                break;
-            case 'cross-eyed':
-                this.leftEye.classList.add('cross-eyed');
-                this.rightEye.classList.add('cross-eyed');
-                break;
-            case 'worry':
-                // Slight squint or widen? For now just look away logic handles direction
                 break;
         }
     }
@@ -293,7 +286,6 @@ class RoboDisplay {
                     this.updateFromState(data);
                     this.updateSystemStatus(data);
                     this.updateControlMode(data.control_mode || 'idle');
-                    this.updateBlockage(data.obstacles || {});
                 }
             } catch (error) {
                 // Connection lost
