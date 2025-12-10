@@ -90,7 +90,6 @@ BACKWARD MOVEMENT SAFETY:
         # State
         self.current_task = "Idle"
         self.last_image = None
-        self.last_image = None
         self.stuck_counter = 0
         self.last_action = None
 
@@ -115,8 +114,6 @@ BACKWARD MOVEMENT SAFETY:
             import sys
             if os.getcwd() not in sys.path:
                 sys.path.append(os.getcwd())
-            from obstacle_detection import ObstacleDetector
-            
             from obstacle_detection import ObstacleDetector
             
             # Use shared detector

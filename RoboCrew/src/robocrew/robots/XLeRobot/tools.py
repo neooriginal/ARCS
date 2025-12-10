@@ -245,8 +245,6 @@ def create_vla_single_arm_manipulation(
         port=arm_port,
         cameras=configured_cameras,
         id="robot_arms",
-        # TODO: Figure out calibration loading/saving issues
-        # calibration_dir=Path("/home/pi/RoboCrew/calibrations")
     )
 
     cfg = RobotClientConfig(

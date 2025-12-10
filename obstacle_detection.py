@@ -1,28 +1,39 @@
 import cv2
 import numpy as np
 import logging
+import threading
+from collections import deque
+from state import state
 
 logger = logging.getLogger(__name__)
 
 class ObstacleDetector:
+    """
+    Vision-based obstacle detection and navigation assistance system.
+    
+    Features:
+    - Vertical edge detection for obstacle identification.
+    - Dynamic safety thresholds for different movement modes.
+    - "Precision Mode" for aligning with narrow gaps/doors.
+    - Continuous safety history to prevent flickering/hysteresis.
+    """
+    
     def __init__(self, width=640, height=480):
         self.width = width
         self.height = height
-        # Thresholds tuned for "Stop at the very last moment"
-        # Y=480 is bottom. Y=420 is very close.
-        self.obstacle_threshold_y = 420
-        self.center_x_threshold = 310
         
-        # Hysteresis / Flicker Safety
-        # Store recent "Blocked" states.
-        # If an action was blocked recently, we keep it blocked for a bit.
-        from collections import deque
-        import threading
-        self.history_len = 12 # Approx 0.5-1.0s depending on FPS
-        self.block_history = deque(maxlen=self.history_len) # Stores set of BLOCKED actions
+        # Detection Thresholds
+        # Y-coordinate thresholds (0=top, 480=bottom)
+        self.obstacle_threshold_y = 420  # Stop when obstacle is very close
+        self.center_x_threshold = 310
+        self.min_edge_pixels = 200      # Minimum edge pixels to consider valid visual input
+        
+        # Hysteresis / Safety History
+        self.history_len = 12  # Approx 0.5-1.0s buffer
+        self.block_history = deque(maxlen=self.history_len)
         self.lock = threading.Lock()
         
-        # UI State for Blockage Visualization
+        # Public State
         self.latest_blockage = {
             'forward': False,
             'left': False,
@@ -31,247 +42,244 @@ class ObstacleDetector:
         
     def process(self, frame):
         """
-        Process the frame to detect obstacles and determine navigation command.
+        Process a video frame to detect obstacles and determine safe navigation actions.
+        
+        Args:
+            frame (np.ndarray): Input video frame (BGR).
+            
         Returns:
-            safe_actions (list): List of allowed actions ['FORWARD', 'LEFT', 'RIGHT', 'BACKWARD']
-            overlay (np.ndarray): Frame with debug drawing
-            metrics (dict): Internal metrics
+            tuple: (
+                safe_actions (list): List of allowed actions ['FORWARD', 'LEFT', 'RIGHT', 'BACKWARD'],
+                overlay (np.ndarray): Visualization frame,
+                metrics (dict): Internal detection metrics
+            )
         """
         if frame is None:
             return ["STOP"], None, {}
 
-        # Noise Reduction
-        filtered = cv2.bilateralFilter(frame, 9, 75, 75)
-        
-        # Edge Detection
-        edges = cv2.Canny(filtered, 50, 150)
-        
+        # 1. Image Preprocessing & Edge Detection
+        edges, total_edge_pixels = self._detect_edges(frame)
         h, w = edges.shape
-        edge_points = []
         
-        # Visualization setup
+        # 2. Column Scanning
+        edge_points = self._scan_columns(edges, w, h)
+        
+        # Visualization Setup
         overlay = frame.copy()
         shapes = frame.copy()
+        self._draw_scan_points(overlay, edge_points)
+
+        # 3. Analyze Obstacle Distances
+        # Divide view into chunks: Left, Center, Right
+        # Center is narrower to focus on immediate path.
+        center_width = len(edge_points) // 6
+        side_width = (len(edge_points) - center_width) // 2
         
-        # Column Scan
-        for x in range(0, w, 5):
-            detected_y = 0 
-            found = False
+        c_left = self._get_chunk_average(edge_points[:side_width])
+        c_fwd = self._get_chunk_average(edge_points[side_width : side_width + center_width])
+        c_right = self._get_chunk_average(edge_points[side_width + center_width:])
+
+        # 4. Check Safety Constraints
+        is_blind = total_edge_pixels < self.min_edge_pixels
+        instant_blocked = self._determine_blocked_directions(c_left, c_fwd, c_right, is_blind)
+        
+        # Update Safety History & Public State
+        safe_actions = self._update_safety_state(instant_blocked, is_blind, shapes, overlay, w, h)
+
+        # 5. Compute Precision Guidance (if enabled)
+        guidance = ""
+        if state.precision_mode:
+            guidance = self._compute_precision_guidance(edge_points, c_fwd, w, h, overlay, shapes)
+
+        # Blend Visualization
+        alpha = 0.4
+        cv2.addWeighted(shapes, alpha, overlay, 1 - alpha, 0, overlay)
+        if guidance:
+            cv2.putText(overlay, guidance, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+
+        return safe_actions, overlay, {
+            'c_left': c_left, 
+            'c_fwd': c_fwd, 
+            'c_right': c_right, 
+            'edges': total_edge_pixels,
+            'guidance': guidance
+        }
+
+    def _detect_edges(self, frame):
+        """Apply filters and Canny edge detection."""
+        filtered = cv2.bilateralFilter(frame, 9, 75, 75)
+        edges = cv2.Canny(filtered, 50, 150)
+        total_pixels = np.count_nonzero(edges)
+        return edges, total_pixels
+
+    def _scan_columns(self, edges, w, h, step=5):
+        """Scan columns to find the lowest (closest) edge pixel."""
+        edge_points = []
+        for x in range(0, w, step):
+            detected_y = 0
+            # Scan bottom-up
             for y in range(h - 1, -1, -1):
                 if edges[y, x] == 255:
                     detected_y = y
-                    found = True
                     break
             edge_points.append((x, detected_y))
-            if found:
-                cv2.circle(overlay, (x, detected_y), 2, (0, 0, 255), -1)
+        return edge_points
 
-        # Chunking & Metrics
-        num_points = len(edge_points)
-        # Narrower Forward Zone for Doors (1/6th instead of 1/5th)
-        center_width = num_points // 6
-        side_width = (num_points - center_width) // 2
-        
-        left_chunk = edge_points[:side_width]
-        center_chunk = edge_points[side_width : side_width + center_width]
-        right_chunk = edge_points[side_width + center_width:]
-        
-        # Grid Visualization
-        center_x_start = side_width * 5
-        center_x_end = (side_width + center_width) * 5
-        cv2.rectangle(shapes, (center_x_start, 0), (center_x_end, h), (50, 50, 50), 1)
-        
-        def get_top_average(chunk, top_n=2):
-            """
-            Get the average of the Top N closest points.
-            Robustly detects thin obstacles (like cables with 2 edges)
-            while filtering single-line noise.
-            """
-            if not chunk: return 0
-            ys = sorted([p[1] for p in chunk], reverse=True) # Descending (Closest first)
-            top_values = ys[:top_n]
-            if not top_values: return 0
-            return sum(top_values) / len(top_values)
-            
-        c_left = get_top_average(left_chunk)
-        c_fwd = get_top_average(center_chunk)
-        c_right = get_top_average(right_chunk)
+    def _draw_scan_points(self, overlay, edge_points):
+        """Draw detected obstacles on the overlay."""
+        for x, y in edge_points:
+            if y > 0:
+                cv2.circle(overlay, (x, y), 2, (0, 0, 255), -1)
 
-        # Safety Logic
-        # Determine INSTANT blocked actions
-        instant_blocked = set()
+    def _get_chunk_average(self, chunk, top_n=2):
+        """
+        Calculate average Y-position of the closest points in a chunk.
+        Robust against single-pixel noise.
+        """
+        if not chunk:
+            return 0
+        ys = sorted([p[1] for p in chunk], reverse=True)  # Descending (Closest first)
+        top_values = ys[:top_n]
+        if not top_values:
+            return 0
+        return sum(top_values) / len(top_values)
+
+    def _determine_blocked_directions(self, c_left, c_fwd, c_right, is_blind):
+        """Determine which directions are unsafe based on thresholds."""
+        blocked = set()
         
-        # Access state for Precision Mode
-        from state import state
-        
-        # Dynamic Thresholds
+        # Adjust threshold based on mode
         threshold = self.obstacle_threshold_y
-        
         if state.precision_mode:
-             # Relax threshold for precision mode to allow getting closer to doors/walls
-             # Original 420. +30 = 450 (Closer). 
+             # Relax threshold to allow closer approach
              threshold += 30
              
-        # --- BLINDNESS CHECK ---
-        total_edge_pixels = np.count_nonzero(edges)
-        min_edge_pixels = 200 
-        is_blind = total_edge_pixels < min_edge_pixels
+        side_threshold = threshold + 50
         
         if is_blind:
-            instant_blocked.add("FORWARD")
-            cv2.rectangle(shapes, (int(w*0.2), int(h*0.2)), (int(w*0.8), int(h*0.8)), (0, 0, 255), -1)
-            cv2.putText(overlay, "BLOCKED (NO VISUALS)", (int(w*0.3), int(h*0.5)), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            blocked.add("FORWARD")
         else:
             if c_fwd > threshold:
-                instant_blocked.add("FORWARD")
-                cv2.rectangle(shapes, (int(w*0.33), int(h*0.5)), (int(w*0.66), h), (0, 0, 255), -1)
-            
-            # Side thresholds - tricky. 
-            # In precision mode, we might want TIGHTER side thresholds or LOOSER?
-            # We want to allow passing through narrow gaps, so we need to tolerate side obstacles being close.
-            # So we increase the threshold there too.
-            side_threshold = threshold + 50
-            
+                blocked.add("FORWARD")
             if c_left > side_threshold:
-                instant_blocked.add("LEFT")
-                cv2.rectangle(shapes, (0, int(h*0.5)), (int(w*0.33), h), (0, 0, 255), -1)
-            
+                blocked.add("LEFT")
             if c_right > side_threshold:
-                instant_blocked.add("RIGHT")
-                cv2.rectangle(shapes, (int(w*0.66), int(h*0.5)), (w, h), (0, 0, 255), -1)
+                blocked.add("RIGHT")
+                
+        return blocked
 
-        # Update History (Thread Safe)
+    def _update_safety_state(self, instant_blocked, is_blind, shapes, overlay, w, h):
+        """
+        Update shared history buffer and determine final safe actions.
+        Draws safety indicators on the overlay.
+        """
         with self.lock:
             self.block_history.append(instant_blocked)
             
-            # Calculate PERSISTENT blocked actions
+            # Combine history to filter noise
             persistent_blocked = set()
             for b_set in self.block_history:
                 persistent_blocked.update(b_set)
-                
-            # Update public state for UI
+            
+            # Update public state
             self.latest_blockage = {
                 'forward': "FORWARD" in persistent_blocked,
                 'left': "LEFT" in persistent_blocked,
                 'right': "RIGHT" in persistent_blocked
             }
             
-        # Determine Safe Actions based on persistent_blocked
-        safe_actions = ["BACKWARD"]
+        safe_actions = ["BACKWARD"] # Backward is mostly always safe (blind)
         
-        if "FORWARD" not in persistent_blocked:
-             safe_actions.append("FORWARD")
-             if not is_blind:
-                  pts = np.array([[int(w*0.3), h], [int(w*0.7), h], [int(w*0.6), int(h*0.4)], [int(w*0.4), int(h*0.4)]], np.int32)
-                  cv2.fillPoly(shapes, [pts], (0, 255, 0))
-                  cv2.putText(overlay, "FWD OK", (int(w*0.45), int(h*0.8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
-                 
-        if "LEFT" not in persistent_blocked:
-            safe_actions.append("LEFT")
-            if not is_blind:
-                 pts = np.array([[0, h], [0, h//2], [w//3, h//2], [0, h]], np.int32)
-                 # cv2.fillPoly for left zone if desired
-                 
-        if "RIGHT" not in persistent_blocked:
-            safe_actions.append("RIGHT")
-            
-        # Blend overlay
-        alpha = 0.4
-        cv2.addWeighted(shapes, alpha, overlay, 1 - alpha, 0, overlay)
+        # Visualize Blockages
+        cx = w // 2
+        cy = h // 2
         
-        
-        # Gap Detection & Precision Visualization
-        # Only ACTIVE if precision_mode is True
-        from state import state
-        guidance = "" 
-        
-        if state.precision_mode:
-            # Find the "Center of Safety" to guide the robot
-            # We classify columns as "Passable" if their obstacle is far away (e.g. Y < 350)
-            # We classify columns as "Passable" if their obstacle is far away (e.g. Y < 350)
-            # Smoothing: Filter out single-column noise spikes by checking neighbors
-            raw_ys = [p[1] for p in edge_points]
-            smoothed_ys = []
-            for i in range(len(raw_ys)):
-                # Median of 3 neighbors
-                prev_y = raw_ys[i-1] if i > 0 else raw_ys[i]
-                next_y = raw_ys[i+1] if i < len(raw_ys)-1 else raw_ys[i]
-                curr_y = raw_ys[i]
-                smoothed_ys.append(sorted([prev_y, curr_y, next_y])[1])
+        if is_blind:
+            cv2.rectangle(shapes, (int(w*0.2), int(h*0.2)), (int(w*0.8), int(h*0.8)), (0, 0, 255), -1)
+            cv2.putText(overlay, "BLOCKED (NO VISUALS)", (int(w*0.3), cy), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        else:
+            if "FORWARD" in persistent_blocked:
+                cv2.rectangle(shapes, (int(w*0.33), cy), (int(w*0.66), h), (0, 0, 255), -1)
+            else:
+                safe_actions.append("FORWARD")
+                # Draw Safe Zone
+                pts = np.array([[int(w*0.3), h], [int(w*0.7), h], [int(w*0.6), int(h*0.4)], [int(w*0.4), int(h*0.4)]], np.int32)
+                cv2.fillPoly(shapes, [pts], (0, 255, 0))
+                cv2.putText(overlay, "FWD OK", (int(w*0.45), int(h*0.8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
 
-            passable_indices = []
-            for i, (x, _) in enumerate(edge_points):
-                # Use smoothed Y for check
-                if smoothed_ys[i] < 350: 
-                    passable_indices.append(x)
-                    
-            best_center_x = w // 2 # Default to center
-            
-            if passable_indices:
-                # Find the largest contiguous segment of passable columns
-                # But edge_points is sparse (step 5). 
-                # We can simplify: just find the mean X of all passable points?
-                # No, that might put us between two doors.
-                # We need the widest gap.
+            if "LEFT" in persistent_blocked:
+                cv2.rectangle(shapes, (0, cy), (int(w*0.33), h), (0, 0, 255), -1)
+            else:
+                safe_actions.append("LEFT")
                 
-                # Group into clusters
-                # Since step is 5, if diff > 10, it's a break.
-                clusters = []
-                if passable_indices:
-                    current_cluster = [passable_indices[0]]
-                    for i in range(1, len(passable_indices)):
-                        # Tolerant of single noise pixel (5) or double noise pixels (10). 
-                        # Step is 5. Adjacent is 5. Gap of 1 is 10. Gap of 2 is 15.
-                        if passable_indices[i] - passable_indices[i-1] <= 15:
-                            current_cluster.append(passable_indices[i])
-                        else:
-                            clusters.append(current_cluster)
-                            current_cluster = [passable_indices[i]]
-                    clusters.append(current_cluster)
-                    
-                # Find widest cluster
-                widest_cluster = max(clusters, key=len)
+            if "RIGHT" in persistent_blocked:
+                cv2.rectangle(shapes, (int(w*0.66), cy), (w, h), (0, 0, 255), -1)
+            else:
+                safe_actions.append("RIGHT")
                 
-                # Calculate center of widest gap
-                if widest_cluster:
-                    start_x = widest_cluster[0]
-                    end_x = widest_cluster[-1]
-                    gap_center = (start_x + end_x) // 2
-                    best_center_x = gap_center
-                    
-                    # Draw Gap Target
-                    cv2.line(overlay, (gap_center, h//2), (gap_center, h), (255, 255, 0), 2)
-                    cv2.putText(overlay, "TARGET", (gap_center - 20, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
-                    
-                    # Calculate simple guidance
-                    center_offset = gap_center - (w // 2)
-                    # > 0 means Target is Right. < 0 means Target is Left.
-                    
-                    is_aligned = abs(center_offset) < 20
-                    is_too_close_to_align = c_fwd > 380 # If obstacles are closer than Y=380, back off to align
-                    
-                    if is_aligned:
-                        guidance = "ALIGNMENT: PERFECT. ACTION: Move FORWARD."
-                        # Draw green "GO" line
-                        cv2.line(overlay, (gap_center, h//2), (gap_center, h), (0, 255, 0), 3)
-                    else:
-                        # We are NOT aligned.
-                        if is_too_close_to_align:
-                            # If we are too close and misaligned, we must back up to get a better view/angle
-                            guidance = "ALIGNMENT: UNSAFE DISTANCE. ACTION: STOP. BACK UP to Align."
-                            cv2.rectangle(shapes, (0, 0), (w, h), (0, 0, 255), 20) # Red border
-                        elif center_offset < 0:
-                            guidance = "ALIGNMENT: OFF-CENTER (Left). ACTION: STOP. Turn LEFT."
-                            cv2.line(overlay, (gap_center, h//2), (gap_center, h), (0, 0, 255), 2)
-                        else:
-                            guidance = "ALIGNMENT: OFF-CENTER (Right). ACTION: STOP. Turn RIGHT."
-                            cv2.line(overlay, (gap_center, h//2), (gap_center, h), (0, 0, 255), 2)
+        return safe_actions
+
+    def _compute_precision_guidance(self, edge_points, c_fwd, w, h, overlay, shapes):
+        """
+        Identify usable gaps and provide alignment guidance.
+        """
+        # 1. Smooth Y-values to reduce noise
+        raw_ys = [p[1] for p in edge_points]
+        smoothed_ys = []
+        for i in range(len(raw_ys)):
+            prev_y = raw_ys[i-1] if i > 0 else raw_ys[i]
+            next_y = raw_ys[i+1] if i < len(raw_ys)-1 else raw_ys[i]
+            smoothed_ys.append(sorted([prev_y, raw_ys[i], next_y])[1]) # Median
             
-            if guidance:
-                 cv2.putText(overlay, guidance, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+        # 2. Identify "Passable" Columns (Obstacle is far away)
+        passable_limit_y = 350
+        passable_indices = [
+            edge_points[i][0] 
+            for i, y in enumerate(smoothed_ys) 
+            if y < passable_limit_y
+        ]
+        
+        if not passable_indices:
+            return "ALIGNMENT: NO GAP DETECTED."
 
-        return safe_actions, overlay, {
-            'c_left': c_left, 'c_fwd': c_fwd, 'c_right': c_right, 'edges': total_edge_pixels,
-            'guidance': guidance
-        }
-
+        # 3. Find Largest Contiguous Gap
+        # Points are separated by 'step=5'. Allow skip of 1-2 points (approx 15px)
+        clusters = []
+        current_cluster = [passable_indices[0]]
+        for i in range(1, len(passable_indices)):
+            if passable_indices[i] - passable_indices[i-1] <= 15:
+                current_cluster.append(passable_indices[i])
+            else:
+                clusters.append(current_cluster)
+                current_cluster = [passable_indices[i]]
+        clusters.append(current_cluster)
+        
+        widest_cluster = max(clusters, key=len)
+        if not widest_cluster:
+            return "ALIGNMENT: NO GAP DETECTED."
+            
+        gap_center = (widest_cluster[0] + widest_cluster[-1]) // 2
+        
+        # Draw Target Line
+        cv2.line(overlay, (gap_center, h//2), (gap_center, h), (255, 255, 0), 2)
+        cv2.putText(overlay, "TARGET", (gap_center - 20, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+        
+        # 4. Generate Guidance
+        center_offset = gap_center - (w // 2)
+        is_aligned = abs(center_offset) < 20
+        is_too_close_to_align = c_fwd > 380 
+        
+        if is_aligned:
+            cv2.line(overlay, (gap_center, h//2), (gap_center, h), (0, 255, 0), 3)
+            return "ALIGNMENT: PERFECT. Go FORWARD."
+        else:
+            if is_too_close_to_align:
+                # Proximity Warning
+                cv2.rectangle(shapes, (0, 0), (w, h), (0, 0, 255), 20)
+                return "ALIGNMENT: TOO CLOSE. BACK UP."
+            elif center_offset < 0:
+                cv2.line(overlay, (gap_center, h//2), (gap_center, h), (0, 0, 255), 2)
+                return "ALIGNMENT: TARGET LEFT. Turn LEFT."
+            else:
+                cv2.line(overlay, (gap_center, h//2), (gap_center, h), (0, 0, 255), 2)
+                return "ALIGNMENT: TARGET RIGHT. Turn RIGHT."
