@@ -30,7 +30,7 @@ python main.py
 ## 📋 Requirements
 - Python 3.10+
 
-## Special Thanks 🙏
+## 🙏 Special Thanks
 Some code was taken from the [RoboCrew](https://github.com/Grigorij-Dudnik/RoboCrew) project. 
 
 ## 📝 License
