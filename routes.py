@@ -318,7 +318,9 @@ def display_state():
         'controller_connected': state.controller is not None,
         'camera_connected': state.camera is not None and state.camera.isOpened() if state.camera else False,
         'arm_connected': state.arm_connected,
-        'control_mode': control_mode
+        'arm_connected': state.arm_connected,
+        'control_mode': control_mode,
+        'is_blocked': state.is_blocked
     })
 
 
@@ -358,6 +360,9 @@ def generate_cv_frames():
             # Display Safe Actions cleanly
             if "FORWARD" not in safe_actions:
                  cv2.putText(overlay, "BLOCKED AHEAD", (overlay.shape[1]//2 - 80, overlay.shape[0]//2), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                 state.is_blocked = True
+            else:
+                 state.is_blocked = False
 
             _, buffer = cv2.imencode('.jpg', overlay, [cv2.IMWRITE_JPEG_QUALITY, 70])
             yield (b'--frame\r\n'

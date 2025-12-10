@@ -376,6 +376,40 @@ body {
     }
 }
 
+/* Blocked expression - Cross eyed and Red/Orange */
+.eye.blocked .eye-white {
+    background: radial-gradient(ellipse at 35% 35%, #fff5f0 0%, #ffece0 50%, #ffd0c0 100%);
+}
+
+.eye.blocked .eye-iris {
+    background: radial-gradient(circle at 35% 35%, #ff8c00 0%, #e06000 30%, #c04000 60%, #a02000 100%);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.eye.blocked .eye-pupil {
+    height: 15px;
+    /* Narrow pupils (shock) */
+    width: 60px;
+    border-radius: 10px;
+}
+
+/* Cross-eyes effect: Left eye looks right, Right eye looks left */
+.left-eye.blocked .eye-iris {
+    transform: translateX(35px) !important;
+}
+
+.right-eye.blocked .eye-iris {
+    transform: translateX(-35px) !important;
+}
+
+.eye.blocked .top-lid {
+    transform: translateY(20%) rotate(10deg);
+}
+
+.eye.blocked .bottom-lid {
+    transform: translateY(-20%) rotate(-10deg);
+}
+
 /* Status Bar */
 .status-bar {
     position: absolute;
