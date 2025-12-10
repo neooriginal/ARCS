@@ -1,4 +1,4 @@
-"""RoboCrew Web Control & AI Agent"""
+"""ARCS Web Control & AI Agent"""
 
 import signal
 import sys
@@ -71,7 +71,7 @@ def cleanup(signum=None, frame=None):
 
 def main():
     print("=" * 50)
-    print("🤖 RoboCrew System Starting")
+    print("🤖 ARCS System Starting")
     print("=" * 50)
     
     signal.signal(signal.SIGINT, cleanup)

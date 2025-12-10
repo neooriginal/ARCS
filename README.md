@@ -1,13 +1,14 @@
-# 🤖 RoboCrew Control System
+# 🤖 ARCS (Autonomous Robot Control System)
 
 **AI Agent • Remote Manipulation • Active Safety**
 
-A robust control framework for the RoboCrew project. Feature-rich, safe, and ready for autonomy.
+A robust control framework for ARCS. Feature-rich, safe, and ready for autonomy.
 
 ## 📚 Documentation
 Full guides available in [`docs/`](docs/):
 
 - **[🚀 Setup Guide](docs/setup.md)**: Install & Calibrate.
+- **[🧭 Navigation](docs/navigation.md)**: Obstacle Detection & Precision Mode.
 - **[🛡️ Safety Architecture](docs/safety.md)**: How it protects itself.
 - **[👁️ Visual Intelligence](docs/visual_intelligence.md)**: How it sees.
 - **[🔐 Security](docs/security.md)**: Network & Privacy.
@@ -31,7 +32,7 @@ python main.py
 - Python 3.10+
 
 ## 🙏 Special Thanks
-Some code was taken from the [RoboCrew](https://github.com/Grigorij-Dudnik/RoboCrew) project. 
+Based on the [RoboCrew](https://github.com/Grigorij-Dudnik/RoboCrew) project. 
 
 ## 📝 License
 [MIT License](LICENSE)

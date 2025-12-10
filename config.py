@@ -1,4 +1,4 @@
-"""RoboCrew Control System Configuration"""
+"""ARCS Configuration"""
 
 # Hardware ports
 CAMERA_PORT = "/dev/video0"

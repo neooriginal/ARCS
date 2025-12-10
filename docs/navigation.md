@@ -1,6 +1,6 @@
 # Navigation System
 
-The RoboCrew navigation system provides robust obstacle detection, safety reflexes, and precision alignment tools for semi-autonomous operation. It leverages computer vision analysis to guide the robot safely through environments and negotiate narrow passages.
+The ARCS navigation system provides robust obstacle detection, safety reflexes, and precision alignment tools for semi-autonomous operation. It leverages computer vision analysis to guide the robot safely through environments and negotiate narrow passages.
 
 ## Core Components
 
