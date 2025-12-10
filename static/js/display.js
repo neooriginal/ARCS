@@ -356,12 +356,8 @@ class RoboDisplay {
             toggle(this.warnCenter, data.blockage.forward);
             toggle(this.warnRight, data.blockage.right);
 
-            // If any blockage, show stress expression
-            if (data.blockage.left || data.blockage.forward || data.blockage.right) {
-                if (this.currentExpression !== 'error' && this.currentExpression !== 'thinking') {
-                    this.setExpression('error');
-                }
-            }
+            // Note: Expression change removed per user request. 
+            // The red warning zones are sufficient feedback.
         }
     }
 
