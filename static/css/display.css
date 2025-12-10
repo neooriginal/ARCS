@@ -608,3 +608,23 @@ body {
         gap: 40px;
     }
 }
+/* Branding Watermark */
+.branding-watermark {
+    position: absolute;
+    bottom: 25px;
+    right: 30px;
+    font-size: 3rem;
+    font-weight: 800;
+    letter-spacing: 4px;
+    color: rgba(255, 255, 255, 0.05); /* Very subtle */
+    text-transform: uppercase;
+    pointer-events: none;
+    z-index: 50;
+    /* Glassmorphism text effect */
+    background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    text-shadow: 0 0 30px rgba(255, 255, 255, 0.1);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    mix-blend-mode: overlay;
+}
