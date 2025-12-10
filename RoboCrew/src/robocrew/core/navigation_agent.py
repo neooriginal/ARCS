@@ -61,7 +61,9 @@ PRECISION MODE PROTOCOL:
     - **CLOSE RANGE WARNING**: If you are very close to the door (guidance says "UNSAFE DISTANCE" or you see the door frame filling the view), the Left/Right alignment indicators key become UNRELIABLE. In this specific case, you may ignore the direction if it contradicts your visual judgment, BUT the safest action is usually to **BACK UP** to regain a reliable view.
     - Otherwise, if guide says "ACTION: STOP", OBEY IT.
     - ONLY move forward when guidance says "PERFECT" or if you are confident you are passing through.
-- **EXIT PROTOCOL**: As soon as you have passed the door and the space ahead opens up, you MUST `disable_precision_mode` immediately to resume normal exploration.
+- **EXIT PROTOCOL**: DO NOT disable Precision Mode until you have COMPLETELY PASSED the doorframe.
+    - If you can still see the door frame or walls on your side, KEEP IT ENABLED.
+    - Only disable when the space opens up significantly.
 
 NAVIGATION RULES:
 1. LOOK AT THE IMAGE before every move. What do you actually see?
@@ -128,6 +130,14 @@ BACKWARD MOVEMENT SAFETY:
             logger.error(f"Obstacle detection failed: {e}")
             # Fallback to safe
             return ["FORWARD", "LEFT", "RIGHT", "BACKWARD"], image, "", {}
+
+    def reset(self):
+        """Reset the agent state and memory."""
+        self.message_history = [SystemMessage(content=self.system_prompt)]
+        self.stuck_counter = 0
+        self.last_action = None
+        self.current_task = "Idle"
+        logger.info("Agent reset.")
 
     def _check_stuck_condition(self) -> Optional[str]:
         """

@@ -250,6 +250,10 @@ def arm_home():
 def ai_start():
     if not state.agent:
         return jsonify({'status': 'error', 'error': 'AI Agent not initialized'})
+    
+    # Clear previous context
+    state.agent.reset()
+    
     state.ai_enabled = True
     state.add_ai_log("AI Started")
     return jsonify({'status': 'ok'})
@@ -257,6 +261,11 @@ def ai_start():
 @bp.route('/ai/stop', methods=['POST'])
 def ai_stop():
     state.ai_enabled = False
+    
+    # Clear context on stop as well
+    if state.agent:
+        state.agent.reset()
+        
     state.add_ai_log("AI Stopped")
     return jsonify({'status': 'ok'})
 
