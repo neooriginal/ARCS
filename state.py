@@ -41,6 +41,9 @@ class RobotState:
         }
         self.gripper_closed = False
         
+        # Precision Mode (for alignment visualization)
+        self.precision_mode = False
+        
         # AI State
         self.ai_enabled = False
         self.ai_status = "Idle"

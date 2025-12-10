@@ -221,9 +221,14 @@ class RoboDisplay {
     }
 
     // Control mode update with animation
-    updateControlMode(mode) {
-        if (this.currentControlMode === mode) return;
+    updateControlMode(mode, precisionMode = false) {
+        // If mode changed OR precision mode toggled while in AI mode
+        const isPrecisionChange = (mode === 'ai' && this.lastPrecisionMode !== precisionMode);
+
+        if (this.currentControlMode === mode && !isPrecisionChange) return;
+
         this.currentControlMode = mode;
+        this.lastPrecisionMode = precisionMode;
 
         this.controlModeBadge.classList.remove('idle', 'remote', 'ai');
         this.controlModeBadge.classList.add(mode);
@@ -239,9 +244,16 @@ class RoboDisplay {
                     break;
                 case 'ai':
                     this.modeEmoji.textContent = '🤖';
-                    this.modeText.textContent = 'AI Driving';
-                    this.setExpression('excited');
-                    setTimeout(() => this.setExpression('active'), 1000);
+                    if (precisionMode) {
+                        this.modeText.textContent = 'AI Precision';
+                        this.modeEmoji.textContent = '🎯'; // Target emoji for precision
+                    } else {
+                        this.modeText.textContent = 'AI Driving';
+                    }
+                    if (this.currentExpression !== 'thinking' && this.currentExpression !== 'error') {
+                        this.setExpression('excited');
+                        setTimeout(() => this.setExpression('active'), 1000);
+                    }
                     break;
                 case 'idle':
                 default:
@@ -255,7 +267,11 @@ class RoboDisplay {
 
         // Update background glow color
         if (mode === 'ai') {
-            this.bgGlow.style.background = 'radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, transparent 70%)';
+            if (precisionMode) {
+                this.bgGlow.style.background = 'radial-gradient(circle, rgba(234, 179, 8, 0.2) 0%, transparent 70%)'; // Yellow for precision
+            } else {
+                this.bgGlow.style.background = 'radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, transparent 70%)'; // Purple for normal AI
+            }
         } else if (mode === 'remote') {
             this.bgGlow.style.background = 'radial-gradient(circle, rgba(96, 165, 250, 0.2) 0%, transparent 70%)';
         } else {
@@ -290,7 +306,7 @@ class RoboDisplay {
                     const data = await response.json();
                     this.updateFromState(data);
                     this.updateSystemStatus(data);
-                    this.updateControlMode(data.control_mode || 'idle');
+                    this.updateControlMode(data.control_mode || 'idle', data.precision_mode);
                 }
             } catch (error) {
                 // Connection lost

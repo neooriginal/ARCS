@@ -319,6 +319,7 @@ def display_state():
         'camera_connected': state.camera is not None and state.camera.isOpened() if state.camera else False,
         'arm_connected': state.arm_connected,
         'control_mode': control_mode,
+        'precision_mode': state.precision_mode,
         'blockage': state.get_detector().latest_blockage if state.detector else {}
     })
 

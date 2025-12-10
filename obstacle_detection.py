@@ -165,78 +165,83 @@ class ObstacleDetector:
         alpha = 0.4
         cv2.addWeighted(shapes, alpha, overlay, 1 - alpha, 0, overlay)
         
-        # Gap Detection
-        # Find the "Center of Safety" to guide the robot
-        # We classify columns as "Passable" if their obstacle is far away (e.g. Y < 350)
-        # We classify columns as "Passable" if their obstacle is far away (e.g. Y < 350)
-        # Smoothing: Filter out single-column noise spikes by checking neighbors
-        raw_ys = [p[1] for p in edge_points]
-        smoothed_ys = []
-        for i in range(len(raw_ys)):
-            # Median of 3 neighbors
-            prev_y = raw_ys[i-1] if i > 0 else raw_ys[i]
-            next_y = raw_ys[i+1] if i < len(raw_ys)-1 else raw_ys[i]
-            curr_y = raw_ys[i]
-            smoothed_ys.append(sorted([prev_y, curr_y, next_y])[1])
+        
+        # Gap Detection & Precision Visualization
+        # Only ACTIVE if precision_mode is True
+        from state import state
+        guidance = "" 
+        
+        if state.precision_mode:
+            # Find the "Center of Safety" to guide the robot
+            # We classify columns as "Passable" if their obstacle is far away (e.g. Y < 350)
+            # We classify columns as "Passable" if their obstacle is far away (e.g. Y < 350)
+            # Smoothing: Filter out single-column noise spikes by checking neighbors
+            raw_ys = [p[1] for p in edge_points]
+            smoothed_ys = []
+            for i in range(len(raw_ys)):
+                # Median of 3 neighbors
+                prev_y = raw_ys[i-1] if i > 0 else raw_ys[i]
+                next_y = raw_ys[i+1] if i < len(raw_ys)-1 else raw_ys[i]
+                curr_y = raw_ys[i]
+                smoothed_ys.append(sorted([prev_y, curr_y, next_y])[1])
 
-        passable_indices = []
-        for i, (x, _) in enumerate(edge_points):
-            # Use smoothed Y for check
-            if smoothed_ys[i] < 350: 
-                passable_indices.append(x)
-                
-        guidance = "" # Default to empty if no gap found
-        best_center_x = w // 2 # Default to center
-        
-        if passable_indices:
-            # Find the largest contiguous segment of passable columns
-            # But edge_points is sparse (step 5). 
-            # We can simplify: just find the mean X of all passable points?
-            # No, that might put us between two doors.
-            # We need the widest gap.
+            passable_indices = []
+            for i, (x, _) in enumerate(edge_points):
+                # Use smoothed Y for check
+                if smoothed_ys[i] < 350: 
+                    passable_indices.append(x)
+                    
+            best_center_x = w // 2 # Default to center
             
-            # Group into clusters
-            # Since step is 5, if diff > 10, it's a break.
-            clusters = []
             if passable_indices:
-                current_cluster = [passable_indices[0]]
-                for i in range(1, len(passable_indices)):
-                    # Tolerant of single noise pixel (5) or double noise pixels (10). 
-                    # Step is 5. Adjacent is 5. Gap of 1 is 10. Gap of 2 is 15.
-                    if passable_indices[i] - passable_indices[i-1] <= 15:
-                        current_cluster.append(passable_indices[i])
+                # Find the largest contiguous segment of passable columns
+                # But edge_points is sparse (step 5). 
+                # We can simplify: just find the mean X of all passable points?
+                # No, that might put us between two doors.
+                # We need the widest gap.
+                
+                # Group into clusters
+                # Since step is 5, if diff > 10, it's a break.
+                clusters = []
+                if passable_indices:
+                    current_cluster = [passable_indices[0]]
+                    for i in range(1, len(passable_indices)):
+                        # Tolerant of single noise pixel (5) or double noise pixels (10). 
+                        # Step is 5. Adjacent is 5. Gap of 1 is 10. Gap of 2 is 15.
+                        if passable_indices[i] - passable_indices[i-1] <= 15:
+                            current_cluster.append(passable_indices[i])
+                        else:
+                            clusters.append(current_cluster)
+                            current_cluster = [passable_indices[i]]
+                    clusters.append(current_cluster)
+                    
+                # Find widest cluster
+                widest_cluster = max(clusters, key=len)
+                
+                # Calculate center of widest gap
+                if widest_cluster:
+                    start_x = widest_cluster[0]
+                    end_x = widest_cluster[-1]
+                    gap_center = (start_x + end_x) // 2
+                    best_center_x = gap_center
+                    
+                    # Draw Gap Target
+                    cv2.line(overlay, (gap_center, h//2), (gap_center, h), (255, 255, 0), 2)
+                    cv2.putText(overlay, "TARGET", (gap_center - 20, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+                    
+                    # Calculate simple guidance
+                    center_offset = gap_center - (w // 2)
+                    # > 0 means Target is Right. < 0 means Target is Left.
+                    
+                    if abs(center_offset) < 40:
+                        guidance = "ALIGNMENT: PERFECT. Go straight."
+                    elif center_offset < 0:
+                        guidance = f"ALIGNMENT: Gap is LEFT. Turn LEFT slightly."
                     else:
-                        clusters.append(current_cluster)
-                        current_cluster = [passable_indices[i]]
-                clusters.append(current_cluster)
-                
-            # Find widest cluster
-            widest_cluster = max(clusters, key=len)
+                        guidance = f"ALIGNMENT: Gap is RIGHT. Turn RIGHT slightly."
             
-            # Calculate center of widest gap
-            if widest_cluster:
-                start_x = widest_cluster[0]
-                end_x = widest_cluster[-1]
-                gap_center = (start_x + end_x) // 2
-                best_center_x = gap_center
-                
-                # Draw Gap Target
-                cv2.line(overlay, (gap_center, h//2), (gap_center, h), (255, 255, 0), 2)
-                cv2.putText(overlay, "TARGET", (gap_center - 20, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
-                
-                # Calculate simple guidance
-                center_offset = gap_center - (w // 2)
-                # > 0 means Target is Right. < 0 means Target is Left.
-                
-                if abs(center_offset) < 40:
-                    guidance = "ALIGNMENT: PERFECT. Go straight."
-                elif center_offset < 0:
-                    guidance = f"ALIGNMENT: Gap is LEFT. Turn LEFT slightly."
-                else:
-                    guidance = f"ALIGNMENT: Gap is RIGHT. Turn RIGHT slightly."
-        
-        if guidance:
-             cv2.putText(overlay, guidance, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+            if guidance:
+                 cv2.putText(overlay, guidance, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
         return safe_actions, overlay, {
             'c_left': c_left, 'c_fwd': c_fwd, 'c_right': c_right, 'edges': total_edge_pixels,

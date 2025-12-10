@@ -178,7 +178,13 @@ BACKWARD MOVEMENT SAFETY:
         ]
         
         # Inject Allowed Actions & Warnings
-        reflex_msg = f"REFLEX SYSTEM: Allowed actions are {safe_actions}. Green Marked Paths are SAFE. Red Marked Areas are BLOCKED.\nVISUAL GUIDANCE: {guidance}"
+        reflex_msg = f"REFLEX SYSTEM: Allowed actions are {safe_actions}. Green Marked Paths are SAFE. Red Marked Areas are BLOCKED."
+        
+        if state.precision_mode:
+            reflex_msg += f"\nVISUAL GUIDANCE: {guidance}"
+            reflex_msg += "\nPRECISION MODE: ON. Use the guidance to align with the gap."
+        else:
+            reflex_msg += "\nPRECISION MODE: OFF. (Enable if you need to pass through a narrow door)"
         
         if self.stuck_counter > 0:
             reflex_msg += f"\nWARNING: You have been blocked {self.stuck_counter} times recently. You are likely STUCK. Do NOT try the same action again. Turn around or find a new path."

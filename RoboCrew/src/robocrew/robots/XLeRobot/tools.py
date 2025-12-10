@@ -25,6 +25,23 @@ def create_end_task():
     return end_task
 
 
+def create_enable_precision_mode():
+    @tool
+    def enable_precision_mode() -> str:
+        """Enable Precision Mode to see alignment targets for narrow gaps/doors."""
+        robot_state.precision_mode = True
+        return "Precision Mode ENABLED. You will now see target lines and alignment guidance on the video feed. Use this to align perfectly with the door."
+    return enable_precision_mode
+
+def create_disable_precision_mode():
+    @tool
+    def disable_precision_mode() -> str:
+        """Disable Precision Mode to stop seeing alignment targets."""
+        robot_state.precision_mode = False
+        return "Precision Mode DISABLED. Alignment guidance hidden."
+    return disable_precision_mode
+
+
 def _interruptible_sleep(duration: float, check_interval: float = 0.1, check_safety: bool = False, movement_type: str = None):
     """
     Sleep that can be interrupted by emergency stop or SAFETY REFLEX.
