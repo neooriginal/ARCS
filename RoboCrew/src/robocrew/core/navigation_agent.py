@@ -51,7 +51,8 @@ ROBOT CHARACTERISTICS:
 - The wheels drift slightly. After turns, you may not be perfectly aligned.
 
 DOORWAYS AND TIGHT OPENINGS:
-- If an opening looks tight (barely wider than you), ENABLE PRECISION MODE.
+- ALWAYS enable `precision_mode` BEFORE approaching any door or narrow gap.
+- NEVER attempt to drive through a door without Precision Mode enabled.
 - Only go through openings that are clearly at least 2x your width.
 
 PRECISION MODE PROTOCOL:
@@ -185,7 +186,9 @@ BACKWARD MOVEMENT SAFETY:
             reflex_msg += f"\nVISUAL GUIDANCE: {guidance}"
             reflex_msg += "\nPRECISION MODE: ON. Use the guidance to align with the gap."
         else:
-            reflex_msg += "\nPRECISION MODE: OFF. (Enable if you need to pass through a narrow door)"
+            reflex_msg += "\nPRECISION MODE: OFF."
+            if "FORWARD" not in safe_actions:
+                 reflex_msg += " (HINT: If you are trying to pass a narrow door/gap, ENABLE PRECISION MODE to allow closer approach.)"
         
         if self.stuck_counter > 0:
             reflex_msg += f"\nWARNING: You have been blocked {self.stuck_counter} times recently. You are likely STUCK. Do NOT try the same action again. Turn around or find a new path."
