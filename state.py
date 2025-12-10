@@ -135,57 +135,5 @@ class RobotState:
 
 
 
-    def init_agent(self, model_name=None):
-        """
-        Initialize the AI agent if robot system is ready.
-        Returns True if successful, False otherwise.
-        """
-        import os
-        if model_name is None:
-             model_name = os.getenv("AI_MODEL", "openai/gpt-5.1")
-
-        with self.lock:
-            # Check if agent already exists
-            if self.agent is not None:
-                return True
-                
-            # Check dependencies
-            if self.robot_system is None or self.controller is None:
-                print("Cannot init agent: Hardware not ready")
-                return False
-                
-            try:
-                print("Lazy initializing AI Agent...")
-                # Lazy imports to avoid circular deps
-                from robocrew.core.navigation_agent import NavigationAgent
-                from robocrew.robots.XLeRobot.tools import (
-                    create_move_forward, 
-                    create_move_backward, 
-                    create_turn_left, 
-                    create_turn_right, 
-                    create_look_around,
-                    create_end_task,
-                    create_check_alignment
-                )
-                
-                tools = [
-                    create_move_forward(self.controller),
-                    create_move_backward(self.controller),
-                    create_turn_left(self.controller),
-                    create_turn_right(self.controller),
-                    create_look_around(self.controller, self.camera),
-                    create_end_task(),
-                    create_check_alignment()
-                ]
-                
-                self.agent = NavigationAgent(self.robot_system, model_name, tools)
-                print("✓ AI Agent initialized (Lazy)")
-                return True
-            except Exception as e:
-                print(f"Agent init failed: {e}")
-                self.last_error = str(e)
-                return False
-
-
 # Global state instance
 state = RobotState()
