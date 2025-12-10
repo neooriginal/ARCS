@@ -57,11 +57,11 @@ DOORWAYS AND TIGHT OPENINGS:
 
 PRECISION MODE PROTOCOL:
 - Use `enable_precision_mode` when approaching a narrow gap.
-- Once enabled, FOLLOW THE VISUAL GUIDANCE STRICTLY:
-    - If it says "ACTION: STOP", you MUST STOP and turn as instructed.
-    - NEVER move forward if alignment is "OFF-CENTER".
-    - ONLY move forward when guidance says "PERFECT".
-- Disable it immediately after passing the gap.
+- Once enabled, FOLLOW THE VISUAL GUIDANCE STRICTLY, WITH ONE EXCEPTION:
+    - **CLOSE RANGE WARNING**: If you are very close to the door (guidance says "UNSAFE DISTANCE" or you see the door frame filling the view), the Left/Right alignment indicators key become UNRELIABLE. In this specific case, you may ignore the direction if it contradicts your visual judgment, BUT the safest action is usually to **BACK UP** to regain a reliable view.
+    - Otherwise, if guide says "ACTION: STOP", OBEY IT.
+    - ONLY move forward when guidance says "PERFECT" or if you are confident you are passing through.
+- **EXIT PROTOCOL**: As soon as you have passed the door and the space ahead opens up, you MUST `disable_precision_mode` immediately to resume normal exploration.
 
 NAVIGATION RULES:
 1. LOOK AT THE IMAGE before every move. What do you actually see?
@@ -122,13 +122,12 @@ BACKWARD MOVEMENT SAFETY:
                 
             safe_actions, overlay, metrics = self.detector.process(image)
             guidance = metrics.get('guidance', '')
-            return safe_actions, overlay, guidance
+            return safe_actions, overlay, guidance, metrics
                 
         except Exception as e:
             logger.error(f"Obstacle detection failed: {e}")
             # Fallback to safe
-            # Fallback to safe
-            return ["FORWARD", "LEFT", "RIGHT", "BACKWARD"], image, ""
+            return ["FORWARD", "LEFT", "RIGHT", "BACKWARD"], image, "", {}
 
     def _check_stuck_condition(self) -> Optional[str]:
         """
@@ -162,7 +161,7 @@ BACKWARD MOVEMENT SAFETY:
             return "Camera error"
             
         # 2. Safety Check & Processing
-        safe_actions, overlay, guidance = self._check_safety(frame)
+        safe_actions, overlay, guidance, metrics = self._check_safety(frame)
         
         # Use overlay if available, otherwise raw frame
         display_frame = overlay if overlay is not None else frame
@@ -182,13 +181,23 @@ BACKWARD MOVEMENT SAFETY:
         # Inject Allowed Actions & Warnings
         reflex_msg = f"REFLEX SYSTEM: Allowed actions are {safe_actions}. Green Marked Paths are SAFE. Red Marked Areas are BLOCKED."
         
+        c_fwd = metrics.get('c_fwd', 0)
+        
         if state.precision_mode:
             reflex_msg += f"\nVISUAL GUIDANCE: {guidance}"
             reflex_msg += "\nPRECISION MODE: ON. Use the guidance to align with the gap."
+            
+            # Hint to disable if path is clear (c_fwd < 250 means obstacles are far away/top of screen)
+            if c_fwd < 250:
+                 reflex_msg += "\n(HINT: The path ahead seems OPEN/CLEAR. You should probably DISABLE PRECISION MODE now to move faster.)"
         else:
             reflex_msg += "\nPRECISION MODE: OFF."
             if "FORWARD" not in safe_actions:
                  reflex_msg += " (HINT: If you are trying to pass a narrow door/gap, ENABLE PRECISION MODE to allow closer approach.)"
+        
+        # Close range warning (independent of mode, but useful context)
+        if c_fwd > 380:
+             reflex_msg += "\n(WARNING: You are very close to an obstacle. Visual indicators might be distorted. Back up if unsure.)"
         
         if self.stuck_counter > 0:
             reflex_msg += f"\nWARNING: You have been blocked {self.stuck_counter} times recently. You are likely STUCK. Do NOT try the same action again. Turn around or find a new path."
