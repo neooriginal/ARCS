@@ -162,11 +162,17 @@ class SimpleSLAM:
 
 
     def update_map(self, frame):
-        """Update occupancy grid using polygon filling for FOV."""
-        small = cv2.resize(frame, (160, 120))
-        edges = cv2.Canny(small, 50, 150)
+        """Update occupancy grid using robust features from ObstacleDetector."""
+        
+        # 1. Use the robust edge detection from ObstacleDetector (Bilateral + Canny)
+        # This gives us "Walls" that match the obstacle detection system.
+        edges, _ = self.detector._detect_edges(frame)
         h, w = edges.shape
         horizon_y = h // 2
+        
+        # 2. Scan Columns to find the "Floor Boundary"
+        # We step every 4 pixels for performance
+        edge_points = self.detector._scan_columns(edges, w, h, step=4)
         
         # Robot position in grid
         rx = int(self.x / self.map_resolution) + self.map_center
@@ -179,26 +185,22 @@ class SimpleSLAM:
         poly_points = [(rx, ry)]
         obstacle_points = []
         
-        # Reduce sampling stepping for smoother polygon, but keep performance
-        step = 2 
+        # Process edges to find World Coordinates
+        curr_wall_segment = []
+        walls = [] # List of segments
         
-        for c in range(0, w, step):
-            # Find bottom-most edge in column
-            obs_y = -1
-            for r in range(h-1, -1, -1):
-                if edges[r, c] > 0:
-                    obs_y = r
-                    break
-            
+        last_world_pos = None
+
+        for (c, obs_y) in edge_points:
             # Ray angle
             ray_angle_cam = (c - (w/2)) * (math.radians(60) / w)
-            ray_angle_global = self.theta + ray_angle_cam # + or - depends on camera mount
+            ray_angle_global = self.theta + ray_angle_cam
             
             dist = 3.0 # Default max range
             is_obstacle = False
             
+            # Distance Calculation matching SimpleSLAM logic
             if obs_y > horizon_y + 5:
-                # Valid ground pixel
                 offset_y = obs_y - horizon_y
                 K = 15.0 # Calibration constant
                 dist = K / offset_y
@@ -208,56 +210,74 @@ class SimpleSLAM:
                 dist = 3.0
                 is_obstacle = False
             
-            # End point
+            # End point in World Frame
             ex = self.x + dist * math.cos(ray_angle_global)
             ey = self.y + dist * math.sin(ray_angle_global)
             
+            # Grid Coords
             gex = int(ex / self.map_resolution) + self.map_center
             gey = int(ey / self.map_resolution) + self.map_center
             
             poly_points.append((gex, gey))
             
             if is_obstacle and dist < 2.5:
+                # Add to obstacle points for dots
                 obstacle_points.append((gex, gey))
+                
+                # Wall Connection Logic
+                # If this point is close to the last point, add to segment
+                if last_world_pos:
+                    # dist between (ex, ey) and last_world_pos
+                    d = math.hypot(ex - last_world_pos[0], ey - last_world_pos[1])
+                    if d < 0.3: # 30cm discontinuity threshold
+                         curr_wall_segment.append((gex, gey))
+                    else:
+                         # Break segment
+                         if len(curr_wall_segment) > 1:
+                             walls.append(curr_wall_segment)
+                         curr_wall_segment = [(gex, gey)]
+                else:
+                    curr_wall_segment.append((gex, gey))
+                
+                last_world_pos = (ex, ey)
+            else:
+                # Free space break
+                if len(curr_wall_segment) > 1:
+                    walls.append(curr_wall_segment)
+                curr_wall_segment = []
+                last_world_pos = None
+
+        # Flush last segment
+        if len(curr_wall_segment) > 1:
+            walls.append(curr_wall_segment)
         
         # 1. Create Masks for Update
         # Free Space Mask (Polygon)
         free_mask = np.zeros_like(self.grid_map)
         cv2.fillPoly(free_mask, [np.array(poly_points)], 255)
         
-        # Obstacle Mask (Dots)
+        # Obstacle Mask (Lines/Walls)
         obs_mask = np.zeros_like(self.grid_map)
+        
+        # Draw Dots (Strong)
         for (ox, oy) in obstacle_points:
             if 0 <= ox < self.map_size and 0 <= oy < self.map_size:
                  cv2.circle(obs_mask, (ox, oy), 2, 255, -1)
         
+        # Draw Walls (Stronger Connection)
+        for segment in walls:
+            if len(segment) > 1:
+                cv2.polylines(obs_mask, [np.array(segment)], False, 255, 2)
+
+        
         # 2. Probabilistic Update
-        # "Free" observation: Increase brightness (Confidence that it is free)
-        # We only update pixels that are IN the FOV (free_mask > 0)
-        # Increment by small amount (e.g., 5) per frame.
-        # Currently, grid_map is 127. 
-        # If free: 127 -> 132 -> ... -> 255.
-        # If obstacle: 127 -> 100 -> ... -> 0.
-        
-        # Apply Free update
-        # We want to ADD to grid_map where free_mask is 255.
-        # cv2.add with mask only adds where mask is non-zero.
-        # But we must be careful not to overwrite Obstacles that were just detected?
-        # Actually, if we detect obstacle, we should DECREASE strongly.
-        
-        # Strategy:
-        # A. Apply Free Space increment to everything in polygon.
-        # B. Apply Obstacle decrement to specific points (stronger).
-        
         # Increase "Free-ness"
-        # We use a temporary array for the increment amount
-        increment = 3 # Slow build up
+        increment = 3 
         cv2.add(self.grid_map, increment, dst=self.grid_map, mask=free_mask)
 
         # Decrease "Free-ness" (Increase Obstacle probability)
-        # Obstacles are more "certain" usually if seen by structure light, but here it's heuristic.
-        # Make it strong.
-        decrement = 25 
+        # Walls are very likely real
+        decrement = 50 
         cv2.subtract(self.grid_map, decrement, dst=self.grid_map, mask=obs_mask)
 
     def get_map_overlay(self):
