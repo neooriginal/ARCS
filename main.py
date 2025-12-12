@@ -118,9 +118,6 @@ def main():
     # AI Agent thread
     threading.Thread(target=agent_loop, daemon=True).start()
     
-    # SLAM thread
-    # threading.Thread(target=slam_loop, daemon=True).start()
-    print("✓")
     
     # Start Web Server
     app = create_app()

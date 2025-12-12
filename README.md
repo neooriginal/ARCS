@@ -1,5 +1,7 @@
 # 🤖 ARCS (Autonomous Robot Control System)
 
+# Very, very experimental as of now, it's still a work in progress.
+
 **AI Agent • Remote Manipulation • Active Safety**
 
 A robust control framework for ARCS. Feature-rich, safe, and ready for autonomy.

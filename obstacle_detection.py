@@ -247,18 +247,25 @@ class ObstacleDetector:
         clusters = []
         current_cluster = [passable_indices[0]]
         for i in range(1, len(passable_indices)):
-            if passable_indices[i] - passable_indices[i-1] <= 15:
+            if passable_indices[i] - passable_indices[i-1] <= 8:
                 current_cluster.append(passable_indices[i])
             else:
                 clusters.append(current_cluster)
                 current_cluster = [passable_indices[i]]
         clusters.append(current_cluster)
         
-        widest_cluster = max(clusters, key=len)
-        if not widest_cluster:
+        # Filter small gaps (noise) and find cluster closest to center
+        # Minimum gap width approx 20px
+        valid_clusters = [c for c in clusters if (c[-1] - c[0]) > 20]
+        
+        if not valid_clusters:
             return "ALIGNMENT: NO GAP DETECTED."
             
-        gap_center = (widest_cluster[0] + widest_cluster[-1]) // 2
+        # Select target closest to image center instead of just the widest
+        image_center = w // 2
+        best_cluster = min(valid_clusters, key=lambda c: abs(((c[0] + c[-1]) // 2) - image_center))
+        
+        gap_center = (best_cluster[0] + best_cluster[-1]) // 2
         
         # Draw Target Line
         cv2.line(overlay, (gap_center, h//2), (gap_center, h), (255, 255, 0), 2)
@@ -267,7 +274,7 @@ class ObstacleDetector:
         # 4. Generate Guidance
         center_offset = gap_center - (w // 2)
         is_aligned = abs(center_offset) < 20
-        is_too_close_to_align = c_fwd > 380 
+        is_too_close_to_align = c_fwd > 440
         
         if is_aligned:
             cv2.line(overlay, (gap_center, h//2), (gap_center, h), (0, 255, 0), 3)
