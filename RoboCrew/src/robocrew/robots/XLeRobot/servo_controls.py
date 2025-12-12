@@ -142,19 +142,24 @@ class ServoControler:
         }
         
         if left_arm_head_usb:
-            self.head_bus = FeetechMotorsBus(
-                port=left_arm_head_usb,
-                motors={
-                    HEAD_SERVO_MAP["yaw"]: Motor(HEAD_SERVO_MAP["yaw"], "sts3215", MotorNormMode.DEGREES),
-                    HEAD_SERVO_MAP["pitch"]: Motor(HEAD_SERVO_MAP["pitch"], "sts3215", MotorNormMode.DEGREES),
-                },
-                calibration=head_calibration,
-            )
-            self.head_bus.connect()
-            self.apply_head_modes()
-            self._head_positions = self.get_head_position()
-            for sid in self._head_ids:
-                self._head_positions.setdefault(sid, 2048)
+            try:
+                self.head_bus = FeetechMotorsBus(
+                    port=left_arm_head_usb,
+                    motors={
+                        HEAD_SERVO_MAP["yaw"]: Motor(HEAD_SERVO_MAP["yaw"], "sts3215", MotorNormMode.DEGREES),
+                        HEAD_SERVO_MAP["pitch"]: Motor(HEAD_SERVO_MAP["pitch"], "sts3215", MotorNormMode.DEGREES),
+                    },
+                    calibration=head_calibration,
+                )
+                self.head_bus.connect()
+                self.apply_head_modes()
+                self._head_positions = self.get_head_position()
+                for sid in self._head_ids:
+                    self._head_positions.setdefault(sid, 2048)
+            except Exception as e:
+                print(f"Warning: Could not connect to head on {left_arm_head_usb}: {e}")
+                self.head_bus = None
+                self._head_positions = {}
 
     @property
     def arm_enabled(self) -> bool:
@@ -226,23 +231,31 @@ class ServoControler:
     # Head control
 
     def apply_head_modes(self) -> None:
+        if not self.head_bus:
+            return
         for sid in self._head_ids:
             self.head_bus.write("Operating_Mode", sid, OperatingMode.POSITION.value)
         self.head_bus.enable_torque()
 
     def turn_head_yaw(self, degrees: float) -> Dict[int, float]:
+        if not self.head_bus:
+            return {}
         payload = {HEAD_SERVO_MAP["yaw"]: float(degrees)}
         self.head_bus.sync_write("Goal_Position", payload)
         self._head_positions.update(payload)
         return payload
 
     def turn_head_pitch(self, degrees: float) -> Dict[int, float]:
+        if not self.head_bus:
+            return {}
         payload = {HEAD_SERVO_MAP["pitch"]: float(degrees)}
         self.head_bus.sync_write("Goal_Position", payload)
         self._head_positions.update(payload)
         return payload
 
     def get_head_position(self) -> Dict[int, float]:
+        if not self.head_bus:
+            return {}
         return self.head_bus.sync_read("Present_Position", list(self._head_ids))
     
     def turn_head_to_vla_position(self, pitch_deg=45) -> str:
