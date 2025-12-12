@@ -98,7 +98,7 @@ def main():
             create_disable_precision_mode()
         ]
 
-        model_name = os.getenv("AI_MODEL", "openai/gpt-5.1") 
+        model_name = os.getenv("AI_MODEL", "openai/gpt-5.2") 
         
         try:
             agent = NavigationAgent(robot, model_name, tools)
