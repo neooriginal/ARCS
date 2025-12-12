@@ -242,119 +242,129 @@ class ObstacleDetector:
 
     def _compute_precision_guidance(self, edge_points, c_fwd, w, h, overlay, shapes):
         """
-        Identify usable gaps and provide alignment guidance.
+        VISION-FGM (Follow The Gap Method) with Safety Bubbles.
+        1. Convert visual boundaries to "Free Space" array.
+        2. "Inflate" obstacles (Safety Bubbles) to account for robot width.
+        3. Find largest/deepest gap in non-inflated space.
         """
-        # 1. Smooth Y-values to reduce noise
-        raw_ys = [p[1] for p in edge_points]
-        smoothed_ys = []
-        for i in range(len(raw_ys)):
-            prev_y = raw_ys[i-1] if i > 0 else raw_ys[i]
-            next_y = raw_ys[i+1] if i < len(raw_ys)-1 else raw_ys[i]
-            smoothed_ys.append(sorted([prev_y, raw_ys[i], next_y])[1]) # Median
+        # --- 1. Generate Pseudo-Scan (Free Space Profile) ---
+        # Map x-coordinate to available depth (inv_y)
+        # We process 'edge_points' which are sparse (step=5) into a dense array if needed,
+        # but working with the sparse array is faster.
+        
+        # 'scan' will hold the Y-coordinate of the obstacle (High Y = Close Obstacle)
+        # We want to minimize Y.
+        scan = np.zeros(w, dtype=np.int32)
+        
+        # Fill scan with 0 (infinite depth) initially
+        # Then populate with detected obstacles
+        for x, y in edge_points:
+            # Masking bottom threshold (Optional, keeping it for robustness)
+            if y > 420:
+                 y = 0
             
-        # 2. Identify "Passable" Columns (Obstacle is far away)
-        passable_limit_y = 350
-        is_very_close = c_fwd > 400
-        
-        passable_indices = []
-        for i, y in enumerate(smoothed_ys):
-             effective_y = y
-             if state.precision_mode and y > 420:
-                 effective_y = 0 
-                 
-             if effective_y < passable_limit_y:
-                 passable_indices.append(edge_points[i][0])
-        
-        if not passable_indices:
-            return "ALIGNMENT: NO GAP DETECTED."
+            # Simple interpolation/filling for sparse points
+            # Fill a small kernel around the point to make it solid
+            start = max(0, x - 2)
+            end = min(w, x + 3)
+            scan[start:end] = np.maximum(scan[start:end], y)
 
-        # 3. Find Largest Contiguous Gap
-        # Points are separated by 'step=5'. Allow skip of 1-2 points (approx 15px)
-        clusters = []
-        current_cluster = [passable_indices[0]]
-        for i in range(1, len(passable_indices)):
-            if passable_indices[i] - passable_indices[i-1] <= 8:
-                current_cluster.append(passable_indices[i])
+        # --- 2. Safety Bubble Inflation ---
+        # If an obstacle is close (High Y), we must be far from it.
+        # Robot Width approx 30-40cm. In pixels this varies by depth.
+        # Simple heuristic: The "Close" zone (Y > 300) requires ~60px clearance radius.
+        
+        inflated_scan = scan.copy()
+        
+        # Iterate through scan to apply bubbles
+        # This is O(W*R), optimization possible but W=640 is small.
+        for x in range(0, w, 5): 
+            y = scan[x]
+            if y > 300: # Obstacle is "Close"
+                # Radius increases with proximity
+                # y=300 -> radius=30
+                # y=450 -> radius=60
+                radius = int(30 + (y - 300) * 0.2)
+                
+                left_bound = max(0, x - radius)
+                right_bound = min(w, x + radius)
+                
+                # Mark inflated area as "Blocked" (Max Y)
+                # We use 480 (Bottom) to signify "Blocked by Bubble"
+                inflated_scan[left_bound:right_bound] = np.maximum(inflated_scan[left_bound:right_bound], 480)
+                
+                # Visualization: Draw bubbles
+                cv2.circle(shapes, (x, y), radius, (0, 0, 255), 1)
+
+        # --- 3. Find Deepest/Best Gap ---
+        # A gap is a sequence where inflated_scan < PASSABLE_THRESHOLD (e.g. 350)
+        PASSABLE_LIMIT_Y = 350
+        
+        gaps = []
+        current_gap = []
+        
+        for x in range(w):
+            if inflated_scan[x] < PASSABLE_LIMIT_Y:
+                current_gap.append(x)
             else:
-                clusters.append(current_cluster)
-                current_cluster = [passable_indices[i]]
-        clusters.append(current_cluster)
-        
-        # Filter small gaps (noise) and find cluster closest to center
-        # Minimum gap width approx 20px
-        valid_clusters = [c for c in clusters if (c[-1] - c[0]) > 20]
-        
-        if not valid_clusters:
-            if is_very_close:
-                 return "ALIGNMENT: BLIND COMMIT. GO FORWARD."
-                 
-            return "ALIGNMENT: NO GAP DETECTED."
+                if len(current_gap) > 20: # Min gap width ~20px
+                    gaps.append(current_gap)
+                current_gap = []
+        if len(current_gap) > 20:
+            gaps.append(current_gap)
             
-        # Smart Gap Selection: Score = Width - (DistanceToCenter * Weight)
-        # We want wide gaps, but we PENALIZE gaps far from the center.
+        if not gaps:
+            # FGM Fail-safe: "Blind Commit" if we are close but no gaps (likely inside door)
+            if c_fwd > 400:
+                 return "ALIGNMENT: FGM SAYS COMMIT. GO FORWARD."
+            return "ALIGNMENT: BLOCKED. NO PATH."
+
+        # --- 4. Select Best Gap ---
         image_center = w // 2
         
-        def gap_score(cluster):
-            width = cluster[-1] - cluster[0]
-            center = (cluster[0] + cluster[-1]) // 2
+        def gap_score(gap):
+            # Same scoring logic: Width - Penalty * DistToCenter
+            width = len(gap)
+            center = (gap[0] + gap[-1]) // 2
             dist = abs(center - image_center)
-            score = width - (dist * 1.2)
             
-            # Hysteresis (Sticky Target)
-            # If this gap is close to the last chosen gap, give it a massive bonus.
-            # This prevents flickering between two similar gaps.
+            # Use 'Last Gap' Hysteresis
+            bonus = 0
             if self.last_gap_center is not None:
                 if abs(center - self.last_gap_center) < 50:
-                    score += 100 
+                    bonus = 100
+                    
+            return width - (dist * 1.0) + bonus
             
-            return score
-            
-        best_cluster = max(valid_clusters, key=gap_score)
-        
-        raw_gap_center = (best_cluster[0] + best_cluster[-1]) // 2
+        best_gap = max(gaps, key=gap_score)
+        raw_gap_center = (best_gap[0] + best_gap[-1]) // 2
         
         # EMA Smoothing
         if self.last_gap_center is None:
             self.last_gap_center = raw_gap_center
-            
-        # Alpha: 0.3 = 30% new, 70% old. Smooths jitter.
+        
         alpha = 0.3
-        self.last_gap_center = int(alpha * raw_gap_center + (1 - alpha) * self.last_gap_center)
-        gap_center = self.last_gap_center
+        smoothed_center = int(alpha * raw_gap_center + (1 - alpha) * self.last_gap_center)
+        self.last_gap_center = smoothed_center
         
-        # Draw Target Line
-        cv2.line(overlay, (gap_center, h//2), (gap_center, h), (255, 255, 0), 2)
-        cv2.putText(overlay, "TARGET", (gap_center - 20, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
-        
-        # Dynamic Green Path (Project towards target)
-        # Base is wide at bottom, Tip is narrow at gap
-        # LeftBase, RightBase, RightTip, LeftTip
+        # --- 5. Visualization & Guidance ---
+        # Draw dynamic green road
         path_poly = np.array([
             [int(w*0.2), h], 
             [int(w*0.8), h], 
-            [gap_center + 40, int(h*0.5)], 
-            [gap_center - 40, int(h*0.5)]
+            [smoothed_center + 40, int(h*0.5)], 
+            [smoothed_center - 40, int(h*0.5)]
         ], np.int32)
-        
-        # Overlay Green Path on shapes layer
         cv2.fillPoly(shapes, [path_poly], (0, 255, 0))
         
-        # 4. Generate Guidance
-        center_offset = gap_center - (w // 2)
-        is_aligned = abs(center_offset) < 20
-        is_too_close_to_align = c_fwd > 440
-        
-        if is_aligned:
-            cv2.line(overlay, (gap_center, h//2), (gap_center, h), (0, 255, 0), 3)
-            return "ALIGNMENT: PERFECT. Go FORWARD."
+        cv2.line(overlay, (smoothed_center, h//2), (smoothed_center, h), (255, 255, 0), 3)
+        cv2.putText(overlay, "FGM TARGET", (smoothed_center - 40, h - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+
+        # Navigation Logic
+        center_offset = smoothed_center - image_center
+        if abs(center_offset) < 25:
+            return "ALIGNMENT: ON PATH. GO FORWARD."
+        elif center_offset < 0:
+            return "ALIGNMENT: PATH LEFTSIDE. Turn LEFT."
         else:
-            if is_too_close_to_align:
-                # Proximity Warning
-                cv2.rectangle(shapes, (0, 0), (w, h), (0, 0, 255), 20)
-                return "ALIGNMENT: TOO CLOSE. BACK UP."
-            elif center_offset < 0:
-                cv2.line(overlay, (gap_center, h//2), (gap_center, h), (0, 0, 255), 2)
-                return "ALIGNMENT: TARGET LEFT. Turn LEFT."
-            else:
-                cv2.line(overlay, (gap_center, h//2), (gap_center, h), (0, 0, 255), 2)
-                return "ALIGNMENT: TARGET RIGHT. Turn RIGHT."
+            return "ALIGNMENT: PATH RIGHTSIDE. Turn RIGHT."
