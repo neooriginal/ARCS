@@ -57,6 +57,8 @@ DOORWAYS AND TIGHT OPENINGS:
 
 PRECISION MODE PROTOCOL:
 - Use `enable_precision_mode` when approaching a narrow gap.
+- STRATEGY: Align with the door from a distance (>1m). Do not drive straight then turn. Rotate UNTIL the GREEN PATH is centered and pointing through the door.
+- VISUAL CONFIRMATION: Look at the GREEN PATH. Is it wide? Is it pointing through the door? If it is narrow or skewed, DO NOT GO.
 - SECURITY NOTICE: In precision mode, obstacle avoidance is minimized. Proceed with extreme caution. You rely SOLELY on the guidance lines.
 - Once enabled, FOLLOW THE VISUAL GUIDANCE STRICTLY, WITH ONE EXCEPTION:
     - **CLOSE RANGE WARNING**: If you are very close to the door (guidance says "UNSAFE DISTANCE" or you see the door frame filling the view), the Left/Right alignment indicators key become UNRELIABLE. In this specific case, you may ignore the direction if it contradicts your visual judgment, BUT the safest action is usually to **BACK UP** to regain a reliable view.

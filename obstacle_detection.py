@@ -298,10 +298,16 @@ class ObstacleDetector:
             width = cluster[-1] - cluster[0]
             center = (cluster[0] + cluster[-1]) // 2
             dist = abs(center - image_center)
-            # Weight: 1.0 means 1px of distance cancels 1px of width. 
-            # Lower weight (0.5) means we prefer width more. Higher (2.0) means we prefer center more.
-            # Using 1.2 to slightly bias towards center over raw width.
-            return width - (dist * 1.2)
+            score = width - (dist * 1.2)
+            
+            # Hysteresis (Sticky Target)
+            # If this gap is close to the last chosen gap, give it a massive bonus.
+            # This prevents flickering between two similar gaps.
+            if self.last_gap_center is not None:
+                if abs(center - self.last_gap_center) < 50:
+                    score += 100 
+            
+            return score
             
         best_cluster = max(valid_clusters, key=gap_score)
         
@@ -319,6 +325,19 @@ class ObstacleDetector:
         # Draw Target Line
         cv2.line(overlay, (gap_center, h//2), (gap_center, h), (255, 255, 0), 2)
         cv2.putText(overlay, "TARGET", (gap_center - 20, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+        
+        # Dynamic Green Path (Project towards target)
+        # Base is wide at bottom, Tip is narrow at gap
+        # LeftBase, RightBase, RightTip, LeftTip
+        path_poly = np.array([
+            [int(w*0.2), h], 
+            [int(w*0.8), h], 
+            [gap_center + 40, int(h*0.5)], 
+            [gap_center - 40, int(h*0.5)]
+        ], np.int32)
+        
+        # Overlay Green Path on shapes layer
+        cv2.fillPoly(shapes, [path_poly], (0, 255, 0))
         
         # 4. Generate Guidance
         center_offset = gap_center - (w // 2)
