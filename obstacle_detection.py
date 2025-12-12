@@ -42,6 +42,8 @@ class ObstacleDetector:
         
         # EMA Smoothing for Precision Mode
         self.last_gap_center = None
+        self.last_gap_update_time = 0
+        self.gap_lock_duration = 5.0  # seconds
         
     def process(self, frame):
         """
@@ -93,9 +95,6 @@ class ObstacleDetector:
         guidance = ""
         if state.precision_mode:
             guidance = self._compute_precision_guidance(edge_points, c_fwd, w, h, overlay, shapes)
-            # Append rotation hint if we're blocked
-            if rotation_hint and "FORWARD" in instant_blocked:
-                guidance = f"{guidance} [{rotation_hint}]"
 
         # Blend Visualization
         alpha = 0.4
@@ -304,13 +303,21 @@ class ObstacleDetector:
         
         raw_gap_center = (best_cluster[0] + best_cluster[-1]) // 2
         
-        # EMA Smoothing
+        # Time-based smoothing: only update position every 5 seconds
+        import time
+        current_time = time.time()
+        
         if self.last_gap_center is None:
             self.last_gap_center = raw_gap_center
-            
-        # Alpha: 0.3 = 30% new, 70% old. Smooths jitter.
-        alpha = 0.3
-        self.last_gap_center = int(alpha * raw_gap_center + (1 - alpha) * self.last_gap_center)
+            self.last_gap_update_time = current_time
+        else:
+            time_since_update = current_time - self.last_gap_update_time
+            if time_since_update >= self.gap_lock_duration:
+                # Lock expired, allow update with EMA
+                alpha = 0.5
+                self.last_gap_center = int(alpha * raw_gap_center + (1 - alpha) * self.last_gap_center)
+                self.last_gap_update_time = current_time
+                
         gap_center = self.last_gap_center
         
         # Draw Target Line
