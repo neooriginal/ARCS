@@ -40,6 +40,9 @@ class ObstacleDetector:
             'right': False
         }
         
+        # EMA Smoothing for Precision Mode
+        self.last_gap_center = None
+        
     def process(self, frame):
         """
         Process a video frame to detect obstacles and determine safe navigation actions.
@@ -273,11 +276,31 @@ class ObstacleDetector:
                  
             return "ALIGNMENT: NO GAP DETECTED."
             
-        # Select target closest to image center instead of just the widest
+        # Smart Gap Selection: Score = Width - (DistanceToCenter * Weight)
+        # We want wide gaps, but we PENALIZE gaps far from the center.
         image_center = w // 2
-        best_cluster = min(valid_clusters, key=lambda c: abs(((c[0] + c[-1]) // 2) - image_center))
         
-        gap_center = (best_cluster[0] + best_cluster[-1]) // 2
+        def gap_score(cluster):
+            width = cluster[-1] - cluster[0]
+            center = (cluster[0] + cluster[-1]) // 2
+            dist = abs(center - image_center)
+            # Weight: 1.0 means 1px of distance cancels 1px of width. 
+            # Lower weight (0.5) means we prefer width more. Higher (2.0) means we prefer center more.
+            # Using 1.2 to slightly bias towards center over raw width.
+            return width - (dist * 1.2)
+            
+        best_cluster = max(valid_clusters, key=gap_score)
+        
+        raw_gap_center = (best_cluster[0] + best_cluster[-1]) // 2
+        
+        # EMA Smoothing
+        if self.last_gap_center is None:
+            self.last_gap_center = raw_gap_center
+            
+        # Alpha: 0.3 = 30% new, 70% old. Smooths jitter.
+        alpha = 0.3
+        self.last_gap_center = int(alpha * raw_gap_center + (1 - alpha) * self.last_gap_center)
+        gap_center = self.last_gap_center
         
         # Draw Target Line
         cv2.line(overlay, (gap_center, h//2), (gap_center, h), (255, 255, 0), 2)
