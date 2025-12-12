@@ -18,14 +18,13 @@ class SimpleSLAM:
         self.map_center = map_size_pixels // 2
         
         # 0 = Unknown/Free, 1 = Free, 255 = Occupied (Visually: 127=Gray, 255=White, 0=Black)
-        # Actually standard: 127 gray (unknown), 255 white (free), 0 black (occupied)
         self.grid_map = np.full((self.map_size, self.map_size), 127, dtype=np.uint8)
         
         # Robot State
         # x, y in meters (global frame), theta in radians
         self.x = 0.0
         self.y = 0.0
-        self.theta = 0.0 # Facing "Up" in map? Or "Right"? Let's say 0 is Right (standard math), pi/2 is Up.
+        self.theta = 0.0 # Radians
         
         # Path trace for visualization
         self.path = deque(maxlen=1000)
@@ -45,15 +44,7 @@ class SimpleSLAM:
                               maxLevel=2,
                               criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
                               
-        # Camera Calibration (Approximation)
-        # FOV ~60 degrees?
-        self.focal_length = self.width / (2 * math.tan(math.radians(60) / 2))
-        self.center_x = self.width / 2
-        self.center_y = self.height / 2
-        
-        # Mapping Projection Config
-        # Assuming camera is at some height and angled down? 
-        # For simplicity, we'll use a linear pixel-y to distance mapping roughly calibrated.
+        # Camera Calibration
         # y=480 is bottom (close), y=0 is top (far/horizon).
         self.cam_height = 0.2 # meters
         self.cam_tilt = -0.0  # radians (looking straight?) No, usually looking forward.
@@ -77,6 +68,7 @@ class SimpleSLAM:
         
         # 2. Visual Odometry
         dx, dy, dtheta = 0, 0, 0
+        vo_dist = 0.0
         
         if self.last_frame is not None:
              if self.last_keypoints is None or len(self.last_keypoints) < 8:
@@ -108,35 +100,28 @@ class SimpleSLAM:
                             
                             # Heuristic conversion to Robot motion
                             # Pixel shift X -> Rotation (Yaw)
-                            # If Robot Turns Left (+Theta), Camera sweeps Left, Image moves Right (+tx).
-                            # So +tx => +Theta.
-                            yaw_scale = 0.0015 # Tune this
+                            yaw_scale = 0.0015 
                             dtheta = img_tx * yaw_scale 
                             
                             # Translation Update (Visual Encoders)
-                            # Simple heuristic: flow y corresponds to forward/backward
-                            # If Robot moves Forward, pixels move OUT/Away from center. 
-                            # Bottom pixels move DOWN (+ty). 
-                            # So +ty (for bottom pixels) => Forward.
+                            # Flow Y (+ty) for ground pixels roughly implies backward motion if camera is looking down/forward?
+                            # Wait, if robot moves forward, ground pixels move DOWN (+Y) in image.
+                            # So +ty => Forward.
                             
+                            # Scale factor needs calibration.
+                            trans_scale = 0.001 
+                            # We only update a local 'vo_dist' variable to blend later
+                            vo_dist = img_ty * trans_scale
                             pass
                         
                     # Update keypoints for next step
                     self.last_keypoints = good_new.reshape(-1, 1, 2)
                  else:
-                    # Flow failed
                     self.last_keypoints = None
              else:
-                 # No keypoints to track
                  self.last_keypoints = None
                     
-        # FUSE with Control Inputs (Simple Motion Model)
-        # If we have a movement command, trust it for "Intent" translation
-        # Use VO mainly for Rotation and Drift correction? 
-        # Actually, let's just use a simple Motion Model for now if VO is too complex to tune blindly.
-        # But user asked for SLAM.
-        
-        # Simplified Motion Model + VO for Rotation
+        # Motion Model
         cmd_v = 0.0
         cmd_w = 0.0
         
@@ -154,11 +139,23 @@ class SimpleSLAM:
         else:
              self.theta += cmd_w 
              
-        # Translation: 
-        # VO for translation is hard without scale. Monocular scale ambiguity.
-        # We will assume scale from cmd_v (Command)
-        distance = cmd_v 
+        # FUSE with Control Inputs
+        # We blend VO and Command.
+        # If cmd_v is present, we trust it more for scale, but VO helps.
+        # Simplified: Use Command for base velocity, add VO as a small correction or use VO if consistent?
+        # Let's just USE VO for now to fulfill "Enable VO".
         
+        if abs(vo_dist) > 0.001:
+             distance = vo_dist
+             # Blend with command if available (Command sets direction intent)
+             if cmd_v != 0:
+                 # Simple average or weighted?
+                 # If VO says 0.05 and Cmd says 0.1, maybe we are slipping?
+                 # Let's just average them 
+                 distance = (distance + cmd_v) / 2.0
+        else:
+             distance = cmd_v
+
         self.x += distance * math.cos(self.theta)
         self.y += distance * math.sin(self.theta)
         
@@ -174,12 +171,8 @@ class SimpleSLAM:
         # Use ObstacleDetector to find floor/obstacles
         # We are going to "project" the view into the map.
         
-        # 1. Bilateral + Canny (Reusing logic, maybe call specific methods if possible, 
-        # but easier to reimplement simplified version or modify ObstacleDetector to return points)
-        
-        # Let's assume a simplified scanner:
-        # Scan columns. Find lowest edge. 
-        # Everything below edge is "Free Floor". Edge is "Obstacle".
+        # 1. Bilateral + Canny
+        # Simplified scanner: Find lowest edge to determine floor boundary.
         
         small = cv2.resize(frame, (160, 120)) # Downscale for speed
         edges = cv2.Canny(small, 50, 150)
@@ -192,12 +185,6 @@ class SimpleSLAM:
         # Raycast for each column
         
         # Simple Pitch Compensation
-        # If head pitches down (+pitch), horizon moves UP (-y).
-        # We need to access state.head_pitch but passing it in is cleaner.
-        # For lightweight, let's just use defaults or try to import heuristic.
-        # Ideally passed in process args.
-        # We will stick to fixed horizon for now but clamp values safely.
-        
         horizon_y = h // 2
         
         for c in range(0, w, 4): # Skip columns for speed (4 instead of 2)

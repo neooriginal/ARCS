@@ -21,10 +21,20 @@ Designed for navigating narrow doorways or tight gaps where standard safety thre
 - **Gap Alignment**: The system identifies the widest contiguous gap in the field of view.
 - **Visual Guidance**: Overlays alignment targets and text instructions (e.g., "ALIGNMENT: TARGET LEFT") on the video feed to assist the operator or AI agent in aligning perfectly with the opening.
 
+### 4. SLAM & Mapping
+The system includes a lightweight monocular SLAM (Simultaneous Localization and Mapping) module (`SimpleSLAM`) to estimate the robot's trajectory and build a local occupancy grid.
+- **Visual Odometry**: Uses Lucas-Kanade optical flow to track features between frames. It estimates:
+    - **Rotation**: From horizontal pixel shifts.
+    - **Translation**: From vertical pixel shifts (assuming ground plane motion).
+- **Occupancy Map**: Projects vision-detected obstacles onto a 2D top-down grid map.
+    - **Input**: Video frames (640x480).
+    - **Output**: 800x800 pixel grid map (5cm/pixel resolution) with the robot centered.
+    - **Update**: As the robot moves, new obstacle observations are drawn onto the map, and the robot's pose path is traced.
+
 ## Usage
 
 ### Operating Precision Mode
-Precision mode is essential for traversing doors.
+Precision mode is essential for navigating doors.
 1. **Enable**: call explicit tool or toggle via API.
 2. **Align**: Rotate the robot until the yellow "TARGET" line turns green and the status reads "PERFECT".
 3. **Drive**: Move forward through the gap. The safety reflex remains active but with adjusted sensitivity.
