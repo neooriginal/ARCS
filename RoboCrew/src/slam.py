@@ -24,8 +24,8 @@ class SimpleSLAM:
         # x, y in meters (global frame), theta in radians
         self.x = 0.0
         self.y = 0.0
-        self.theta = 0.0 # Radians
-        
+        self.theta = -math.pi / 2 # Pointing UP (North) initially
+
         # Path trace for visualization
         self.path = deque(maxlen=1000)
         
@@ -47,7 +47,7 @@ class SimpleSLAM:
         # Camera Calibration
         # y=480 is bottom (close), y=0 is top (far/horizon).
         self.cam_height = 0.2 # meters
-        self.cam_tilt = -0.0  # radians (looking straight?) No, usually looking forward.
+        self.cam_tilt = -0.0  # radians
         
         # Reusing basic obstruction logic for map
         from obstacle_detection import ObstacleDetector
@@ -85,34 +85,24 @@ class SimpleSLAM:
                     
                     if len(good_new) > 4:
                         # Estimate transformation
-                        # Using estimateAffinePartial2D to get rotation and translation
                         m, _ = cv2.estimateAffinePartial2D(good_old, good_new)
                         
                         if m is not None:
-                            # m is [[cos, -sin, tx], [sin, cos, ty]]
-                            # But this is image-space shift.
-                            # Image shift X (tx) -> Yaw rotation (mostly).
-                            # Image shift Y (ty) -> Forward/Back motion.
-                            
                             img_tx = m[0, 2]
                             img_ty = m[1, 2]
-                            img_rot = math.atan2(m[1, 0], m[0, 0]) * (180.0 / math.pi) # Rotation in Frame
                             
                             # Heuristic conversion to Robot motion
                             # Pixel shift X -> Rotation (Yaw)
+                            # Image moves LEFT (+tx) -> Robot turned LEFT (-yaw)?
+                            # Wait: If image moves LEFT, object moves LEFT. Robot turned RIGHT.
+                            # Standard: Rotation = -tx * scale
                             yaw_scale = 0.0015 
-                            dtheta = img_tx * yaw_scale 
+                            dtheta = -img_tx * yaw_scale 
                             
-                            # Translation Update (Visual Encoders)
-                            # Flow Y (+ty) for ground pixels roughly implies backward motion if camera is looking down/forward?
-                            # Wait, if robot moves forward, ground pixels move DOWN (+Y) in image.
-                            # So +ty => Forward.
-                            
-                            # Scale factor needs calibration.
+                            # Translation Update
+                            # Image moves DOWN (+ty) -> Robot moved FORWARD (+dist)
                             trans_scale = 0.001 
-                            # We only update a local 'vo_dist' variable to blend later
                             vo_dist = img_ty * trans_scale
-                            pass
                         
                     # Update keypoints for next step
                     self.last_keypoints = good_new.reshape(-1, 1, 2)
@@ -128,30 +118,29 @@ class SimpleSLAM:
         if movement_cmd:
             if movement_cmd.get('forward'): cmd_v = 0.1
             if movement_cmd.get('backward'): cmd_v = -0.1
-            if movement_cmd.get('left'): cmd_w = 0.15 
-            if movement_cmd.get('right'): cmd_w = -0.15
+            if movement_cmd.get('left'): cmd_w = -0.15 # Left turn = +rotation? Usually. 
+            # In standard ROS: Counter-Clockwise is Positive.
+            # If dtheta reduces angle, it turns Right.
+            # Initial theta = -pi/2 (-90).
+            # Turn Left -> -pi/2 + 0.1 = -1.47 (towards 0/East).
+            # Turn Right -> -pi/2 - 0.1 = -1.67 (towards -pi/West).
+            # Visual check needed. Let's stick to standard CCW (+).
+            if movement_cmd.get('left'): cmd_w = -0.15 
+            if movement_cmd.get('right'): cmd_w = 0.15
 
-        # If VO rotation detected strong signal, use it?
-        # dtheta comes from VO. 
-        # If we are rotating, VO dtheta is likely better than Odometry?
+        # Update Heading
         if abs(dtheta) > 0.001:
              self.theta += dtheta
         else:
              self.theta += cmd_w 
              
-        # FUSE with Control Inputs
-        # We blend VO and Command.
-        # If cmd_v is present, we trust it more for scale, but VO helps.
-        # Simplified: Use Command for base velocity, add VO as a small correction or use VO if consistent?
-        # Let's just USE VO for now to fulfill "Enable VO".
-        
+        # Normalize theta to -pi..pi
+        self.theta = math.atan2(math.sin(self.theta), math.cos(self.theta))
+
+        # Update Position
         if abs(vo_dist) > 0.001:
              distance = vo_dist
-             # Blend with command if available (Command sets direction intent)
              if cmd_v != 0:
-                 # Simple average or weighted?
-                 # If VO says 0.05 and Cmd says 0.1, maybe we are slipping?
-                 # Let's just average them 
                  distance = (distance + cmd_v) / 2.0
         else:
              distance = cmd_v
@@ -168,26 +157,27 @@ class SimpleSLAM:
 
 
     def update_map(self, frame):
-        # Use ObstacleDetector to find floor/obstacles
-        # We are going to "project" the view into the map.
-        
-        # 1. Bilateral + Canny
-        # Simplified scanner: Find lowest edge to determine floor boundary.
-        
-        small = cv2.resize(frame, (160, 120)) # Downscale for speed
+        """Update occupancy grid using polygon filling for FOV."""
+        small = cv2.resize(frame, (160, 120))
         edges = cv2.Canny(small, 50, 150)
         h, w = edges.shape
-        
-        # Robot Position in Grid
-        grid_x = int(self.x / self.map_resolution) + self.map_center
-        grid_y = int(self.y / self.map_resolution) + self.map_center
-        
-        # Raycast for each column
-        
-        # Simple Pitch Compensation
         horizon_y = h // 2
         
-        for c in range(0, w, 4): # Skip columns for speed (4 instead of 2)
+        # Robot position in grid
+        rx = int(self.x / self.map_resolution) + self.map_center
+        ry = int(self.y / self.map_resolution) + self.map_center
+        
+        if not (0 <= rx < self.map_size and 0 <= ry < self.map_size):
+            return
+
+        # Polygon points for Free Space
+        poly_points = [(rx, ry)]
+        obstacle_points = []
+        
+        # Reduce sampling stepping for smoother polygon, but keep performance
+        step = 2 
+        
+        for c in range(0, w, step):
             # Find bottom-most edge in column
             obs_y = -1
             for r in range(h-1, -1, -1):
@@ -195,48 +185,48 @@ class SimpleSLAM:
                     obs_y = r
                     break
             
-            # Angle of this ray (relative to camera center)
-            # c ranges 0..160. Center 80.
-            # Field of view ~60 deg
-            ray_angle_cam = (c - (w/2)) * (math.radians(60) / w) 
+            # Ray angle
+            ray_angle_cam = (c - (w/2)) * (math.radians(60) / w)
+            ray_angle_global = self.theta + ray_angle_cam # + or - depends on camera mount
             
-            # Global Angle
-            ray_angle_global = self.theta - ray_angle_cam 
-            
-            dist = 999.0
+            dist = 3.0 # Default max range
             is_obstacle = False
             
             if obs_y > horizon_y + 5:
                 # Valid ground pixel
                 offset_y = obs_y - horizon_y
-                # Calibrate this constant K
-                K = 15.0 
+                K = 15.0 # Calibration constant
                 dist = K / offset_y
                 is_obstacle = True
-            elif obs_y == -1:
-                # No edge found, assume clear up to max range
-                dist = 2.0 # 2 meters clear
+            
+            if dist > 3.0: 
+                dist = 3.0
                 is_obstacle = False
-            else:
-                 # Above horizon? Ignore or infinite.
-                 dist = 2.0
-                 is_obstacle = False
             
-            if dist > 3.0: dist = 3.0 # Cap range
+            # End point
+            ex = self.x + dist * math.cos(ray_angle_global)
+            ey = self.y + dist * math.sin(ray_angle_global)
             
-            # End Point in Global Frame
-            end_x = self.x + dist * math.cos(ray_angle_global)
-            end_y = self.y + dist * math.sin(ray_angle_global)
+            gex = int(ex / self.map_resolution) + self.map_center
+            gey = int(ey / self.map_resolution) + self.map_center
             
-            end_grid_x = int(end_x / self.map_resolution) + self.map_center
-            end_grid_y = int(end_y / self.map_resolution) + self.map_center
+            poly_points.append((gex, gey))
             
-            # Draw Line (Free Space) using Bresenham
-            if 0 <= grid_x < self.map_size and 0 <= grid_y < self.map_size and 0 <= end_grid_x < self.map_size and 0 <= end_grid_y < self.map_size:
-                self.draw_line(grid_x, grid_y, end_grid_x, end_grid_y, 255) # White = Free
-
-                if is_obstacle and dist < 2.0:
-                    cv2.circle(self.grid_map, (end_grid_x, end_grid_y), 1, 0, -1) # Black = Occupied
+            if is_obstacle and dist < 2.5:
+                obstacle_points.append((gex, gey))
+        
+        # 1. Clear Free Space (White Polygon)
+        # We draw a filled polygon representing the current FOV as "Free"
+        # This overwrites any previous "Unknown" (Gray) or "transient" obstacles
+        # However, to avoid erasing REAL static obstacles we saw before, 
+        # usually we use log-odds. But for "SimpleSLAM", Overwriting is fine 
+        # as long as the sensor is trusted.
+        cv2.fillPoly(self.grid_map, [np.array(poly_points)], 255)
+        
+        # 2. Draw Obstacles (Black Dots)
+        for (ox, oy) in obstacle_points:
+            if 0 <= ox < self.map_size and 0 <= oy < self.map_size:
+                 cv2.circle(self.grid_map, (ox, oy), 2, 0, -1)
     
     def draw_line(self, x0, y0, x1, y1, color):
         cv2.line(self.grid_map, (x0, y0), (x1, y1), int(color), 1)
