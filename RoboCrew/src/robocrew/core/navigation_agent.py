@@ -63,6 +63,7 @@ PRECISION MODE PROTOCOL:
     - **BLIND COMMIT**: If guidance says "BLIND COMMIT. GO FORWARD.", it means you are crossing the threshold and sensors are masked. MOVE FORWARD CONFIDENTLY.
     - **GUIDANCE IS A HINT**: The line helps you align, but it can be wrong (jitter/jump). If the line points into a wall, IGNORE IT and rely on your own judgment of the door frame.
     - **ROTATION HINTS**: When blocked near a door, guidance may include [ROTATE LEFT/RIGHT to align]. Make a SMALL turn (5-10 degrees) in that direction, then try forward again. Do NOT back up unless you've tried rotating first.
+    - **Backing Up**: If you are STUCK at a door, prefer rotating in place to find the gap. Only back up if rotation fails or you are physically wedged.
     - Otherwise, if guide says "ACTION: STOP", OBEY IT.
     - ONLY move forward when guidance says "PERFECT" or if you are confident you are passing through.
 - **EXIT PROTOCOL**: DO NOT disable Precision Mode until you have COMPLETELY PASSED the doorframe.
@@ -96,6 +97,7 @@ BACKWARD MOVEMENT SAFETY:
         self.last_image = None
         self.stuck_counter = 0
         self.last_action = None
+        self.latest_rotation_hint = None
 
     def set_task(self, task: str):
         """Set a new task for the agent."""
@@ -173,6 +175,7 @@ BACKWARD MOVEMENT SAFETY:
             
         # 2. Safety Check & Processing
         safe_actions, overlay, guidance, metrics = self._check_safety(frame)
+        self.latest_rotation_hint = metrics.get('rotation_hint')
         
         # Use overlay if available, otherwise raw frame
         display_frame = overlay if overlay is not None else frame
@@ -270,7 +273,13 @@ BACKWARD MOVEMENT SAFETY:
                         required_action = action_map[tool_name]
                         if required_action not in safe_actions:
                             blocked = True
-                            result = f"REFLEX SYSTEM INTERVENTION: Action '{tool_name}' BLOCKED. detected obstacle. Allowed: {safe_actions}. Please choose another path."
+                            result = f"REFLEX SYSTEM INTERVENTION: Action '{tool_name}' BLOCKED. detected obstacle. Allowed: {safe_actions}."
+                            
+                            # Inject Rotation Hint if available
+                            if self.latest_rotation_hint:
+                                result += f" HINT: {self.latest_rotation_hint}. TRY THIS INSTEAD OF BACKING UP."
+                            else:
+                                result += " Please choose another path."
                         
                         # --- BACKWARD SAFETY ---
                         if tool_name == "move_backward":
