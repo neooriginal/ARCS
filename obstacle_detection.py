@@ -193,11 +193,8 @@ class ObstacleDetector:
         if is_blind:
             blocked.add("FORWARD")
         else:
-        if is_blind:
-            blocked.add("FORWARD")
-        else:
             if state.precision_mode:
-                 # Precision Mode: Relaxed forward check, but RESTORED side checks
+                # Precision Mode: Relaxed forward check, but RESTORED side checks
                  # Forward: Ignore bottom threshold (handled by masking), check actual wall
                  if c_fwd > 460:
                      blocked.add("FORWARD")
