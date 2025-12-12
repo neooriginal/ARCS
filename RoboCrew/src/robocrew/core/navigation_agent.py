@@ -57,13 +57,11 @@ DOORWAYS AND TIGHT OPENINGS:
 
 PRECISION MODE PROTOCOL:
 - Use `enable_precision_mode` when approaching a narrow gap.
-- STRATEGY: Align with the door from a distance (>1m). Do not drive straight then turn. Rotate UNTIL the GREEN PATH is centered and pointing through the door.
-- VISUAL CONFIRMATION: Look at the GREEN PATH. Is it wide? Is it pointing through the door? If it is narrow or skewed, DO NOT GO.
-- SECURITY NOTICE: In precision mode, obstacle avoidance is minimized. Proceed with extreme caution. You rely SOLELY on the guidance lines.
-- Once enabled, FOLLOW THE VISUAL GUIDANCE STRICTLY, WITH ONE EXCEPTION:
-    - **CLOSE RANGE WARNING**: If you are very close to the door (guidance says "UNSAFE DISTANCE" or you see the door frame filling the view), the Left/Right alignment indicators key become UNRELIABLE. In this specific case, you may ignore the direction if it contradicts your visual judgment, BUT the safest action is usually to **BACK UP** to regain a reliable view.
-    - **BLIND COMMIT**: If guidance says "BLIND COMMIT. GO FORWARD.", it means you are crossing the threshold and sensors are masked. MOVE FORWARD CONFIDENTLY.
-    - **GUIDANCE IS A HINT**: The line helps you align, but it can be wrong (jitter/jump). If the line points into a wall, IGNORE IT and rely on your own judgment of the door frame.
+- YOU ARE THE PILOT: There are no guidance lines. The code pathfinder has been disabled because it was unreliable.
+- USE YOUR VISION: Aim for the center of the dark void (doorway).
+- THRESHOLD MASKING: The bottom of the view (floor threshold) is masked out by the system. It will not stop you.
+- SAFETY: The system will only stop you if you are about to hit a WALL directly. You must manage the fine alignment.
+- IGNORE PREVIOUS VISUAL RULES: The "Green Path" and "TARGET" lines are gone. Trust your eyes.
     - Otherwise, if guide says "ACTION: STOP", OBEY IT.
     - ONLY move forward when guidance says "PERFECT" or if you are confident you are passing through.
 - **EXIT PROTOCOL**: DO NOT disable Precision Mode until you have COMPLETELY PASSED the doorframe.
