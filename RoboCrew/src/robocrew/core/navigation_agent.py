@@ -57,11 +57,11 @@ DOORWAYS AND TIGHT OPENINGS:
 
 PRECISION MODE PROTOCOL:
 - Use `enable_precision_mode` when approaching a narrow gap.
-- YOU ARE THE PILOT: There are no guidance lines. The code pathfinder has been disabled because it was unreliable.
-- USE YOUR VISION: Aim for the center of the dark void (doorway).
-- THRESHOLD MASKING: The bottom of the view (floor threshold) is masked out by the system. It will not stop you.
-- SAFETY: The system will only stop you if you are about to hit a WALL directly. You must manage the fine alignment.
-- IGNORE PREVIOUS VISUAL RULES: The "Green Path" and "TARGET" lines are gone. Trust your eyes.
+- YOU ARE THE PILOT: Use your vision to aim for the center of the void.
+- **GREEN ZONE**: If you see a GREEN TRAPEZOID on the floor, the path ahead is clear.
+- **DRIFT HINTS**: If the screen says "Suggest: Drift X", use small rotation commands to center yourself in the doorway.
+- **SAFETY**: The system will STOP you if you get too close to the side frames.
+- THRESHOLD MASKING: The floor bar is ignored. You can drive over it.
     - Otherwise, if guide says "ACTION: STOP", OBEY IT.
     - ONLY move forward when guidance says "PERFECT" or if you are confident you are passing through.
 - **EXIT PROTOCOL**: DO NOT disable Precision Mode until you have COMPLETELY PASSED the doorframe.

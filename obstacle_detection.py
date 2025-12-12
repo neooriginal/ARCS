@@ -95,15 +95,41 @@ class ObstacleDetector:
         # Update Safety History & Public State
         safe_actions = self._update_safety_state(instant_blocked, is_blind, shapes, overlay, w, h)
 
-        # 5. Compute Precision Guidance (AI-Only Mode)
-        # We removed the algorithmic pathfinding. The AI observes the "overlay" and "shapes".
+        # 5. Compute Precision Guidance (AI-Only Mode + Helpers)
         guidance = ""
-        # We still show the red "Blocked" bubbles? No, simplified.
-        # Just pure Vision for the AI.
+        
+        if state.precision_mode:
+            # A. Green Safe Zone (Visual Reference)
+            if "FORWARD" not in safe_actions:
+                 # Blocked - No Green Zone
+                 pass
+            else:
+                 # Draw Green Trapezoid (The "FWD OK" Zone)
+                 # Base is wide, tip is narrower (Projecting into the door)
+                 trap_poly = np.array([
+                    [int(w*0.2), h], 
+                    [int(w*0.8), h], 
+                    [int(w*0.65), int(h*0.6)], 
+                    [int(w*0.35), int(h*0.6)]
+                 ], np.int32)
+                 cv2.fillPoly(shapes, [trap_poly], (0, 255, 0))
+                 cv2.putText(overlay, "FWD OK", (w//2 - 40, h - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            
+            # B. Soft Guidance (Drift Hints)
+            # Compare sides to suggest centering
+            # If c_left is high (obstacle close), drift right.
+            balance = c_left - c_right
+            if abs(balance) > 40: # Significant imbalance
+                if balance > 0: # Left is closer
+                    guidance = "Suggest: Drift RIGHT ->"
+                else: # Right is closer
+                    guidance = "Suggest: <- Drift LEFT"
 
         # Blend Visualization
         alpha = 0.4
         cv2.addWeighted(shapes, alpha, overlay, 1 - alpha, 0, overlay)
+        if guidance:
+             cv2.putText(overlay, guidance, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
 
         return safe_actions, overlay, {
             'c_left': c_left, 
@@ -167,9 +193,23 @@ class ObstacleDetector:
         if is_blind:
             blocked.add("FORWARD")
         else:
+        if is_blind:
+            blocked.add("FORWARD")
+        else:
             if state.precision_mode:
+                 # Precision Mode: Relaxed forward check, but RESTORED side checks
+                 # Forward: Ignore bottom threshold (handled by masking), check actual wall
                  if c_fwd > 460:
                      blocked.add("FORWARD")
+                     
+                 # Side Checks: Prevent hitting the door frame
+                 # Use a tighter threshold than normal to allow passage, but stop collisions
+                 # Norm threshold ~420. Side threshold ~470.
+                 side_limit = threshold + 60 
+                 if c_left > side_limit:
+                     blocked.add("LEFT")
+                 if c_right > side_limit:
+                     blocked.add("RIGHT")
             else:
                  if c_fwd > threshold:
                      blocked.add("FORWARD")
