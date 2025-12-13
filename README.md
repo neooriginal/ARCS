@@ -1,6 +1,7 @@
 # 🤖 ARCS (Autonomous Robot Control System)
 
 # Very, very experimental as of now, it's still a work in progress.
+## You can use the "main" branch for the latest, tested version. If you want to try the latest features, use the "exp" branch.
 
 **AI Agent • Remote Manipulation • Active Safety**
 
