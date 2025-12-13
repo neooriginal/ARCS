@@ -12,7 +12,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Add local RoboCrew source to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'RoboCrew', 'src'))
+# NOTE: Uses lowercase 'robocrew' based on detected folder structure
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'robocrew', 'src'))
 
 from flask import Flask
 
