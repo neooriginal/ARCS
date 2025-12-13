@@ -22,5 +22,10 @@ pyaudio>=0.2.13
 # Motor Control (lerobot - install from source or pip)
 # lerobot  # Install separately: pip install lerobot
 
+# gRPC/Protobuf (pinned for lerobot compatibility)
+grpcio==1.67.1
+grpcio-tools==1.67.1
+protobuf>=5.27.2,<6.0
+
 # Text-to-Speech (optional)
 pyttsx3>=2.90
