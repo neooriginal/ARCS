@@ -201,20 +201,17 @@ BACKWARD MOVEMENT SAFETY:
         # Draw QR Visuals on Overlay (if overlay exists)
         if overlay is not None and qr_points is not None:
              try:
-                 # Flatten points if they are wrapped (standard output is (1, 4, 2))
                  points = qr_points
                  if points.ndim == 3 and points.shape[0] == 1:
                     points = points[0]
                  
                  points = points.astype(int)
                  
-                 # Draw Green Polygon
                  for i in range(len(points)):
                      pt1 = tuple(points[i])
                      pt2 = tuple(points[(i+1) % len(points)])
                      cv2.line(overlay, pt1, pt2, (0, 255, 0), 3)
                  
-                 # Draw Title Text under the box
                  if qr_title:
                      x, y = points[0]
                      cv2.putText(overlay, qr_title, (int(x), int(y) + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)

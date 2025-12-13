@@ -10,8 +10,6 @@ class QRScanner:
         self.seen_codes = set()
         self.last_seen_time = {}
         # Cooldown in seconds before reporting the same code again (if we want to allow re-reporting)
-        # User asked for "only once", but practically, if we leave and come back 10 mins later, it might be relevant.
-        # Let's set a very long cooldown or just strictly once.
         # Setting strictly once per session for now.
         
     def scan(self, frame, pose=None):
@@ -35,7 +33,6 @@ class QRScanner:
             data, points, _ = self.detector.detectAndDecode(frame)
             
             if data and points is not None:
-                # Parse Title for Visualization (format "TITLE: Info")
                 title = data.split(':', 1)[0].strip()
                 
                 new_context = None

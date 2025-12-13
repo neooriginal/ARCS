@@ -47,5 +47,5 @@ LOCATION-TITLE: Optional longer description or data...
     *   The AI receives a high-priority system message: `CONTEXT UPDATE: Detected marker 'KITCHEN' at x=1.5, y=3.2`.
     *   **De-duplication**: Unique codes are reported only **once** per session to prevent flooding the AI's context window.
 3.  **Visualization**:
-    *   **Green Bounding Box**: Drawn around the detected QR code on the live video feed.
-    *   **Label**: The `LOCATION-TITLE` is rendered in small text just below the box for operator awareness.
+    *   **Green Bounding Polygon**: A green outline is drawn connecting the 4 corners of the detected QR code.
+    *   **Label**: The `LOCATION-TITLE` is rendered in green text just below the polygon.
