@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 import json
+import os
 from pathlib import Path
 from typing import Dict, Mapping, Optional
 from lerobot.motors import Motor, MotorCalibration, MotorNormMode
@@ -11,9 +12,9 @@ from lerobot.motors.feetech import FeetechMotorsBus, OperatingMode
 
 
 DEFAULT_BAUDRATE = 1_000_000
-DEFAULT_SPEED = 10_000
-LINEAR_MPS = 0.25
-ANGULAR_DPS = 100.0
+DEFAULT_SPEED = int(os.getenv("ROBOT_SPEED", 10_000))
+LINEAR_MPS = float(os.getenv("ROBOT_LINEAR_MPS", 0.25))
+ANGULAR_DPS = float(os.getenv("ROBOT_ANGULAR_DPS", 100.0))
 
 ACTION_MAP = {
     "up": {7: 1, 8: 0, 9: -1},
