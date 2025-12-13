@@ -270,6 +270,7 @@ def ai_start():
 @bp.route('/ai/stop', methods=['POST'])
 def ai_stop():
     state.ai_enabled = False
+    state.precision_mode = False
     
     # Clear context on stop as well
     if state.agent:
@@ -300,6 +301,7 @@ def ai_status():
 @bp.route('/emergency_stop', methods=['POST'])
 def emergency_stop():
     state.ai_enabled = False
+    state.precision_mode = False
     state.stop_all_movement()
     if state.robot_system:
         state.robot_system.emergency_stop()

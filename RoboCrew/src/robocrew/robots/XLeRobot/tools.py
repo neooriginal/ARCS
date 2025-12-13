@@ -19,6 +19,7 @@ def create_end_task():
         """Call this when you have completed your assigned task or mission. Provide a reason explaining what was accomplished."""
         print(f"[TOOL] end_task - reason: {reason}")
         robot_state.ai_enabled = False
+        robot_state.precision_mode = False
         robot_state.ai_status = f"Task completed: {reason}"
         robot_state.add_ai_log(f"TASK COMPLETED: {reason}")
         return f"Task ended. Reason: {reason}. AI has been paused."
