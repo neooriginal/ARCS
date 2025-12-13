@@ -2,6 +2,7 @@
 
 # Web Framework
 flask>=2.3.0
+werkzeug>=2.3.0
 
 # Computer Vision
 opencv-python>=4.8.0
@@ -10,17 +11,21 @@ numpy>=1.24.0
 # Environment Variables
 python-dotenv>=1.0.0
 
-# AI/LLM (for navigation agent)
+# AI/LLM
 langchain>=0.1.0
 langchain-core>=0.1.0
+langchain-community>=0.0.10
 litellm>=1.0.0
 openai>=1.0.0
 
-# Audio (for voice features)
+# Hardware / Audio
 pyaudio>=0.2.13
+pyserial>=3.5
 
-# Motor Control (lerobot - install from source or pip)
-# lerobot  # Install separately: pip install lerobot
+# Motor Control
+# Note: 'lerobot' must be installed manually or via pip if available
+# pip install lerobot
 
-# Text-to-Speech (optional)
+# Misc
+requests>=2.31.0
 pyttsx3>=2.90
