@@ -544,6 +544,24 @@ h1 {
     border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
+/* CSS for Memory Panel */
+.memory-panel {
+    background: #222;
+    border: 1px solid #444;
+    border-radius: 8px;
+}
+
+.memory-item {
+    border-bottom: 1px solid #333;
+    padding: 4px 0;
+}
+
+.memory-time {
+    color: #666;
+    font-size: 0.8em;
+    margin-right: 8px;
+}
+
 /* Debug panel */
 .debug-panel {
     margin-top: 15px;

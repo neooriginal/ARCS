@@ -16,6 +16,7 @@ from state import state
 from qr_scanner import QRScanner
 from robocrew.core.robot_system import RobotSystem # Added missing import for RobotSystem
 from robocrew.core.oscillation_detector import OscillationDetector
+from robocrew.core.memory_db import get_recent_memories
 
 logger = logging.getLogger(__name__)
 
@@ -308,6 +309,13 @@ BACKWARD MOVEMENT SAFETY:
         # Check Oscillation
         if self.oscillation_detector.detect_oscillation():
              reflex_msg += f"\n{self.oscillation_detector.get_warning_message()}"
+
+        # Inject Memories
+        recent_memories = get_recent_memories(limit=10)
+        if recent_memories:
+            reflex_msg += "\n\nMEMORIES:"
+            for m in recent_memories:
+                reflex_msg += f"\n- {m['text']}"
             
         if forced_action == "FORCE_TURN_AROUND":
             reflex_msg += "\nCRITICAL: YOU ARE STUCK. IGNORING YOUR OUTPUT. FORCING A TURN."

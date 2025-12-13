@@ -43,6 +43,26 @@ def create_disable_precision_mode():
     return disable_precision_mode
 
 
+def create_remember_fact():
+    # Import inside function to avoid circular imports if tools are imported early
+    from robocrew.core.memory_db import add_memory
+    
+    @tool
+    def remember_fact(fact: str) -> str:
+        """
+        Persistently remember a fact about the environment (e.g., room layout, object location).
+        Use this when you discover something important that you should know for later tasks.
+        Example: "The kitchen is through the north door."
+        """
+        try:
+            add_memory(fact)
+            print(f"[MEMORY] Saved: {fact}")
+            return f"Memory saved: '{fact}'"
+        except Exception as e:
+            return f"Failed to save memory: {e}"
+    return remember_fact
+
+
 def _interruptible_sleep(duration: float, check_interval: float = 0.1, check_safety: bool = False, movement_type: str = None):
     """
     Sleep that can be interrupted by emergency stop or SAFETY REFLEX.

@@ -369,6 +369,33 @@ async function armHome() {
 
 // ============== Event Handlers ==============
 
+// Memory Management
+function fetchMemories() {
+    fetch('/memories?limit=10')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                const list = document.getElementById('memory-list');
+                list.innerHTML = '';
+                if (data.memories.length === 0) {
+                    list.innerHTML = '<li>No memories recorded yet.</li>';
+                } else {
+                    data.memories.forEach(mem => {
+                        const li = document.createElement('li');
+                        li.className = 'memory-item';
+                        // Format timestamp slightly?
+                        li.innerHTML = `<span class="memory-time">[${mem.timestamp}]</span> ${mem.text}`;
+                        list.appendChild(li);
+                    });
+                }
+            }
+        })
+        .catch(err => console.error("Memory fetch failed", err));
+}
+
+// Start polling
+setInterval(fetchMemories, 5000);
+fetchMemories(); // Initial load
 // Mouse movement
 document.addEventListener('mousemove', (e) => {
     if (currentMode === 'drive' && driveLocked) {

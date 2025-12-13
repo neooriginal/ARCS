@@ -298,6 +298,16 @@ def ai_status():
         'logs': state.ai_logs
     })
 
+@bp.route('/memories')
+def get_memories():
+    from robocrew.core.memory_db import get_recent_memories
+    try:
+        limit = int(request.args.get('limit', 50))
+        mems = get_recent_memories(limit)
+        return jsonify({'status': 'ok', 'memories': mems})
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)})
+
 @bp.route('/emergency_stop', methods=['POST'])
 def emergency_stop():
     state.ai_enabled = False
