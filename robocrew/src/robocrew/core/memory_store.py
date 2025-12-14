@@ -71,7 +71,7 @@ class MemoryStore:
         with self._db_lock:
             cursor = self.conn.cursor()
             cursor.execute(
-                'SELECT category, content, location_x, location_y FROM notes ORDER BY created_at DESC LIMIT ?',
+                'SELECT id, category, content, location_x, location_y FROM notes ORDER BY created_at DESC LIMIT ?',
                 (limit,)
             )
             rows = cursor.fetchall()

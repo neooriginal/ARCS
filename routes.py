@@ -393,3 +393,68 @@ def ai_video_feed():
     return Response(generate_cv_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
+@bp.route('/memory')
+def memory_page():
+    return render_template('memory.html')
+
+
+@bp.route('/api/memory', methods=['GET'])
+def get_memories():
+    from robocrew.core.memory_store import memory_store
+    notes = memory_store.get_notes(limit=50)
+    return jsonify({'notes': notes})
+
+
+@bp.route('/api/memory', methods=['POST'])
+def add_memory():
+    from robocrew.core.memory_store import memory_store
+    data = request.json
+    category = data.get('category', 'other')
+    content = data.get('content', '')
+    if not content:
+        return jsonify({'status': 'error', 'error': 'Content required'}), 400
+    note_id = memory_store.save_note(category, content)
+    return jsonify({'status': 'ok', 'id': note_id})
+
+
+@bp.route('/api/memory/<int:note_id>', methods=['DELETE'])
+def delete_memory(note_id):
+    from robocrew.core.memory_store import memory_store
+    with memory_store._db_lock:
+        cursor = memory_store.conn.cursor()
+        cursor.execute('DELETE FROM notes WHERE id = ?', (note_id,))
+        memory_store.conn.commit()
+        deleted = cursor.rowcount > 0
+    if deleted:
+        return jsonify({'status': 'ok'})
+    return jsonify({'status': 'error', 'error': 'Note not found'}), 404
+
+
+@bp.route('/api/memory/<int:note_id>', methods=['PUT'])
+def update_memory(note_id):
+    from robocrew.core.memory_store import memory_store
+    data = request.json
+    category = data.get('category')
+    content = data.get('content')
+    
+    with memory_store._db_lock:
+        cursor = memory_store.conn.cursor()
+        if category and content:
+            cursor.execute('UPDATE notes SET category = ?, content = ? WHERE id = ?', (category, content, note_id))
+        elif content:
+            cursor.execute('UPDATE notes SET content = ? WHERE id = ?', (content, note_id))
+        elif category:
+            cursor.execute('UPDATE notes SET category = ? WHERE id = ?', (category, note_id))
+        memory_store.conn.commit()
+        updated = cursor.rowcount > 0
+    
+    if updated:
+        return jsonify({'status': 'ok'})
+    return jsonify({'status': 'error', 'error': 'Note not found'}), 404
+
+
+@bp.route('/api/memory/clear', methods=['POST'])
+def clear_memories():
+    from robocrew.core.memory_store import memory_store
+    memory_store.clear_all()
+    return jsonify({'status': 'ok'})

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARCS AI Memory</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        .memory-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            color: #00d4ff;
+        }
+
+        .back-link {
+            color: #888;
+            text-decoration: none;
+        }
+
+        .back-link:hover {
+            color: #fff;
+        }
+
+        .add-section {
+            background: #1a1a2e;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .add-section select,
+        .add-section input,
+        .add-section button {
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 6px;
+            background: #222;
+            color: #fff;
+        }
+
+        .add-section input {
+            flex: 1;
+        }
+
+        .add-section button {
+            background: #28a745;
+            border: none;
+            cursor: pointer;
+        }
+
+        .add-section button:hover {
+            background: #218838;
+        }
+
+        .memory-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .memory-item {
+            background: #1a1a2e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 12px 15px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .memory-item:hover {
+            border-color: #444;
+        }
+
+        .category-badge {
+            background: #333;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            text-transform: uppercase;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .category-badge.layout {
+            background: #2d4a6f;
+        }
+
+        .category-badge.landmark {
+            background: #4a2d6f;
+        }
+
+        .category-badge.obstacle {
+            background: #6f2d2d;
+        }
+
+        .category-badge.path {
+            background: #2d6f4a;
+        }
+
+        .category-badge.other {
+            background: #4a4a4a;
+        }
+
+        .memory-content {
+            flex: 1;
+            color: #e0e0e0;
+        }
+
+        .memory-content.editing {
+            display: flex;
+            gap: 8px;
+        }
+
+        .memory-content.editing input {
+            flex: 1;
+            padding: 6px 10px;
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #fff;
+        }
+
+        .memory-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-icon {
+            background: none;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .btn-icon:hover {
+            background: #333;
+            color: #fff;
+        }
+
+        .btn-icon.delete:hover {
+            background: #6f2d2d;
+            color: #ff6b6b;
+        }
+
+        .btn-icon.save {
+            color: #28a745;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .clear-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .clear-btn:hover {
+            background: #c82333;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .stats {
+            color: #888;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="memory-container">
+        <div class="header">
+            <a href="/ai" class="back-link">← AI Control</a>
+            <h1>🧠 AI Memory</h1>
+        </div>
+
+        <div class="add-section">
+            <select id="new-category">
+                <option value="layout">Layout</option>
+                <option value="landmark">Landmark</option>
+                <option value="obstacle">Obstacle</option>
+                <option value="path">Path</option>
+                <option value="other">Other</option>
+            </select>
+            <input type="text" id="new-content" placeholder="Add a new memory note...">
+            <button onclick="addNote()">Add</button>
+        </div>
+
+        <div class="toolbar">
+            <span class="stats" id="stats">Loading...</span>
+            <button class="clear-btn" onclick="clearAll()">Clear All</button>
+        </div>
+
+        <div class="memory-list" id="memory-list"></div>
+    </div>
+
+    <script>
+        function loadNotes() {
+            fetch('/api/memory')
+                .then(r => r.json())
+                .then(data => {
+                    const list = document.getElementById('memory-list');
+                    const stats = document.getElementById('stats');
+
+                    if (!data.notes || data.notes.length === 0) {
+                        list.innerHTML = '<div class="empty-state">No memories yet. The AI will save notes as it explores.</div>';
+                        stats.textContent = '0 notes';
+                        return;
+                    }
+
+                    stats.textContent = data.notes.length + ' note' + (data.notes.length !== 1 ? 's' : '');
+
+                    list.innerHTML = data.notes.map(note => `
+                        <div class="memory-item" data-id="${note.id}">
+                            <span class="category-badge ${note.category}">${note.category}</span>
+                            <div class="memory-content" id="content-${note.id}">${escapeHtml(note.content)}</div>
+                            <div class="memory-actions">
+                                <button class="btn-icon" onclick="editNote(${note.id})" title="Edit">✏️</button>
+                                <button class="btn-icon delete" onclick="deleteNote(${note.id})" title="Delete">🗑️</button>
+                            </div>
+                        </div>
+                    `).join('');
+                });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function addNote() {
+            const category = document.getElementById('new-category').value;
+            const content = document.getElementById('new-content').value.trim();
+
+            if (!content) return;
+
+            fetch('/api/memory', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ category, content })
+            })
+                .then(r => r.json())
+                .then(() => {
+                    document.getElementById('new-content').value = '';
+                    loadNotes();
+                });
+        }
+
+        function deleteNote(id) {
+            if (!confirm('Delete this note?')) return;
+
+            fetch('/api/memory/' + id, { method: 'DELETE' })
+                .then(() => loadNotes());
+        }
+
+        function editNote(id) {
+            const el = document.getElementById('content-' + id);
+            const currentText = el.textContent;
+
+            el.classList.add('editing');
+            el.innerHTML = `
+                <input type="text" value="${escapeHtml(currentText)}" id="edit-input-${id}">
+                <button class="btn-icon save" onclick="saveNote(${id})">✓</button>
+                <button class="btn-icon" onclick="loadNotes()">✕</button>
+            `;
+
+            document.getElementById('edit-input-' + id).focus();
+        }
+
+        function saveNote(id) {
+            const content = document.getElementById('edit-input-' + id).value.trim();
+            if (!content) return;
+
+            fetch('/api/memory/' + id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content })
+            })
+                .then(() => loadNotes());
+        }
+
+        function clearAll() {
+            if (!confirm('Delete ALL memories? This cannot be undone.')) return;
+
+            fetch('/api/memory/clear', { method: 'POST' })
+                .then(() => loadNotes());
+        }
+
+        document.getElementById('new-content').addEventListener('keypress', e => {
+            if (e.key === 'Enter') addNote();
+        });
+
+        loadNotes();
+    </script>
+</body>
+
+</html>
