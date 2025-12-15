@@ -399,7 +399,7 @@ PERSISTENT NOTES:
              elif "turn_right" in self.tool_map:
                  self.tool_map["turn_right"].invoke({"angle_degrees": 90})
                  
-             self.message_history.append(ToolMessage(content="System forced 90 degree turn to unstuck robot.", tool_call_id="system_forced_turn"))
+             self.message_history.append(SystemMessage(content="System Notification: Forced 90 degree turn executed to unstuck robot."))
              return "Stuck Detected - Forced Turn Executed"
         
         # 6. LLM Inference
