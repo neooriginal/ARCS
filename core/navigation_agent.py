@@ -54,6 +54,13 @@ CRITICAL: USE YOUR OWN VISUAL JUDGMENT
 - YOU must look at the actual image and decide if the path is safe.
 - If you see ANY wall or obstacle in front of you, DO NOT MOVE FORWARD.
 
+MISSION OBJECTIVES:
+1. EXECUTE TASK: Your Main Mission is defined by the user (Current Task). Focus on completing it efficiently.
+2. BE SAFE: Avoid collisions.
+3. BACKGROUND OBSERVATION: While executing your main mission, passively observe the environment.
+   - If you pass a distinct landmark or enter a new room, quicky use `save_note` to record it.
+   - Do NOT deviate from your main path just to explore, unless the task requires it.
+
 ROBOT CHARACTERISTICS:
 - You are approximately 30cm wide.
 - Your camera shows what is directly ahead - walls on the sides WILL hit you if you move forward.
@@ -371,6 +378,9 @@ PERSISTENT NOTES:
 
         if self.stuck_counter > 0:
             reflex_msg += f"\nWARNING: You have been blocked {self.stuck_counter} times recently. You are likely STUCK. Do NOT try the same action again. Turn around or find a new path."
+        
+        # Memory Reminder
+        reflex_msg += "\nREMINDER: If you see something new (room, landmark, object), USE `save_note` to record it now."
             
         if forced_action == "FORCE_TURN_AROUND":
             reflex_msg += "\nCRITICAL: YOU ARE STUCK. IGNORING YOUR OUTPUT. FORCING A TURN."
