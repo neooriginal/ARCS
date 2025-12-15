@@ -93,7 +93,7 @@ APPROACH MODE (MANIPULATION):
 - **PROTOCOL**:
   1. Align with the target from a distance.
   2. Enable Approach Mode.
-  3. Move Forward in small increments (0.2m maximum).
+  3. Move Forward in small increments.
   4. STOP when the target fills the bottom of your view.
   5. Disable Approach Mode immediately after interaction or backing away.
 
@@ -107,7 +107,7 @@ NAVIGATION RULES:
 1. LOOK AT THE IMAGE before every move. What do you actually see?
 2. **ALIGNMENT RULE**: Before approaching any surface (counter, table), you MUST be PERPENDICULAR (facing it directly). If the edge is slanted, TURN to align first. DO NOT approach at an angle.
 3. Start with small moves (0.3m). If clear, you can go further (up to 1.0m).
-4. **APPROACH RULE**: In Approach Mode, you move VERY slowly (10% speed). You CAN use larger steps (0.4m - 0.5m) to save time/tokens. Only use tiny steps (0.1m) for the final touch.
+4. **APPROACH RULE**: In Approach Mode, you move VERY slowly (10% speed). You CAN use larger steps (0.4m - 1m) to save time/tokens. Only use tiny steps (0.1m) for the final few centimeters.
 5. The safety system will STOP you if you miss an obstacle. Trust it.
 6. Prefer open spaces. Avoid narrow passages.
 
@@ -379,13 +379,6 @@ PERSISTENT NOTES:
             reflex_msg += "\nPRECISION MODE: OFF."
             if "FORWARD" not in safe_actions:
                  reflex_msg += " (HINT: If you are trying to pass a narrow door/gap, ENABLE PRECISION MODE to allow closer approach.)"
-        
-        # Close range warning (independent of mode, but useful context)
-        if c_fwd > 380:
-             reflex_msg += "\n(WARNING: You are very close to an obstacle. Visual indicators might be distorted. Back up if unsure.)"
-             
-             if not state.approach_mode and not state.precision_mode:
-                 reflex_msg += "\n(HINT: If you are trying to interact with this object, ENABLE APPROACH MODE now.)"
         
         # We use the NEW data as immediate context, but we could also use the raw string if we want:
         if qr_new_data:
