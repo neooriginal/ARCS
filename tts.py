@@ -84,11 +84,12 @@ class TTSEngine:
             if self.audio_player == 'aplay':
                 # aplay needs the file converted from mp3 first, or use mpg123 to decode
                 # Let's use mpg123 to decode to wav and pipe to aplay
-                cmd = f'mpg123 -w - "{temp_file}" | aplay -q'
+                # plughw:1,0 = Card 1 (HDMI 0) with automatic sample rate conversion
+                cmd = f'mpg123 -w - "{temp_file}" | aplay -D plughw:1,0 -q'
                 use_shell = True
             elif self.audio_player == 'mpg123':
-                # Try with explicit ALSA output and default device
-                cmd = ['mpg123', '-q', '-o', 'alsa', '-a', 'default', temp_file]
+                # Try with explicit ALSA output and HDMI card 1
+                cmd = ['mpg123', '-q', '-o', 'alsa', '-a', 'plughw:1,0', temp_file]
                 use_shell = False
             elif self.audio_player == 'ffplay':
                 cmd = ['ffplay', '-nodisp', '-autoexit', '-loglevel', 'quiet', temp_file]
