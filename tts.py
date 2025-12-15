@@ -4,16 +4,10 @@ import threading
 import queue
 import tempfile
 import os
+import subprocess
 from gtts import gTTS
 from config import TTS_ENABLED, TTS_DEVICE
 
-# Try to import pygame for audio playback (but don't initialize yet)
-PYGAME_AVAILABLE = False
-try:
-    import pygame
-    PYGAME_AVAILABLE = True
-except ImportError:
-    print("[TTS] Warning: pygame not available, TTS will be disabled")
 
 class TTSEngine:
     def __init__(self):
@@ -21,27 +15,34 @@ class TTSEngine:
         self.device = TTS_DEVICE
         self.speech_queue = queue.Queue()
         self.worker_thread = None
-        self.mixer_initialized = False
         
         if self.enabled:
-            # Try to initialize pygame mixer (optional)
-            if PYGAME_AVAILABLE:
-                try:
-                    pygame.mixer.init()
-                    self.mixer_initialized = True
-                    print("[TTS] Initialized (using gTTS with pygame)")
-                except Exception as e:
-                    print(f"[TTS] Pygame mixer failed: {e}")
-                    print("[TTS] Will use system audio player as fallback")
+            # Check if we have an audio player available
+            self.audio_player = self._find_audio_player()
+            if self.audio_player:
+                self.worker_thread = threading.Thread(target=self._worker, daemon=True)
+                self.worker_thread.start()
+                print(f"[TTS] Initialized with Google voices (using {self.audio_player})")
             else:
-                print("[TTS] Pygame not available, will use system audio player")
-            
-            # Start worker thread regardless of pygame status
-            self.worker_thread = threading.Thread(target=self._worker, daemon=True)
-            self.worker_thread.start()
-            print("[TTS] TTS enabled with Google voices")
+                print("[TTS] No audio player found. Install mpg123, ffplay, or mpg321")
+                self.enabled = False
         else:
             print("[TTS] TTS disabled in config")
+    
+    def _find_audio_player(self):
+        """Find an available audio player on the system."""
+        players = ['mpg123', 'ffplay', 'mpg321', 'play']
+        
+        for player in players:
+            try:
+                subprocess.run([player, '--version'], 
+                             stdout=subprocess.DEVNULL, 
+                             stderr=subprocess.DEVNULL,
+                             timeout=1)
+                return player
+            except:
+                continue
+        return None
     
     def _worker(self):
         """Background worker that processes speech queue."""
@@ -54,13 +55,13 @@ class TTSEngine:
             except queue.Empty:
                 continue
             except Exception as e:
-                print(f"[TTS] Error: {e}")
+                print(f"[TTS] Worker error: {e}")
     
     def _speak_blocking(self, text):
         """Generate speech using gTTS and play it."""
         temp_file = None
         try:
-            print(f"[TTS] Generating speech: '{text}'")
+            print(f"[TTS] Generating: '{text}'")
             
             # Create temporary file for audio
             with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as fp:
@@ -69,31 +70,31 @@ class TTSEngine:
             # Generate speech with gTTS
             tts = gTTS(text=text, lang='en', slow=False)
             tts.save(temp_file)
-            print(f"[TTS] Audio saved to: {temp_file}")
             
-            # Try to play with pygame first
-            if self.mixer_initialized:
-                try:
-                    print("[TTS] Using pygame for playback")
-                    pygame.mixer.music.load(temp_file)
-                    pygame.mixer.music.play()
-                    
-                    # Wait for playback to finish
-                    while pygame.mixer.music.get_busy():
-                        pygame.time.Clock().tick(10)
-                    print("[TTS] Pygame playback finished")
-                except Exception as e:
-                    print(f"[TTS] Pygame playback failed: {e}, trying system command")
-                    self._play_with_system_command(temp_file)
-            else:
-                # Fallback to system command
-                print("[TTS] Using system command for playback")
-                self._play_with_system_command(temp_file)
+            # Play audio based on which player we found
+            if self.audio_player == 'mpg123':
+                cmd = ['mpg123', '-q', temp_file]
+            elif self.audio_player == 'ffplay':
+                cmd = ['ffplay', '-nodisp', '-autoexit', '-loglevel', 'quiet', temp_file]
+            elif self.audio_player == 'mpg321':
+                cmd = ['mpg321', '-q', temp_file]
+            else:  # play (sox)
+                cmd = ['play', '-q', temp_file]
+            
+            # Play the audio
+            subprocess.run(cmd, 
+                         stdout=subprocess.DEVNULL, 
+                         stderr=subprocess.DEVNULL,
+                         timeout=10,
+                         check=True)
+            print(f"[TTS] Played successfully")
                 
+        except subprocess.TimeoutExpired:
+            print(f"[TTS] Playback timed out")
+        except subprocess.CalledProcessError as e:
+            print(f"[TTS] Playback failed: exit code {e.returncode}")
         except Exception as e:
-            print(f"[TTS] Speech error: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"[TTS] Error: {e}")
         finally:
             # Clean up temp file
             if temp_file:
@@ -101,42 +102,6 @@ class TTSEngine:
                     os.unlink(temp_file)
                 except:
                     pass
-    
-    def _play_with_system_command(self, audio_file):
-        """Fallback audio playback using system commands."""
-        import subprocess
-        
-        # Try different audio players in order of preference
-        players = [
-            ['mpg123', '-q', audio_file],           # Common on Linux
-            ['ffplay', '-nodisp', '-autoexit', '-loglevel', 'quiet', audio_file],  # ffmpeg
-            ['mpg321', '-q', audio_file],           # Alternative
-            ['play', audio_file],                   # sox
-        ]
-        
-        for player_cmd in players:
-            try:
-                print(f"[TTS] Trying audio player: {player_cmd[0]}")
-                result = subprocess.run(player_cmd, 
-                             stdout=subprocess.DEVNULL, 
-                             stderr=subprocess.PIPE,
-                             timeout=10,
-                             check=True)
-                print(f"[TTS] Successfully played audio with {player_cmd[0]}")
-                return  # Success
-            except FileNotFoundError:
-                print(f"[TTS] {player_cmd[0]} not found")
-                continue  # Try next player
-            except subprocess.TimeoutExpired:
-                print(f"[TTS] {player_cmd[0]} timed out")
-                continue
-            except subprocess.CalledProcessError as e:
-                print(f"[TTS] {player_cmd[0]} failed with exit code {e.returncode}")
-                if e.stderr:
-                    print(f"[TTS] Error: {e.stderr.decode()}")
-                continue
-        
-        print("[TTS] ERROR: No audio player worked. Install mpg123, ffplay, or mpg321")
     
     def speak(self, text):
         """Queue text for asynchronous speech."""
