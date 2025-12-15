@@ -107,45 +107,22 @@ class TTSEngine:
                 sys.stdout.flush()
                 return
             
-            # Try to amplify with sox if available, otherwise use original WAV
-            audio_to_play = temp_wav
-            try:
-                with tempfile.NamedTemporaryFile(delete=False, suffix='_boost.wav') as fp:
-                    temp_wav_boosted = fp.name
-                
-                result = subprocess.run(['sox', temp_wav, temp_wav_boosted, 'gain', str(self.volume_boost)], 
-                             stdout=subprocess.DEVNULL, 
-                             stderr=subprocess.DEVNULL,
-                             timeout=2,
-                             check=False)
-                
-                if result.returncode == 0:
-                    audio_to_play = temp_wav_boosted
-                    print(f"[TTS] Amplified +{self.volume_boost}dB")
-                    sys.stdout.flush()
-            except FileNotFoundError:
-                print(f"[TTS] sox not installed, playing without boost")
-                sys.stdout.flush()
-            except Exception as e:
-                print(f"[TTS] sox failed: {e}")
-                sys.stdout.flush()
+            # Amplify audio using sox (2x volume boost)
+            with tempfile.NamedTemporaryFile(delete=False, suffix='_boost.wav') as fp:
+                temp_wav_boosted = fp.name
             
-            # Play audio
-            print(f"[TTS] Playing: {audio_to_play}")
-            sys.stdout.flush()
+            subprocess.run(['sox', temp_wav, temp_wav_boosted, 'gain', str(self.volume_boost)], 
+                         stdout=subprocess.DEVNULL, 
+                         stderr=subprocess.DEVNULL,
+                         timeout=2)
             
-            result = subprocess.run(['aplay', '-D', self.audio_device, audio_to_play], 
-                         stdout=subprocess.PIPE, 
-                         stderr=subprocess.PIPE,
-                         timeout=10,
-                         check=False)
+            # Play amplified audio
+            subprocess.run(['aplay', '-D', self.audio_device, temp_wav_boosted], 
+                         stdout=subprocess.DEVNULL, 
+                         stderr=subprocess.DEVNULL,
+                         timeout=10)
             
-            if result.returncode == 0:
-                print(f"[TTS] ✓")
-            else:
-                print(f"[TTS] aplay failed: {result.returncode}")
-                if result.stderr:
-                    print(f"[TTS] stderr: {result.stderr.decode()}")
+            print(f"[TTS] ✓")
             sys.stdout.flush()
                 
         except subprocess.TimeoutExpired:
