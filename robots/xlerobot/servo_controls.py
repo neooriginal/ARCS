@@ -173,8 +173,12 @@ class ServoControler:
     # Wheel control
 
     def _wheels_write(self, action: str) -> Dict[int, int]:
+        from state import state
+        # Enforce Approach Mode Speed Limit (25%)
+        effective_speed = 2500 if state.approach_mode else self.speed
+        
         multipliers = self.action_map[action.lower()]
-        payload = {wid: self.speed * factor for wid, factor in multipliers.items()}
+        payload = {wid: effective_speed * factor for wid, factor in multipliers.items()}
         self.wheel_bus.sync_write("Goal_Velocity", payload)
         return payload
 
@@ -214,6 +218,10 @@ class ServoControler:
         up_vec = self.action_map['up']
         left_vec = self.action_map['left']
         
+        from state import state
+        # Enforce Approach Mode Speed Limit (25%)
+        effective_speed = 2500 if state.approach_mode else self.speed
+
         payload = {}
         for wid in self._wheel_ids:
             # Calculate combined motor factor
@@ -222,10 +230,10 @@ class ServoControler:
             
             combined_factor = (forward * u_val) + (lateral * l_val)
             
-            # Scale by base speed
-            payload[wid] = int(self.speed * combined_factor)
+            # Scale by effective speed
+            payload[wid] = int(effective_speed * combined_factor)
             
-        print(f"[DEBUG] set_velocity_vector: Speed={self.speed}, Factor={combined_factor:.2f}, Payload={payload}")
+        # print(f"[DEBUG] set_velocity_vector: Speed={effective_speed}, Payload={payload}")
         self.wheel_bus.sync_write("Goal_Velocity", payload)
         return payload
 
