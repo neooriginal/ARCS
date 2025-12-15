@@ -16,6 +16,18 @@ class TTSEngine:
             try:
                 import pyttsx3
                 self.engine = pyttsx3.init()
+                
+                # Try to find and set a male voice
+                try:
+                    voices = self.engine.getProperty('voices')
+                    # Try to find a male voice (usually has 'male' or specific IDs)
+                    for voice in voices:
+                        if 'male' in voice.name.lower() or 'man' in voice.name.lower():
+                            self.engine.setProperty('voice', voice.id)
+                            break
+                except:
+                    pass  # Use default voice
+                
                 # Try to set properties
                 try:
                     self.engine.setProperty('rate', 150)  # Speed
@@ -25,6 +37,7 @@ class TTSEngine:
                 
                 self.worker_thread = threading.Thread(target=self._worker, daemon=True)
                 self.worker_thread.start()
+                print("[TTS] Initialized successfully")
             except Exception as e:
                 print(f"[TTS] Init failed: {e}")
                 self.enabled = False
