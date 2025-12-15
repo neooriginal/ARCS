@@ -58,6 +58,10 @@ class RobotState:
         self.last_remote_activity = 0  # timestamp of last remote input
         self.last_movement_activity = 0 # timestamp of last movement command
         
+        # Wheel speed control
+        self.default_wheel_speed = 10000  # Default speed from servo_controls.py
+        self.manual_wheel_speed = None  # When None, use controller's default
+        
         # Shared Obstacle Detector
         self.detector = None
         
@@ -131,6 +135,28 @@ class RobotState:
                     print(f"Error creating detector: {e}")
                     return None
             return self.detector
+    
+    def set_wheel_speed(self, speed):
+        """Set manual wheel speed."""
+        with self.lock:
+            # Clamp speed between 1000 and 15000
+            self.manual_wheel_speed = max(1000, min(15000, int(speed)))
+            if self.controller and hasattr(self.controller, 'set_speed'):
+                self.controller.set_speed(self.manual_wheel_speed)
+    
+    def get_wheel_speed(self):
+        """Get current wheel speed."""
+        with self.lock:
+            if self.manual_wheel_speed is not None:
+                return self.manual_wheel_speed
+            return self.default_wheel_speed
+    
+    def reset_wheel_speed(self):
+        """Reset wheel speed to default."""
+        with self.lock:
+            self.manual_wheel_speed = None
+            if self.controller and hasattr(self.controller, 'set_speed'):
+                self.controller.set_speed(self.default_wheel_speed)
 
     def add_ai_log(self, message: str):
         """Add a log message to AI logs."""

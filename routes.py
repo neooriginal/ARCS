@@ -264,8 +264,8 @@ def ai_start():
     if current_task:
         state.agent.set_task(current_task)
     
-    # Reset TTS speed to default when AI starts
-    tts.reset_speed()
+    # Reset wheel speed to default when AI starts
+    state.reset_wheel_speed()
     
     state.ai_enabled = True
     state.add_ai_log("AI Started")
@@ -328,19 +328,22 @@ def tts_speak():
         return jsonify({'status': 'ok'})
     return jsonify({'status': 'error', 'error': 'No text provided'}), 400
 
-@bp.route('/tts/speed', methods=['POST'])
-def tts_set_speed():
+
+# Wheel Speed Routes
+
+@bp.route('/wheels/speed', methods=['POST'])
+def set_wheel_speed():
     data = request.json
-    speed = data.get('speed', 150)
+    speed = data.get('speed', 10000)
     try:
-        tts.set_speed(speed)
-        return jsonify({'status': 'ok', 'speed': tts.get_speed()})
+        state.set_wheel_speed(speed)
+        return jsonify({'status': 'ok', 'speed': state.get_wheel_speed()})
     except Exception as e:
         return jsonify({'status': 'error', 'error': str(e)}), 400
 
-@bp.route('/tts/speed', methods=['GET'])
-def tts_get_speed():
-    return jsonify({'speed': tts.get_speed()})
+@bp.route('/wheels/speed', methods=['GET'])
+def get_wheel_speed():
+    return jsonify({'speed': state.get_wheel_speed()})
 
 
 @bp.route('/display')

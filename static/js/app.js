@@ -23,8 +23,10 @@ const armGripper = document.getElementById('arm-gripper');
 // TTS elements
 const ttsTextInput = document.getElementById('tts-text');
 const ttsSpeakBtn = document.getElementById('tts-speak-btn');
-const ttsSpeedSlider = document.getElementById('tts-speed');
-const ttsSpeedValue = document.getElementById('tts-speed-value');
+
+// Wheel speed elements
+const wheelSpeedSlider = document.getElementById('wheel-speed');
+const wheelSpeedValue = document.getElementById('wheel-speed-value');
 
 // State
 let currentMode = 'none'; // 'none', 'drive', 'arm'
@@ -486,34 +488,36 @@ ttsTextInput.addEventListener('keydown', (e) => {
     }
 });
 
-// TTS speed slider
-ttsSpeedSlider.addEventListener('input', async (e) => {
+// ============== Wheel Speed Controls ==============
+
+// Wheel speed slider
+wheelSpeedSlider.addEventListener('input', async (e) => {
     const speed = parseInt(e.target.value);
-    ttsSpeedValue.textContent = speed + ' WPM';
+    wheelSpeedValue.textContent = speed;
 
     try {
-        await fetch('/tts/speed', {
+        await fetch('/wheels/speed', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ speed })
         });
     } catch (e) {
-        console.log('TTS speed error:', e.message);
+        console.log('Wheel speed error:', e.message);
     }
 });
 
-// Load current TTS speed on page load
-async function loadTTSSpeed() {
+// Load current wheel speed on page load
+async function loadWheelSpeed() {
     try {
-        const res = await fetch('/tts/speed');
+        const res = await fetch('/wheels/speed');
         const data = await res.json();
         if (data.speed) {
-            ttsSpeedSlider.value = data.speed;
-            ttsSpeedValue.textContent = data.speed + ' WPM';
+            wheelSpeedSlider.value = data.speed;
+            wheelSpeedValue.textContent = data.speed;
         }
     } catch (e) {
-        console.log('TTS load speed error:', e.message);
+        console.log('Wheel speed load error:', e.message);
     }
 }
 
-loadTTSSpeed();
+loadWheelSpeed();

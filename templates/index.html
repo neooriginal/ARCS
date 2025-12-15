@@ -17,7 +17,7 @@
                 style="background: #333; color: white; text-decoration: none; padding: 5px 10px; border-radius: 4px; font-size: 0.8em; margin-left: 10px;">🤖
                 AI Mode</a>
 
-            <!-- TTS Controls -->
+            <!-- TTS & Speed Controls -->
             <div style="display: inline-flex; align-items: center; gap: 10px; margin-left: auto;">
                 <div
                     style="display: flex; flex-direction: column; gap: 5px; padding: 5px 10px; background: #2a2a2a; border-radius: 4px;">
@@ -29,11 +29,11 @@
                             style="background: #4CAF50; color: white; padding: 4px 10px; border: none; border-radius: 3px; cursor: pointer; font-size: 0.75em;">Speak</button>
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
-                        <label style="font-size: 0.7em; color: #888; margin: 0; width: 45px;">Speed:</label>
-                        <input type="range" id="tts-speed" min="80" max="300" value="150"
-                            style="width: 120px; accent-color: #4CAF50;">
-                        <span id="tts-speed-value" style="font-size: 0.7em; color: #aaa; min-width: 45px;">150
-                            WPM</span>
+                        <label style="font-size: 0.7em; color: #888; margin: 0; width: 45px;">🚗 Speed:</label>
+                        <input type="range" id="wheel-speed" min="1000" max="15000" value="10000" step="100"
+                            style="width: 120px; accent-color: #FF9800;">
+                        <span id="wheel-speed-value"
+                            style="font-size: 0.7em; color: #aaa; min-width: 45px;">10000</span>
                     </div>
                 </div>
             </div>
