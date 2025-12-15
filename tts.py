@@ -15,32 +15,52 @@ class TTSEngine:
         if self.enabled:
             try:
                 import pyttsx3
-                self.engine = pyttsx3.init()
-                
-                # Try to find and set a male voice
+                # Initialize engine - don't fail if this raises warnings
                 try:
-                    voices = self.engine.getProperty('voices')
-                    # Try to find a male voice (usually has 'male' or specific IDs)
-                    for voice in voices:
-                        if 'male' in voice.name.lower() or 'man' in voice.name.lower():
-                            self.engine.setProperty('voice', voice.id)
-                            break
-                except:
-                    pass  # Use default voice
+                    self.engine = pyttsx3.init()
+                except Exception as init_error:
+                    print(f"[TTS] Engine init warning: {init_error}")
+                    # Try fallback init without driver specification
+                    try:
+                        self.engine = pyttsx3.init(driverName='espeak')
+                    except:
+                        raise Exception("Could not initialize TTS engine")
                 
-                # Try to set properties
-                try:
-                    self.engine.setProperty('rate', 150)  # Speed
-                    self.engine.setProperty('volume', 1.0)  # Volume
-                except:
-                    pass  # Ignore property errors
+                # Try to configure voice (don't fail if this doesn't work)
+                if self.engine:
+                    try:
+                        voices = self.engine.getProperty('voices')
+                        if voices:
+                            # Try to find a male voice
+                            male_voice = None
+                            for voice in voices:
+                                voice_name = getattr(voice, 'name', '').lower()
+                                if 'male' in voice_name or 'man' in voice_name:
+                                    male_voice = voice.id
+                                    break
+                            
+                            if male_voice:
+                                self.engine.setProperty('voice', male_voice)
+                    except Exception as voice_error:
+                        # Voice selection failed, use default
+                        pass
+                    
+                    # Set other properties (also don't fail if this doesn't work)
+                    try:
+                        self.engine.setProperty('rate', 150)
+                        self.engine.setProperty('volume', 1.0)
+                    except:
+                        pass
                 
+                # Start worker thread
                 self.worker_thread = threading.Thread(target=self._worker, daemon=True)
                 self.worker_thread.start()
                 print("[TTS] Initialized successfully")
+                
             except Exception as e:
-                print(f"[TTS] Init failed: {e}")
+                print(f"[TTS] Initialization failed, TTS disabled: {e}")
                 self.enabled = False
+                self.engine = None
     
     def _worker(self):
         """Background worker that processes speech queue."""
