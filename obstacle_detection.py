@@ -77,7 +77,7 @@ class ObstacleDetector:
         # 3. Analyze Obstacle Distances
         # Divide view into chunks: Left, Center, Right
         # Center is narrower to focus on immediate path.
-        center_width = len(edge_points) // 6
+        center_width = len(edge_points) // 5
         side_width = (len(edge_points) - center_width) // 2
         
         c_left = self._get_chunk_average(edge_points[:side_width])
