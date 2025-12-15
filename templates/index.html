@@ -16,6 +16,27 @@
             <a href="/ai" class="btn"
                 style="background: #333; color: white; text-decoration: none; padding: 5px 10px; border-radius: 4px; font-size: 0.8em; margin-left: 10px;">🤖
                 AI Mode</a>
+
+            <!-- TTS Controls -->
+            <div style="display: inline-flex; align-items: center; gap: 10px; margin-left: auto;">
+                <div
+                    style="display: flex; flex-direction: column; gap: 5px; padding: 5px 10px; background: #2a2a2a; border-radius: 4px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label style="font-size: 0.8em; color: #aaa; margin: 0;">🔊 TTS</label>
+                        <input type="text" id="tts-text" placeholder="Test message..."
+                            style="padding: 4px 8px; background: #1a1a1a; border: 1px solid #444; border-radius: 3px; color: white; font-size: 0.75em; width: 150px;">
+                        <button id="tts-speak-btn" class="btn"
+                            style="background: #4CAF50; color: white; padding: 4px 10px; border: none; border-radius: 3px; cursor: pointer; font-size: 0.75em;">Speak</button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label style="font-size: 0.7em; color: #888; margin: 0; width: 45px;">Speed:</label>
+                        <input type="range" id="tts-speed" min="80" max="300" value="150"
+                            style="width: 120px; accent-color: #4CAF50;">
+                        <span id="tts-speed-value" style="font-size: 0.7em; color: #aaa; min-width: 45px;">150
+                            WPM</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="panels">

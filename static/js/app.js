@@ -20,6 +20,12 @@ const armReachDisplay = document.getElementById('arm-reach');
 const armWristDisplay = document.getElementById('arm-wrist-val');
 const armGripper = document.getElementById('arm-gripper');
 
+// TTS elements
+const ttsTextInput = document.getElementById('tts-text');
+const ttsSpeakBtn = document.getElementById('tts-speak-btn');
+const ttsSpeedSlider = document.getElementById('tts-speed');
+const ttsSpeedValue = document.getElementById('tts-speed-value');
+
 // State
 let currentMode = 'none'; // 'none', 'drive', 'arm'
 let driveLocked = false;
@@ -453,3 +459,61 @@ setInterval(() => {
         sendMovement();
     }
 }, 200);
+
+// ============== TTS Controls ==============
+
+// TTS speak button
+ttsSpeakBtn.addEventListener('click', async () => {
+    const text = ttsTextInput.value.trim();
+    if (!text) return;
+
+    try {
+        await fetch('/tts/speak', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        });
+    } catch (e) {
+        console.log('TTS speak error:', e.message);
+    }
+});
+
+// TTS text input - speak on Enter key
+ttsTextInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        ttsSpeakBtn.click();
+    }
+});
+
+// TTS speed slider
+ttsSpeedSlider.addEventListener('input', async (e) => {
+    const speed = parseInt(e.target.value);
+    ttsSpeedValue.textContent = speed + ' WPM';
+
+    try {
+        await fetch('/tts/speed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ speed })
+        });
+    } catch (e) {
+        console.log('TTS speed error:', e.message);
+    }
+});
+
+// Load current TTS speed on page load
+async function loadTTSSpeed() {
+    try {
+        const res = await fetch('/tts/speed');
+        const data = await res.json();
+        if (data.speed) {
+            ttsSpeedSlider.value = data.speed;
+            ttsSpeedValue.textContent = data.speed + ' WPM';
+        }
+    } catch (e) {
+        console.log('TTS load speed error:', e.message);
+    }
+}
+
+loadTTSSpeed();

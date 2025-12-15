@@ -10,6 +10,7 @@ from state import state
 from camera import generate_frames
 from movement import execute_movement
 from arm import arm_controller
+import tts
 
 bp = Blueprint('robot', __name__)
 
@@ -263,6 +264,9 @@ def ai_start():
     if current_task:
         state.agent.set_task(current_task)
     
+    # Reset TTS speed to default when AI starts
+    tts.reset_speed()
+    
     state.ai_enabled = True
     state.add_ai_log("AI Started")
     return jsonify({'status': 'ok'})
@@ -311,6 +315,32 @@ def emergency_stop():
 @bp.route('/ai')
 def ai_page():
     return render_template('ai_control.html')
+
+
+# TTS Routes
+
+@bp.route('/tts/speak', methods=['POST'])
+def tts_speak():
+    data = request.json
+    text = data.get('text', '')
+    if text:
+        tts.speak(text)
+        return jsonify({'status': 'ok'})
+    return jsonify({'status': 'error', 'error': 'No text provided'}), 400
+
+@bp.route('/tts/speed', methods=['POST'])
+def tts_set_speed():
+    data = request.json
+    speed = data.get('speed', 150)
+    try:
+        tts.set_speed(speed)
+        return jsonify({'status': 'ok', 'speed': tts.get_speed()})
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)}), 400
+
+@bp.route('/tts/speed', methods=['GET'])
+def tts_get_speed():
+    return jsonify({'speed': tts.get_speed()})
 
 
 @bp.route('/display')
