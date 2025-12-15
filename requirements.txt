@@ -28,8 +28,7 @@ grpcio-tools==1.67.1
 protobuf>=5.27.2,<6.0
 
 # Text-to-Speech
-pyttsx3>=2.90
-# NOTE: pyttsx3 requires espeak on Linux. Install with: sudo apt-get install espeak
+# NOTE: Requires espeak on Linux. Install with: sudo apt-get install espeak
 
 # QR Code
 qrcode[pil]
