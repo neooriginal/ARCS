@@ -85,20 +85,20 @@ class TTSEngine:
                 # aplay needs the file converted from mp3 first, or use mpg123 to decode
                 # Let's use mpg123 to decode to wav and pipe to aplay
                 # plughw:1,0 = Card 1 (HDMI 0) with automatic sample rate conversion
-                cmd = f'mpg123 -w - "{temp_file}" | aplay -D plughw:1,0 -q'
+                cmd = f'mpg123 -w - "{temp_file}" | aplay -D plughw:1,0'
                 use_shell = True
             elif self.audio_player == 'mpg123':
                 # Try with explicit ALSA output and HDMI card 1
-                cmd = ['mpg123', '-q', '-o', 'alsa', '-a', 'plughw:1,0', temp_file]
+                cmd = ['mpg123', '-o', 'alsa', '-a', 'plughw:1,0', temp_file]
                 use_shell = False
             elif self.audio_player == 'ffplay':
                 cmd = ['ffplay', '-nodisp', '-autoexit', '-loglevel', 'quiet', temp_file]
                 use_shell = False
             elif self.audio_player == 'mpg321':
-                cmd = ['mpg321', '-q', temp_file]
+                cmd = ['mpg321', temp_file]
                 use_shell = False
             else:  # play (sox)
-                cmd = ['play', '-q', temp_file]
+                cmd = ['play', temp_file]
                 use_shell = False
             
             # Play the audio
@@ -124,6 +124,10 @@ class TTSEngine:
                 if result.stderr:
                     print(f"[TTS] stderr: {result.stderr.decode()}")
             sys.stdout.flush()
+            
+            # Small delay to ensure audio playback completes before file deletion
+            import time
+            time.sleep(0.1)
                 
         except subprocess.TimeoutExpired:
             print(f"[TTS] Playback timed out")
