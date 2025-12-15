@@ -102,6 +102,19 @@ class ObstacleDetector:
         if guidance:
             cv2.putText(overlay, guidance, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
+        # Draw Mode Status
+        mode_text = "MODE: STANDARD"
+        mode_color = (0, 255, 0) # Green
+        
+        if state.approach_mode:
+            mode_text = "MODE: APPROACH (SAFETY OFF)"
+            mode_color = (0, 0, 255) # Red
+        elif state.precision_mode:
+            mode_text = "MODE: PRECISION"
+            mode_color = (255, 255, 0) # Cyan
+            
+        cv2.putText(overlay, mode_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, mode_color, 2)
+
         return safe_actions, overlay, {
             'c_left': c_left, 
             'c_fwd': c_fwd, 

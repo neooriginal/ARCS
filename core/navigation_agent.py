@@ -107,8 +107,9 @@ NAVIGATION RULES:
 1. LOOK AT THE IMAGE before every move. What do you actually see?
 2. If there is a wall in the view, TURN AWAY first.
 3. Start with small moves (0.3m). If clear, you can go further (up to 1.0m).
-4. The safety system will STOP you if you miss an obstacle. Trust it.
-5. Prefer open spaces. Avoid narrow passages.
+4. **APPROACH RULE**: When you are getting close to an object (it looks large or guidance warns you), YOU MUST USE SMALL STEPS (0.1m - 0.2m). Do NOT use large moves.
+5. The safety system will STOP you if you miss an obstacle. Trust it.
+6. Prefer open spaces. Avoid narrow passages.
 
 WHEN YOU SEE A WALL:
 - STOP immediately
