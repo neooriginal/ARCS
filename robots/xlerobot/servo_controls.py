@@ -165,6 +165,11 @@ class ServoControler:
     def arm_enabled(self) -> bool:
         return self._arm_enabled
 
+    def set_speed(self, speed: int) -> None:
+        """Set the global speed for wheel motors."""
+        self.speed = speed
+        print(f"[CONTROLLER] Speed set to {self.speed}")
+
     # Wheel control
 
     def _wheels_write(self, action: str) -> Dict[int, int]:

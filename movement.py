@@ -26,11 +26,6 @@ def execute_movement(movement):
         if movement.get('left'): lat += 1.0
         if movement.get('right'): lat -= 1.0
         
-        # Power Scaling for Approach Mode (0.3x)
-        if state.approach_mode:
-            fwd *= 0.3
-            lat *= 0.3
-        
         # Use vector control if available
         if hasattr(state.controller, 'set_velocity_vector'):
             state.controller.set_velocity_vector(fwd, lat)

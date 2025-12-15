@@ -64,7 +64,12 @@ def create_enable_approach_mode():
         from state import state as robot_state
         robot_state.approach_mode = True
         robot_state.precision_mode = False # Mutually exclusive usually
-        return "Approach Mode ENABLED. Safety thresholds relaxed. Proceed with caution."
+        
+        # Hardware Speed Limit (25%)
+        if robot_state.robot_system and robot_state.robot_system.servo_controller:
+             robot_state.robot_system.servo_controller.set_speed(2500)
+             
+        return "Approach Mode ENABLED. Safety thresholds relaxed. Speed limited to 25%."
     return enable_approach_mode
 
 def create_disable_approach_mode():
@@ -73,7 +78,12 @@ def create_disable_approach_mode():
         """Disable Approach Mode. Re-enables standard safety stops."""
         from state import state as robot_state
         robot_state.approach_mode = False
-        return "Approach Mode DISABLED. Safety systems active."
+        
+        # Restore Speed (100%)
+        if robot_state.robot_system and robot_state.robot_system.servo_controller:
+             robot_state.robot_system.servo_controller.set_speed(10000)
+             
+        return "Approach Mode DISABLED. Safety systems active. Speed restored."
     return disable_approach_mode
 
 
