@@ -165,12 +165,17 @@ def create_move_forward(servo_controller):
                      if detector:
                          _, _, metrics = detector.process(frame)
                          c_fwd = metrics.get('c_fwd', 0)
-                         # If visibly close (blind or > 420)
-                         if c_fwd > 420:
+                         
+                         # If extremely close (> 380), auto-disable
+                         if c_fwd > 380:
                              robot_state.approach_mode = False
                              if robot_state.robot_system.servo_controller:
                                  robot_state.robot_system.servo_controller.set_speed(10000)
-                             return f"Moved forward {distance:.2f} meters. TARGET REACHED. Approach Mode Auto-Disabled."
+                             return f"Moved forward {distance:.2f} meters. ✓ TARGET REACHED (c_fwd={c_fwd}). Approach Mode Auto-Disabled. You are now touching/very close to the object."
+                         
+                         # If getting close (> 300), warn
+                         elif c_fwd > 300:
+                             return f"Moved forward {distance:.2f} meters. PROXIMITY WARNING: Very close (c_fwd={c_fwd}). One more small step should reach target."
              except Exception:
                  pass
                  
