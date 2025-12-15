@@ -32,3 +32,4 @@ REMOTE_TIMEOUT = 0.5
 TTS_ENABLED = True
 TTS_AUDIO_DEVICE = "plughw:1,0"  # ALSA device (plughw:1,0 = HDMI 1)
 TTS_TLD = "com"  # Google TLD for voice variant (com, co.uk, com.au, etc.)
+TTS_VOLUME_BOOST = 12  # Volume boost in dB (6dB = 2x louder, 12dB = 4x louder)
