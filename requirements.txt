@@ -29,6 +29,7 @@ protobuf>=5.27.2,<6.0
 
 # Text-to-Speech
 gtts>=2.3.0
+langdetect>=1.0.9
 # Note: Also requires system audio player (mpg123, ffplay, or mpg321)
 # Install with: sudo apt-get install mpg123
 

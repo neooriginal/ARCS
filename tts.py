@@ -1,4 +1,4 @@
-"""Text-to-Speech module for robot audio feedback using gTTS."""
+"""Text-to-Speech module using gTTS."""
 
 import threading
 import queue
@@ -6,32 +6,37 @@ import tempfile
 import os
 import subprocess
 from gtts import gTTS
-from config import TTS_ENABLED, TTS_DEVICE
+from config import TTS_ENABLED, TTS_AUDIO_DEVICE, TTS_TLD
+
+try:
+    from langdetect import detect
+    LANGDETECT_AVAILABLE = True
+except ImportError:
+    LANGDETECT_AVAILABLE = False
 
 
 class TTSEngine:
     def __init__(self):
         self.enabled = TTS_ENABLED
-        self.device = TTS_DEVICE
+        self.audio_device = TTS_AUDIO_DEVICE
+        self.tld = TTS_TLD
         self.speech_queue = queue.Queue()
         self.worker_thread = None
         
         if self.enabled:
-            # Check if we have an audio player available
             self.audio_player = self._find_audio_player()
             if self.audio_player:
                 self.worker_thread = threading.Thread(target=self._worker, daemon=True)
                 self.worker_thread.start()
                 print(f"[TTS] Initialized with Google voices (using {self.audio_player})")
             else:
-                print("[TTS] No audio player found. Install mpg123, ffplay, or mpg321")
+                print("[TTS] No audio player found")
                 self.enabled = False
         else:
             print("[TTS] TTS disabled in config")
     
     def _find_audio_player(self):
-        """Find an available audio player on the system."""
-        # aplay is more reliable on headless Linux systems
+        """Find available audio player."""
         players = ['aplay', 'mpg123', 'ffplay', 'mpg321', 'play']
         
         for player in players:
@@ -46,7 +51,7 @@ class TTSEngine:
         return None
     
     def _worker(self):
-        """Background worker that processes speech queue."""
+        """Background worker processing speech queue."""
         while True:
             try:
                 text = self.speech_queue.get(timeout=1)
@@ -58,78 +63,63 @@ class TTSEngine:
             except Exception as e:
                 print(f"[TTS] Worker error: {e}")
     
+    def _detect_language(self, text):
+        """Auto-detect language, fallback to English."""
+        if not LANGDETECT_AVAILABLE:
+            return 'en'
+        
+        try:
+            lang = detect(text)
+            return lang if lang else 'en'
+        except:
+            return 'en'
+    
     def _speak_blocking(self, text):
-        """Generate speech using gTTS and play it."""
+        """Generate and play speech."""
         import sys
         temp_mp3 = None
         temp_wav = None
+        
         try:
-            print(f"[TTS] Generating: '{text}'")
+            lang = self._detect_language(text)
+            print(f"[TTS] Speaking ({lang}): '{text}'")
             sys.stdout.flush()
             
-            # Create temporary file for MP3
             with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as fp:
                 temp_mp3 = fp.name
             
-            # Generate speech with gTTS (this requires internet)
-            print(f"[TTS] Connecting to Google TTS API...")
-            sys.stdout.flush()
-            
-            tts = gTTS(text=text, lang='en', slow=False, timeout=5)
+            tts = gTTS(text=text, lang=lang, tld=self.tld, slow=False, timeout=5)
             tts.save(temp_mp3)
             
-            print(f"[TTS] MP3 created: {temp_mp3}")
-            sys.stdout.flush()
-            
-            # Convert MP3 to WAV using mpg123
             with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as fp:
                 temp_wav = fp.name
             
-            print(f"[TTS] Converting to WAV...")
-            sys.stdout.flush()
-            
-            # Decode MP3 to WAV
             result = subprocess.run(['mpg123', '-w', temp_wav, temp_mp3], 
-                         stdout=subprocess.PIPE, 
-                         stderr=subprocess.PIPE,
-                         timeout=5,
-                         check=False)
+                         stdout=subprocess.DEVNULL, 
+                         stderr=subprocess.DEVNULL,
+                         timeout=5)
             
             if result.returncode != 0:
-                print(f"[TTS] MP3 decode failed: {result.stderr.decode()}")
+                print(f"[TTS] MP3 decode failed")
                 sys.stdout.flush()
                 return
             
-            print(f"[TTS] WAV created, playing...")
-            sys.stdout.flush()
+            # Play at max volume on HDMI
+            subprocess.run(['aplay', '-D', self.audio_device, temp_wav], 
+                         stdout=subprocess.DEVNULL, 
+                         stderr=subprocess.DEVNULL,
+                         timeout=10)
             
-            # Play WAV with aplay on HDMI
-            cmd = ['aplay', '-D', 'plughw:1,0', temp_wav]
-            
-            result = subprocess.run(cmd, 
-                         stdout=subprocess.PIPE, 
-                         stderr=subprocess.PIPE,
-                         timeout=10,
-                         check=False)
-            
-            if result.returncode == 0:
-                print(f"[TTS] Played successfully")
-            else:
-                print(f"[TTS] aplay exited with code {result.returncode}")
-                if result.stderr:
-                    print(f"[TTS] stderr: {result.stderr.decode()}")
+            print(f"[TTS] ✓")
             sys.stdout.flush()
                 
         except subprocess.TimeoutExpired:
-            print(f"[TTS] Playback timed out")
+            print(f"[TTS] Timeout")
             sys.stdout.flush()
         except Exception as e:
             print(f"[TTS] Error: {e}")
             sys.stdout.flush()
-            import traceback
-            traceback.print_exc()
         finally:
-            # Clean up temp files
             if temp_mp3:
                 try:
                     os.unlink(temp_mp3)
@@ -142,7 +132,7 @@ class TTSEngine:
                     pass
     
     def speak(self, text):
-        """Queue text for asynchronous speech."""
+        """Queue text for speech."""
         if self.enabled and text:
             self.speech_queue.put(text)
     
@@ -153,7 +143,6 @@ class TTSEngine:
             self.worker_thread.join(timeout=2)
 
 
-# Global TTS instance
 _tts = None
 
 def init():

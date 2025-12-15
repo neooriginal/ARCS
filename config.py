@@ -30,4 +30,5 @@ REMOTE_TIMEOUT = 0.5
 
 # Text-to-Speech
 TTS_ENABLED = True
-TTS_DEVICE = None  # Audio device (None = default)
+TTS_AUDIO_DEVICE = "plughw:1,0"  # ALSA device (plughw:1,0 = HDMI 1)
+TTS_TLD = "com"  # Google TLD for voice variant (com, co.uk, com.au, etc.)
