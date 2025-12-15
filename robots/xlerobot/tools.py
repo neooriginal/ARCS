@@ -99,6 +99,17 @@ def create_disable_approach_mode():
     return disable_approach_mode
 
 
+def create_speak():
+    @tool
+    def speak(message: str) -> str:
+        """Speak a message out loud via TTS. Use ONLY when necessary to communicate important information (task complete, warnings, errors). Do NOT use for routine status updates."""
+        import tts
+        print(f"[TOOL] speak: {message}")
+        tts.speak(message)
+        return f"Spoke: {message}"
+    return speak
+
+
 def _interruptible_sleep(duration: float, check_interval: float = 0.1, check_safety: bool = False, movement_type: str = None):
     """
     Sleep that can be interrupted by emergency stop or SAFETY REFLEX.

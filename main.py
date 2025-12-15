@@ -32,7 +32,8 @@ from robots.xlerobot.tools import (
     create_disable_precision_mode,
     create_save_note,
     create_enable_approach_mode,
-    create_disable_approach_mode
+    create_disable_approach_mode,
+    create_speak
 )
 
 # Configure logging - reduce verbosity
@@ -102,7 +103,8 @@ def main():
             create_disable_precision_mode(),
             create_save_note(),
             create_enable_approach_mode(),
-            create_disable_approach_mode()
+            create_disable_approach_mode(),
+            create_speak()
         ]
 
         model_name = os.getenv("AI_MODEL", "openai/gpt-5.2") 
