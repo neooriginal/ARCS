@@ -123,6 +123,21 @@ def _interruptible_sleep(duration: float, check_interval: float = 0.1, check_saf
             except Exception as e:
                 print(f"[SAFETY] Error during check: {e}")
 
+        # --- STALL DETECTION (Approach Mode Safety) ---
+        # Prevent wheel grinding if pressing against an object
+        if robot_state.approach_mode and robot_state.robot_system and robot_state.robot_system.servo_controller:
+            try:
+                loads = robot_state.robot_system.servo_controller.get_wheel_loads()
+                # Threshold for stall (Feetech 0-1000 scale, >200 usually implies heavy resistance)
+                STALL_THRESHOLD = 300 
+                if any(abs(load) > STALL_THRESHOLD for load in loads.values()):
+                    print(f"[SAFETY] STALL DETECTED! Loads: {loads}. Stopping.")
+                    robot_state.add_ai_log("SAFETY REFLEX: STALL DETECTED (Touching object)")
+                    robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
+                    return False
+            except Exception as e:
+                pass # Don't crash on read error
+                
         time.sleep(min(check_interval, duration - elapsed))
         elapsed += check_interval
     return True

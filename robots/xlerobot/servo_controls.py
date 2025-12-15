@@ -177,8 +177,11 @@ class ServoControler:
         # Enforce Approach Mode Speed Limit (10%)
         effective_speed = 1000 if state.approach_mode else self.speed
         
-        # print(f"[DEBUG] _wheels_write: Mode={state.approach_mode}, Effective Speed={effective_speed}")
-
+    def _wheels_write(self, action: str) -> Dict[int, int]:
+        from state import state
+        # Enforce Approach Mode Speed Limit (10%)
+        effective_speed = 1000 if state.approach_mode else self.speed
+        
         multipliers = self.action_map[action.lower()]
         payload = {wid: effective_speed * factor for wid, factor in multipliers.items()}
         self.wheel_bus.sync_write("Goal_Velocity", payload)
@@ -235,7 +238,9 @@ class ServoControler:
             # Scale by effective speed
             payload[wid] = int(effective_speed * combined_factor)
             
-        print(f"[DEBUG] set_velocity_vector: Mode={state.approach_mode}, EffectiveSpeed={effective_speed}, Payload={payload}")
+            # Scale by effective speed
+            payload[wid] = int(effective_speed * combined_factor)
+            
         self.wheel_bus.sync_write("Goal_Velocity", payload)
         return payload
 
@@ -243,6 +248,15 @@ class ServoControler:
         for wid in self._wheel_ids:
             self.wheel_bus.write("Operating_Mode", wid, OperatingMode.VELOCITY.value)
         self.wheel_bus.enable_torque()
+
+    def get_wheel_loads(self) -> Dict[int, int]:
+        """Read the current load (0-1000) from wheel motors."""
+        if not self.wheel_bus:
+            return {}
+        try:
+            return self.wheel_bus.sync_read("Present_Load", list(self._wheel_ids))
+        except Exception:
+            return {}
 
     # Head control
 
