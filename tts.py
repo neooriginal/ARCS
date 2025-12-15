@@ -59,18 +59,25 @@ class TTSEngine:
     
     def _speak_blocking(self, text):
         """Generate speech using gTTS and play it."""
+        import sys
         temp_file = None
         try:
             print(f"[TTS] Generating: '{text}'")
+            sys.stdout.flush()
             
             # Create temporary file for audio
             with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as fp:
                 temp_file = fp.name
             
-            # Generate speech with gTTS
-            tts = gTTS(text=text, lang='en', slow=False)
+            # Generate speech with gTTS (this requires internet)
+            print(f"[TTS] Connecting to Google TTS API...")
+            sys.stdout.flush()
+            
+            tts = gTTS(text=text, lang='en', slow=False, timeout=5)
             tts.save(temp_file)
+            
             print(f"[TTS] Audio file created: {temp_file}")
+            sys.stdout.flush()
             
             # Play audio based on which player we found
             if self.audio_player == 'mpg123':
@@ -84,6 +91,8 @@ class TTSEngine:
             
             # Play the audio
             print(f"[TTS] Playing with: {' '.join(cmd)}")
+            sys.stdout.flush()
+            
             result = subprocess.run(cmd, 
                          stdout=subprocess.PIPE, 
                          stderr=subprocess.PIPE,
@@ -98,11 +107,14 @@ class TTSEngine:
                     print(f"[TTS] stdout: {result.stdout.decode()}")
                 if result.stderr:
                     print(f"[TTS] stderr: {result.stderr.decode()}")
+            sys.stdout.flush()
                 
         except subprocess.TimeoutExpired:
             print(f"[TTS] Playback timed out")
+            sys.stdout.flush()
         except Exception as e:
             print(f"[TTS] Error: {e}")
+            sys.stdout.flush()
             import traceback
             traceback.print_exc()
         finally:
