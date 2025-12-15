@@ -113,7 +113,7 @@ class ObstacleDetector:
             mode_text = "MODE: PRECISION"
             mode_color = (255, 255, 0) # Cyan
             
-        cv2.putText(overlay, mode_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, mode_color, 2)
+        cv2.putText(overlay, mode_text, (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, mode_color, 2)
 
         return safe_actions, overlay, {
             'c_left': c_left, 

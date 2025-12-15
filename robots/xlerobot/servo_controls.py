@@ -225,6 +225,7 @@ class ServoControler:
             # Scale by base speed
             payload[wid] = int(self.speed * combined_factor)
             
+        print(f"[DEBUG] set_velocity_vector: Speed={self.speed}, Factor={combined_factor:.2f}, Payload={payload}")
         self.wheel_bus.sync_write("Goal_Velocity", payload)
         return payload
 
