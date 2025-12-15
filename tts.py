@@ -42,9 +42,9 @@ class TTSEngine:
     def _speak_blocking(self, text):
         """Use espeak directly."""
         try:
-            # Use espeak with male voice (-v en-us or -v en+m3 for male)
+            # Use espeak with male voice and max volume (-a 200)
             subprocess.run(
-                ['espeak', '-v', 'en-us+m3', '-s', '150', text],
+                ['espeak', '-v', 'en-us+m3', '-s', '150', '-a', '200', text],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 timeout=5
@@ -53,7 +53,7 @@ class TTSEngine:
             # Fallback without voice specification
             try:
                 subprocess.run(
-                    ['espeak', '-s', '150', text],
+                    ['espeak', '-s', '150', '-a', '200', text],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     timeout=5

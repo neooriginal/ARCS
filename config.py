@@ -30,4 +30,3 @@ REMOTE_TIMEOUT = 0.5
 
 # Text-to-Speech
 TTS_ENABLED = True
-TTS_DEVICE = "plughw:1,0"

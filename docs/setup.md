@@ -40,6 +40,12 @@
     OPENAI_API_KEY=sk-your_actual_api_key_here
     ```
 
+3. Optional: Enable Text-to-Speech
+    Set preferred speaker as default speaker in your system settings.
+    ```ini
+    TTS_ENABLED=True
+    ```
+
 ## 🔧 Calibration
 
 **Critical Step**: You must calibrate the motors before first use.
