@@ -206,41 +206,29 @@ class VinsSlam:
         return points.astype(np.float32).reshape(-1, 1, 2)
     
     def _generate_imu_reading(self, dt):
-        self.imu_sim_time += dt
-        
-        acceleration = np.zeros(3)
-        acceleration[1] = -9.81
-        acceleration[2] += 0.25 * np.sin(self.imu_sim_time * 0.5)
-        
-        angular_velocity = np.zeros(3)
-        angular_velocity[0] = 0.001 * np.random.randn()
-        angular_velocity[1] = 0.001 * np.random.randn()
-        
-        return {'acceleration': acceleration, 'angular_velocity': angular_velocity}
+        pass
     
     def _fuse_visual_inertial(self, R_vo, t_vo, imu_data, dt, R_global):
-        a_motion = imu_data['acceleration'].copy()
-        a_motion[1] += 9.81
-        
-        a_world = R_global @ a_motion
-        delta_v = a_world * dt
-        current_velocity = self.prev_velocity + delta_v
-        delta_t_imu = current_velocity * dt
-        
-        scale_imu = np.linalg.norm(delta_t_imu)
         scale_vo = np.linalg.norm(t_vo)
         
-        if scale_vo < 1e-6 or scale_imu < 1e-6:
-            t_fused = t_vo * 0.001
-        else:
-            scale_factor = scale_imu / scale_vo
-            t_fused = t_vo * scale_factor
+        if scale_vo < 1e-6:
+            return R_vo, t_vo * 0.0
         
-        self.prev_velocity = current_velocity
+        fixed_scale = 0.05
+        t_scaled = t_vo * fixed_scale
         
-        return R_vo, t_fused
+        t_mag = np.linalg.norm(t_scaled)
+        max_step = 0.1
+        if t_mag > max_step:
+            t_scaled = t_scaled * (max_step / t_mag)
+        
+        return R_vo, t_scaled
     
     def _update_pose(self, R_delta, t_delta):
+        t_mag = np.linalg.norm(t_delta)
+        if t_mag < 0.001:
+            return
+            
         with self.lock:
             T_delta = np.eye(4)
             T_delta[:3, :3] = R_delta
