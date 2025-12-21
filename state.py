@@ -66,12 +66,10 @@ class RobotState:
         # Shared Obstacle Detector
         self.detector = None
         
-        # SLAM
-        self.slam = None
-        # SLAM
-        self.slam_system = None
+        # VINS-SLAM
+        self.vins_slam = None
+        self.slam_enabled = True
         self.pose = {'x': 0.0, 'y': 0.0, 'theta': 0.0}
-        self.current_frame = None  # Latest camera frame for shared access
 
     
     def update_movement(self, data):

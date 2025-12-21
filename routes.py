@@ -486,47 +486,38 @@ def update_memory(note_id):
     return jsonify({'status': 'error', 'error': 'Note not found'}), 404
 
 
-
-@bp.route('/api/slam_map')
-def get_slam_map():
-    """Return current SLAM map and trajectory."""
-    if state.slam_system is None:
-         return jsonify({'trajectory': [], 'points': []})
-    
-    # Extract data securely
-    try:
-        # Convert numpy arrays to lists for JSON serialization
-        traj = [t.tolist() for t in state.slam_system.slam_map.trajectory]
-        
-        # Point cloud is a list of arrays, flatten it for simpler frontend handling
-        # Or just send recent points to save bandwidth? For now, send all.
-        points = []
-        if state.slam_system.slam_map.point_cloud:
-             # points are 3x1 arrays in a list, or chunks
-             # The system adds (3, N) chunks.
-             # Let's flatten to a simple list of [x, y, z] dicts or lists
-             accumulated_points = np.hstack(state.slam_system.slam_map.point_cloud)
-             # Shape is (3, TotalPoints)
-             # Transpose to (TotalPoints, 3)
-             points = accumulated_points.T.tolist()
-             
-             # Optimization: Limit points if too many?
-             if len(points) > 2000:
-                  points = points[-2000:]
-             
-             # Sanitize points (replace NaN/Inf)
-             points = [[0 if np.isnan(x) or np.isinf(x) else x for x in p] for p in points]
-
-        return jsonify({
-            'trajectory': traj,
-            'points': points,
-            'scale': 1.0 # Placeholder
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)})
-
 @bp.route('/api/memory/clear', methods=['POST'])
 def clear_memories():
     from core.memory_store import memory_store
     memory_store.clear_all()
     return jsonify({'status': 'ok'})
+
+
+@bp.route('/slam/data')
+def slam_data():
+    if state.vins_slam is None:
+        return jsonify({'error': 'SLAM not initialized'})
+    return jsonify(state.vins_slam.get_data())
+
+
+@bp.route('/slam/status')
+def slam_status():
+    if state.vins_slam is None:
+        return jsonify({'enabled': False, 'error': 'SLAM not initialized'})
+    status = state.vins_slam.get_status()
+    status['enabled'] = state.slam_enabled
+    return jsonify(status)
+
+
+@bp.route('/slam/toggle', methods=['POST'])
+def slam_toggle():
+    state.slam_enabled = not state.slam_enabled
+    return jsonify({'enabled': state.slam_enabled})
+
+
+@bp.route('/slam/reset', methods=['POST'])
+def slam_reset():
+    if state.vins_slam:
+        state.vins_slam.reset()
+    return jsonify({'status': 'ok'})
+

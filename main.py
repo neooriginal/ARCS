@@ -21,6 +21,7 @@ from config import WEB_PORT
 
 from core.robot_system import RobotSystem
 from core.navigation_agent import NavigationAgent
+from core.vins_slam import VinsSlam
 from robots.xlerobot.tools import (
     create_move_forward, 
     create_move_backward, 
@@ -60,6 +61,28 @@ def agent_loop():
                 logger.error(f"Agent step error: {e}")
                 state.add_ai_log(f"Error: {e}")
                 state.ai_enabled = False # Safety disable
+        time.sleep(0.1)
+
+
+def slam_loop():
+    """Background thread for VINS-SLAM mapping."""
+    logger.info("SLAM loop started")
+    while state.running:
+        if not state.slam_enabled or state.vins_slam is None:
+            time.sleep(0.5)
+            continue
+        
+        if state.camera is None:
+            time.sleep(0.5)
+            continue
+        
+        try:
+            ret, frame = state.camera.read()
+            if ret and frame is not None:
+                state.vins_slam.process_frame(frame)
+        except Exception as e:
+            logger.debug(f"SLAM frame error: {e}")
+        
         time.sleep(0.1)
 
 
@@ -124,34 +147,13 @@ def main():
     # Movement thread (manual control)
     threading.Thread(target=movement_loop, daemon=True).start()
     
-    # Camera Capture thread
-    import camera
-    threading.Thread(target=camera.start_camera_capture, daemon=True).start()
-
-    # SLAM thread
-    import vins_slam
-    def slam_loop():
-        """Background thread for VINS-SLAM."""
-        print("🗺️ SLAM System started")
-        slam = vins_slam.VinsSlamSystem()
-        state.slam_system = slam
-        
-        while state.running:
-            if state.current_frame is not None:
-                try:
-                    slam.process_frame(state.current_frame)
-                    # Update global pose state (X=Left/Right, Y=Depth/Forward)
-                    pose = slam.slam_map.camera_pose
-                    state.pose['x'] = float(pose[0, 3])
-                    state.pose['y'] = float(pose[1, 3])
-                except Exception as e:
-                    logger.error(f"SLAM error: {e}")
-            time.sleep(0.05)
-            
-    threading.Thread(target=slam_loop, daemon=True).start()
-    
     # AI Agent thread
     threading.Thread(target=agent_loop, daemon=True).start()
+    
+    # VINS-SLAM thread
+    state.vins_slam = VinsSlam()
+    threading.Thread(target=slam_loop, daemon=True).start()
+    print("🗺️ SLAM ready")
     
     # TTS Startup Announcement
     tts.speak("System ready")
@@ -168,11 +170,13 @@ def main():
     # Auto-open display on Raspberry Pi's physical screen (works over SSH)
     if os.getenv('AUTO_OPEN_DISPLAY', 'true').lower() == 'true':
         def open_display():
-            time.sleep(2)  # Wait for server start
+            import time
+            time.sleep(2)  # Wait for server to start
             display_url = f'http://localhost:{WEB_PORT}/display'
             env = os.environ.copy()
-            env['DISPLAY'] = ':0' 
+            env['DISPLAY'] = ':0'  # Target the main display
             try:
+                # Try chromium-browser first (common on Raspberry Pi)
                 subprocess.Popen(
                     ['chromium-browser', '--kiosk', '--noerrdialogs', '--disable-infobars', display_url],
                     env=env,

@@ -143,6 +143,63 @@
                 box-shadow: 0 0 0 0 rgba(255, 0, 0, 0);
             }
         }
+
+        .slam-panel {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+
+        .slam-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .slam-header h3 {
+            margin: 0;
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        .slam-canvas {
+            width: 100%;
+            height: 180px;
+            background: #000;
+            border: 1px solid #222;
+            border-radius: 4px;
+        }
+
+        .slam-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #666;
+            margin-top: 6px;
+        }
+
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 11px;
+            background: #333;
+            border: 1px solid #444;
+            color: #aaa;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn-small:hover {
+            background: #444;
+        }
+
+        .btn-small.active {
+            background: #28a745;
+            border-color: #28a745;
+            color: white;
+        }
     </style>
 </head>
 
@@ -178,12 +235,131 @@
 
             <div class="log-window" id="log-window"></div>
 
+            <div class="slam-panel">
+                <div class="slam-header">
+                    <h3>🗺️ SLAM Map</h3>
+                    <div>
+                        <button id="slam-toggle" class="btn-small active">ON</button>
+                        <button id="slam-reset" class="btn-small">Reset</button>
+                    </div>
+                </div>
+                <canvas id="slam-canvas" class="slam-canvas"></canvas>
+                <div class="slam-stats">
+                    <span id="slam-frames">Frames: 0</span>
+                    <span id="slam-points">Points: 0</span>
+                    <span id="slam-loops">Loops: 0</span>
+                </div>
+            </div>
+
             <button id="btn-estop" class="btn btn-estop">EMERGENCY STOP</button>
         </div>
     </div>
 
     <script>
-        console.log('AI Control Script Loaded');
+        var slamCanvas = document.getElementById('slam-canvas');
+        var slamCtx = slamCanvas.getContext('2d');
+        var slamEnabled = true;
+
+        function resizeSlamCanvas() {
+            var rect = slamCanvas.getBoundingClientRect();
+            slamCanvas.width = rect.width * window.devicePixelRatio;
+            slamCanvas.height = rect.height * window.devicePixelRatio;
+            slamCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+        resizeSlamCanvas();
+        window.addEventListener('resize', resizeSlamCanvas);
+
+        function drawSlamMap(trajectory, pointCloud) {
+            var w = slamCanvas.width / window.devicePixelRatio;
+            var h = slamCanvas.height / window.devicePixelRatio;
+            slamCtx.clearRect(0, 0, w, h);
+
+            if (!trajectory || trajectory.length === 0) {
+                slamCtx.fillStyle = '#333';
+                slamCtx.font = '12px sans-serif';
+                slamCtx.textAlign = 'center';
+                slamCtx.fillText('No trajectory data', w / 2, h / 2);
+                return;
+            }
+
+            var minX = Infinity, maxX = -Infinity;
+            var minY = Infinity, maxY = -Infinity;
+            for (var i = 0; i < trajectory.length; i++) {
+                var x = trajectory[i][0];
+                var y = trajectory[i][2];
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+
+            var rangeX = maxX - minX || 1;
+            var rangeY = maxY - minY || 1;
+            var scale = Math.min((w - 40) / rangeX, (h - 40) / rangeY);
+            var offsetX = (w - rangeX * scale) / 2;
+            var offsetY = (h - rangeY * scale) / 2;
+
+            function toScreen(pt) {
+                return {
+                    x: offsetX + (pt[0] - minX) * scale,
+                    y: offsetY + (pt[2] - minY) * scale
+                };
+            }
+
+            if (pointCloud && pointCloud.length > 0) {
+                slamCtx.fillStyle = 'rgba(100, 100, 200, 0.3)';
+                for (var j = 0; j < pointCloud.length; j++) {
+                    var p = toScreen(pointCloud[j]);
+                    slamCtx.fillRect(p.x - 1, p.y - 1, 2, 2);
+                }
+            }
+
+            slamCtx.strokeStyle = '#0f0';
+            slamCtx.lineWidth = 2;
+            slamCtx.beginPath();
+            var first = toScreen(trajectory[0]);
+            slamCtx.moveTo(first.x, first.y);
+            for (var k = 1; k < trajectory.length; k++) {
+                var pt = toScreen(trajectory[k]);
+                slamCtx.lineTo(pt.x, pt.y);
+            }
+            slamCtx.stroke();
+
+            var last = toScreen(trajectory[trajectory.length - 1]);
+            slamCtx.fillStyle = '#ff0';
+            slamCtx.beginPath();
+            slamCtx.arc(last.x, last.y, 4, 0, Math.PI * 2);
+            slamCtx.fill();
+        }
+
+        function updateSlam() {
+            if (!slamEnabled) return;
+            fetch('/slam/data')
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.error) return;
+                    drawSlamMap(data.trajectory, data.point_cloud);
+                    document.getElementById('slam-frames').textContent = 'Frames: ' + data.frame_count;
+                    document.getElementById('slam-points').textContent = 'Points: ' + data.total_points;
+                    document.getElementById('slam-loops').textContent = 'Loops: ' + data.loop_closures;
+                })
+                .catch(function (e) { });
+        }
+
+        document.getElementById('slam-toggle').addEventListener('click', function () {
+            fetch('/slam/toggle', { method: 'POST' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    slamEnabled = data.enabled;
+                    var btn = document.getElementById('slam-toggle');
+                    btn.textContent = slamEnabled ? 'ON' : 'OFF';
+                    btn.className = slamEnabled ? 'btn-small active' : 'btn-small';
+                });
+        });
+
+        document.getElementById('slam-reset').addEventListener('click', function () {
+            fetch('/slam/reset', { method: 'POST' });
+        });
 
         function updateStatus() {
             fetch('/ai/status')
@@ -208,41 +384,35 @@
                     logs.innerHTML = html;
                     logs.scrollTop = logs.scrollHeight;
                 })
-                .catch(function (e) { console.error('Status error:', e); });
+                .catch(function (e) { });
         }
 
         document.getElementById('btn-start').addEventListener('click', function () {
-            console.log('Start AI clicked');
-            fetch('/ai/start', { method: 'POST' })
-                .then(function (r) { return r.json(); })
-                .then(function (d) { console.log('Start resp:', d); });
+            fetch('/ai/start', { method: 'POST' });
         });
 
         document.getElementById('btn-stop').addEventListener('click', function () {
-            console.log('Stop AI clicked');
             fetch('/ai/stop', { method: 'POST' });
         });
 
         document.getElementById('btn-set-task').addEventListener('click', function () {
             var task = document.getElementById('task-input').value;
-            console.log('Set Task clicked:', task);
             fetch('/ai/task', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ task: task })
-            })
-                .then(function (r) { return r.json(); })
-                .then(function (d) { console.log('Task resp:', d); });
+            });
         });
 
         document.getElementById('btn-estop').addEventListener('click', function () {
-            console.log('ESTOP clicked');
             fetch('/emergency_stop', { method: 'POST' });
             alert('EMERGENCY STOP TRIGGERED');
         });
 
         setInterval(updateStatus, 500);
+        setInterval(updateSlam, 1000);
         updateStatus();
+        updateSlam();
     </script>
 </body>
 

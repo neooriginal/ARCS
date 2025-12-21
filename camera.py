@@ -35,55 +35,35 @@ def init_camera():
         return False
 
 
-
-def start_camera_capture():
-    """Background thread to continuously capture frames."""
-    if state.camera is None:
-        return
-
+def generate_frames():
+    """MJPEG video stream generator with low latency."""
     while state.running:
         if state.camera is None:
             time.sleep(0.1)
             continue
         
         try:
-            # Grab and retrieve in one go
-            ret, frame = state.camera.read()
-            if ret:
-                state.current_frame = frame
-            else:
-                time.sleep(0.01)
-        except Exception as e:
-            state.last_error = f"Camera capture error: {str(e)}"
-            time.sleep(0.1)
-
-def generate_frames():
-    """MJPEG video stream generator reading from shared state."""
-    last_frame_time = 0
-    
-    while state.running:
-        if state.current_frame is None:
-            time.sleep(0.1)
-            continue
+            # Flush camera buffer by grabbing frames without decoding
+            # This ensures we always get the latest frame
+            state.camera.grab()
+            state.camera.grab()
+            ret, frame = state.camera.retrieve()
             
-        try:
-            # Simple frame limiting or just encode always
-            # For MJPEG, we can just encode the current frame
+            if not ret:
+                ret, frame = state.camera.read()
+                if not ret:
+                    time.sleep(0.02)
+                    continue
             
             # Lower quality = faster encoding = lower latency
-            _, buffer = cv2.imencode('.jpg', state.current_frame, [
+            _, buffer = cv2.imencode('.jpg', frame, [
                 cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY,
                 cv2.IMWRITE_JPEG_OPTIMIZE, 0
             ])
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-                   
-            # Limit stream FPS slightly to save bandwidth if needed, but 
-            # let's keep it max speed for now or rely on client consumption
-            time.sleep(0.03) # Approx 30 FPS cap for the stream
-            
         except Exception as e:
-            state.last_error = f"Stream error: {str(e)}"
+            state.last_error = f"Camera error: {str(e)}"
             time.sleep(0.05)
 
 
