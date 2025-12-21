@@ -513,6 +513,9 @@ def get_slam_map():
              # Optimization: Limit points if too many?
              if len(points) > 2000:
                   points = points[-2000:]
+             
+             # Sanitize points (replace NaN/Inf)
+             points = [[0 if np.isnan(x) or np.isinf(x) else x for x in p] for p in points]
 
         return jsonify({
             'trajectory': traj,

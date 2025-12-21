@@ -258,14 +258,23 @@ class VinsSlamSystem:
         mask_good = mask_E.ravel() == 1
         good_new_filtered = good_new[mask_good]
         good_prev_filtered = good_prev[mask_good]
-
+        
+        # Only add points if we have moved enough to get a baseline
+        # Avoid degenerate triangulation when stationary
+        # Reference code didn't check t_fused threshold, just point count.
         if len(good_new_filtered) >= 1:
             P1 = K @ np.hstack((np.eye(3), np.zeros((3,1))))
             P2 = K @ np.hstack((R_fused, t_fused))
             
             points_4d = cv2.triangulatePoints(P1, P2, good_prev_filtered.reshape(-1,2).T, good_new_filtered.reshape(-1,2).T)
             points_3d = points_4d[:3] / points_4d[3]
-            self.slam_map.add_points(points_3d)
+            
+            # Filter points behind camera (Z <= 0) or too far
+            positive_depth_mask = (points_3d[2] > 0) & (points_3d[2] < 50)
+            valid_points = points_3d[:, positive_depth_mask]
+            
+            if valid_points.shape[1] > 0:
+                self.slam_map.add_points(valid_points)
 
         # Prepare for next iteration
         self.prev_frame = current_frame_gray.copy()
