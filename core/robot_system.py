@@ -6,7 +6,8 @@ from typing import Optional, Dict, Any
 
 from state import state
 from robots.xlerobot.servo_controls import ServoControler
-from config import WHEEL_USB, HEAD_USB, CAMERA_PORT, CAMERA_WIDTH, CAMERA_HEIGHT, CAMERA_BUFFER_SIZE
+from config import WHEEL_USB, HEAD_USB, CAMERA_PORT, CAMERA_WIDTH, CAMERA_HEIGHT, CAMERA_BUFFER_SIZE, STALL_LOAD_THRESHOLD, STALL_CHECK_INTERVAL
+import tts
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,9 @@ class RobotSystem:
         # Initialize hardware
         self._init_camera()
         self._init_servos()
+        
+        # Safety Monitor Thread
+        threading.Thread(target=self._safety_monitor_loop, daemon=True).start()
         
         state.robot_system = self
         
@@ -87,6 +91,26 @@ class RobotSystem:
             if ret:
                 return frame
             return None
+            
+    def _safety_monitor_loop(self):
+        """Background thread to check for stalls/safety issues."""
+        last_stall_alert = 0
+        while self.running:
+            if self.controller:
+                try:
+                    stall_msg = self.controller.check_stall(STALL_LOAD_THRESHOLD)
+                    if stall_msg:
+                        logger.error(f"STALL DETECTED: {stall_msg}")
+                        state.last_error = f"SAFETY STOP: {stall_msg}"
+                        
+                        # Alert with cooldown (every 5 seconds)
+                        if time.time() - last_stall_alert > 5:
+                            tts.speak("Motor stall detected. Automatic restart required.")
+                            last_stall_alert = time.time()
+                except Exception as e:
+                    logger.warning(f"Safety monitor error: {e}")
+            
+            time.sleep(STALL_CHECK_INTERVAL)
 
     def cleanup(self):
         """Release resources."""

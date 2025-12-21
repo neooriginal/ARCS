@@ -9,6 +9,7 @@ from collections import deque
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain.chat_models import init_chat_model
+from config import AI_MIN_BRIGHTNESS
 
 load_dotenv()
 
@@ -310,7 +311,18 @@ PERSISTENT NOTES:
         if frame is None:
             return "Camera error"
             
-        # --- QR SCAN ---
+        # Darkness Check
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        brightness = np.mean(gray)
+        if brightness < AI_MIN_BRIGHTNESS:
+            logger.warning(f"Too dark for AI: {brightness:.1f} < {AI_MIN_BRIGHTNESS}")
+            
+            # Use import inside method to avoid circular imports layout issues
+            import tts
+            tts.speak("It is too dark to see.")
+            return "Too Dark - Navigation Aborted"
+
+        # QR Scan
         qr_title, qr_points, qr_new_data = self.qr_scanner.scan(frame, state.pose)
         qr_alert = ""
         
@@ -439,7 +451,7 @@ PERSISTENT NOTES:
                     args = tool_call["args"]
                     logger.info(f"Agent executing: {tool_name}({args})")
                     
-                    # --- SAFETY CHECK ---
+                    # Safety Check
                     # Map tool names to abstract actions
                     action_map = {
                         "move_forward": "FORWARD",
@@ -461,7 +473,7 @@ PERSISTENT NOTES:
                             else:
                                 result += " Please choose another path."
                         
-                        # --- BACKWARD SAFETY ---
+                        # Backward Safety
                         if tool_name == "move_backward":
                             if self.last_action == "move_backward":
                                 blocked = True

@@ -336,6 +336,60 @@ class ServoControler:
         angle = 2.0 if closed else 90.0
         return self.set_arm_joint("gripper", angle)
 
+    # Stall Detection
+
+    def get_head_loads(self) -> Dict[int, int]:
+        """Read the current load (0-1000) from head motors."""
+        if not self.head_bus:
+            return {}
+        try:
+            return self.head_bus.sync_read("Present_Load", list(self._head_ids))
+        except Exception:
+            return {}
+
+    def get_arm_loads(self) -> Dict[int, int]:
+        """Read the current load (0-1000) from arm motors."""
+        if not self._arm_enabled:
+            return {}
+        try:
+            # Remap from motor_id to joint_name or just return motor_id map
+            return self.wheel_bus.sync_read("Present_Load", list(self._arm_ids))
+        except Exception:
+            return {}
+
+    def check_stall(self, threshold: int = 600) -> Optional[str]:
+        """
+        Check for stalled motors (load > threshold).
+        If stalled, disabling torque for safety.
+        Returns description of stall or None.
+        """
+        warnings = []
+        
+        # Check Head
+        head_loads = self.get_head_loads()
+        for mid, load in head_loads.items():
+            if abs(load) > threshold:
+                warnings.append(f"Head Motor {mid} stalled (Load: {load})")
+                try:
+                    self.head_bus.write("Torque_Enable", mid, 0)
+                except:
+                    pass
+
+        # Check Arm
+        if self._arm_enabled:
+            arm_loads = self.get_arm_loads()
+            for mid, load in arm_loads.items():
+                if abs(load) > threshold:
+                    warnings.append(f"Arm Motor {mid} stalled (Load: {load})")
+                    try:
+                        self.wheel_bus.write("Torque_Enable", mid, 0)
+                    except:
+                        pass
+        
+        if warnings:
+            return "; ".join(warnings)
+        return None
+
     # Cleanup
 
     def disconnect(self) -> None:
@@ -348,3 +402,4 @@ class ServoControler:
     def __del__(self) -> None:
         if hasattr(self, "wheel_bus") and self.wheel_bus and self.wheel_bus.is_connected:
             self.disconnect()
+
