@@ -85,8 +85,9 @@ PRECISION MODE PROTOCOL:
     - Otherwise, if guide says "ACTION: STOP", OBEY IT.
     - ONLY move forward when guidance says "PERFECT" or if you are confident you are passing through.
 - **EXIT PROTOCOL**: DO NOT disable Precision Mode until you have COMPLETELY PASSED the doorframe.
-    - If you can still see the door frame or walls on your side, KEEP IT ENABLED.
-    - Only disable when the space opens up significantly.
+    - If you disable it too early, the safety reflex will see the doorframe as a wall and STOP YOU.
+    - Better to leave it on for an extra meter than to disable it early.
+    - Only disable when the space opens up significantly on BOTH sides.
 
 APPROACH MODE (MANIPULATION):
 - Use `enable_approach_mode` ONLY when you need to get within touching distance of a surface (counter, table, button).
@@ -385,8 +386,8 @@ PERSISTENT NOTES:
             reflex_msg += "\nPRECISION MODE: ON. Use the guidance to align with the gap."
             
             # Hint to disable if path is clear (c_fwd < 250 means obstacles are far away/top of screen)
-            if c_fwd < 250:
-                 reflex_msg += "\n(HINT: The path ahead seems OPEN/CLEAR. You should probably DISABLE PRECISION MODE now to move faster.)"
+            # REMOVED: This was causing early disables while still in the doorway (since center is clear).
+            # The AI must judge "space opening up" visually effectively.
         else:
             reflex_msg += "\nPRECISION MODE: OFF."
             if "FORWARD" not in safe_actions:
