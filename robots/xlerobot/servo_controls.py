@@ -127,16 +127,38 @@ class ServoControler:
                 motors=motors,
                 calibration=calibration,
             )
-            self.wheel_bus.connect()
-            self.apply_wheel_modes()
             
-            if arm_ready:
-                self._apply_arm_modes()
-                self._arm_enabled = True
-                try:
-                    self._arm_positions = self.get_arm_position()
-                except Exception as e:
-                    print(f"[ARM] Could not read position: {e}")
+            try:
+                self.wheel_bus.connect()
+                self.apply_wheel_modes()
+                
+                if arm_ready:
+                    self._apply_arm_modes()
+                    self._arm_enabled = True
+                    try:
+                        self._arm_positions = self.get_arm_position()
+                    except Exception as e:
+                        print(f"[ARM] Could not read position: {e}")
+            except Exception as e:
+                print(f"[CONTROLLER] Error initializing with Arm: {e}")
+                if arm_ready:
+                    print("[CONTROLLER] Retrying with ONLY wheels...")
+                    # Fallback: Re-init with only wheels
+                    motors = {
+                        7: Motor(7, "sts3215", MotorNormMode.RANGE_M100_100),
+                        8: Motor(8, "sts3215", MotorNormMode.RANGE_M100_100),
+                        9: Motor(9, "sts3215", MotorNormMode.RANGE_M100_100),
+                    }
+                    self.wheel_bus = FeetechMotorsBus(
+                        port=right_arm_wheel_usb,
+                        motors=motors,
+                        calibration=None,
+                    )
+                    self.wheel_bus.connect()
+                    self.apply_wheel_modes()
+                    print("[CONTROLLER] Wheels connected successfully (Arm disabled)")
+                else:
+                    raise e
         
         head_calibration = {
             7: MotorCalibration(id=7, drive_mode=0, homing_offset=0, range_min=0, range_max=4095),
