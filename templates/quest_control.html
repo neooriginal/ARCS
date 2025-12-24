@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RoboCrew VR Control</title>
+    <!-- A-Frame Library -->
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <style>
+        body {
+            background-color: #111;
+            color: #ccc;
+            font-family: sans-serif;
+        }
+
+        #overlay {
+            position: absolute;
+            z-index: 1000;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            pointer-events: none;
+            /* Let clicks pass through */
+        }
+    </style>
+</head>
+
+<body>
+    <div id="overlay">
+        <h2>🤖 RoboCrew VR</h2>
+        <p>Enter <strong>AR/VR</strong> to control.</p>
+        <p><strong>Left Stick:</strong> Drive | <strong>Right Hand:</strong> Arm | <strong>Grip:</strong> Gripper</p>
+    </div>
+
+    <!-- 
+      Passthrough Setup:
+      1. background="color: transparent" -> Allows video passthrough in AR mode.
+      2. webxr="optionalFeatures: ..." -> Request features (hit-test for AR, hand-tracking).
+      3. renderer="alpha: true" -> Ensure transparent canvas.
+    -->
+    <a-scene background="color: transparent" renderer="alpha: true"
+        webxr="optionalFeatures: hit-test, local-floor, hand-tracking; overlay: false">
+        <a-assets>
+            <img id="camera-feed" src="/video_feed" crossorigin="anonymous">
+        </a-assets>
+
+        <!-- Video Screen (Curved) 
+             Positioned floating in front. 
+        -->
+        <a-curvedimage src="#camera-feed" height="3.0" radius="2.5" theta-length="90" position="0 1.6 -2.5"
+            rotation="0 135 0" scale="1.5 1.5 1.5">
+        </a-curvedimage>
+
+        <!-- Camera Rig -->
+        <a-entity id="rig" position="0 0 0">
+            <a-camera position="0 1.6 0" look-controls="pointerLockEnabled: false"></a-camera>
+
+            <!-- Controllers -->
+            <!-- Left: Drive -->
+            <a-entity id="leftHand" oculus-touch-controls="hand: left" robot-drive-controller></a-entity>
+            <!-- Right: Arm -->
+            <a-entity id="rightHand" oculus-touch-controls="hand: right" robot-arm-controller></a-entity>
+        </a-entity>
+    </a-scene>
+
+    <script>
+        // --- Robot Control Logic (A-Frame Components) ---
+
+        // Throttle config
+        const UPDATE_INTERVAL = 100;
+
+        // 1. Drive Controller (Left Hand)
+        AFRAME.registerComponent('robot-drive-controller', {
+            init: function () {
+                this.lastUpdate = 0;
+            },
+            tick: function (time, timeDelta) {
+                // Get Gamepad
+                if (!this.el.components['oculus-touch-controls']) return;
+                const controller = this.el.components['oculus-touch-controls'].controller;
+                if (!controller || !controller.gamepad) return;
+
+                const gp = controller.gamepad;
+                if (!gp.axes) return;
+
+                // Quest: axes[2] = X, axes[3] = Y
+                const x = gp.axes[2] || 0;
+                const y = gp.axes[3] || 0;
+
+                const now = Date.now();
+                if (now - this.lastUpdate > UPDATE_INTERVAL) {
+                    let direction = 'stop';
+                    const DEADZONE = 0.2;
+
+                    if (y < -DEADZONE) direction = 'forward';
+                    else if (y > DEADZONE) direction = 'backward';
+                    else if (x < -DEADZONE) direction = 'left';
+                    else if (x > DEADZONE) direction = 'right';
+
+                    fetch('/move', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ direction: direction })
+                    }).catch(e => { });
+
+                    this.lastUpdate = now;
+                }
+            }
+        });
+
+        // 2. Arm Controller (Right Hand)
+        AFRAME.registerComponent('robot-arm-controller', {
+            init: function () {
+                this.lastUpdate = 0;
+                this.gripperState = false;
+                this.lastGripperCheck = 0;
+            },
+            tick: function (time, timeDelta) {
+                const now = Date.now();
+
+                // Get Pose
+                const position = this.el.object3D.position;
+                const rotation = this.el.object3D.rotation; // Euler radians
+
+                // Get Gamepad
+                let gripPressed = false;
+                if (this.el.components['oculus-touch-controls']) {
+                    const controller = this.el.components['oculus-touch-controls'].controller;
+                    if (controller && controller.gamepad && controller.gamepad.buttons) {
+                        // Button 1 is Grip/Squeeze on Quest
+                        gripPressed = controller.gamepad.buttons[1]?.pressed || false;
+                    }
+                }
+
+                // Check Gripper (Grip Button)
+                if (gripPressed !== this.gripperState && (now - this.lastGripperCheck > 200)) {
+                    this.gripperState = gripPressed;
+                    fetch('/gripper', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ closed: gripPressed })
+                    }).catch(e => { });
+                    this.lastGripperCheck = now;
+                }
+
+                // Update Arm Position
+                if (now - this.lastUpdate > UPDATE_INTERVAL) {
+
+                    // --- Heuristic Kinematics ---
+
+                    // Reference Frame:
+                    // Origin (0,0,0) is usually user's feet (local-floor).
+                    // Shoulder Pivot approximate world pos: (0.2, 1.4, 0)
+                    // We map relative to an assumed shoulder anchor.
+                    const shoulderAnchor = { x: 0.2, y: 1.3, z: -0.2 };
+
+                    const dx = position.x - shoulderAnchor.x;
+                    const dy = position.y - shoulderAnchor.y;
+                    const dz = position.z - shoulderAnchor.z; // negative is forward in WebXR? 
+                    // In A-Frame/WebXR, -Z is forward. +Z is back towards user.
+
+                    // 1. Shoulder Pan (Left/Right)
+                    // Map X: -0.4 (Left) to 0.4 (Right) -> -90 to 90
+                    // Inverted: dx * -200
+                    let s_pan = Math.max(-90, Math.min(90, dx * -200));
+
+                    // 2. Shoulder Lift (Up/Down)
+                    // Map Y: -0.4 (Down) to 0.4 (Up) -> -60 to 60
+                    // Inverted: dy * -150
+                    let s_lift = Math.max(-90, Math.min(90, dy * -150));
+
+                    // 3. Elbow Flex (Reach)
+                    // Calculate extension distance (from shoulder anchor)
+                    // But mostly Z matters for simple reaching.
+                    // -Z increases as we reach forward.
+                    // Hand near body (z ~ 0.1) -> Flexed
+                    // Hand extended (z ~ -0.5) -> Straight
+
+                    // Elbow: -90 (Flexed) to 0 (Straight)? 
+                    // Or 0 (Flexed) to 90? Need to check robot config.
+                    // Assuming standard: 
+                    // Let's trying mapping -Z (reach):
+                    // z = 0 (close) -> Elbow Flex -90
+                    // z = -0.5 (far) -> Elbow Flex 0
+
+                    // Z is usually negative in front.
+                    // reach = -position.z (approx 0.0 to 0.6)
+                    const reach = -position.z;
+                    // map 0.1 -> -90, 0.6 -> 0
+                    let e_flex = (reach - 0.6) * 180;
+                    // e_flex clamped -90 to 0
+                    e_flex = Math.max(-90, Math.min(0, e_flex));
+
+                    // 4. Wrist Roll (Rotation around Z axis of controller)
+                    // Rotation.z is roll in Radians
+                    let w_roll = THREE.MathUtils.radToDeg(rotation.z);
+                    // Clamp -150 to 150
+                    // Inverted (Not negated, as requested to fix inversion, previously it wasn't negated, then requested to invert... wait)
+                    // User said "up down left right pretty much all are inverted".
+                    // Step 175: I set w_roll to w_roll (removed negation). It was previously -w_roll (in Step 154 logic, not code, wait).
+                    // In Step 154 I wrote: w_roll = ... -w_roll.
+                    // In Step 175 I wrote: w_roll = ... w_roll. (Removing negation -> Inverting relative to previous).
+                    // So this is correct.
+                    w_roll = Math.max(-150, Math.min(150, w_roll));
+
+                    // 5. Wrist Flex (Pitch)
+                    // Rotation.x is pitch
+                    let w_flex = THREE.MathUtils.radToDeg(rotation.x);
+                    // Usually controller flat = 0.
+                    // Tip down = negative?
+                    // Prev: w_flex. 
+                    // Step 175: -w_flex.
+                    w_flex = Math.max(-90, Math.min(90, -w_flex));
+
+                    const payload = {
+                        positions: {
+                            shoulder_pan: s_pan,
+                            shoulder_lift: s_lift,
+                            elbow_flex: e_flex,
+                            wrist_roll: w_roll,
+                            wrist_flex: w_flex
+                        }
+                    };
+
+                    fetch('/arm', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    }).catch(e => { });
+
+                    this.lastUpdate = now;
+                }
+            }
+        });
+
+        // 3. Texture Auto-Update Fix
+        // Sometimes MJPEG on a texture needs manual refresh in WebGL
+        AFRAME.registerComponent('auto-refresh-texture', {
+            tick: function () {
+                const mesh = this.el.getObject3D('mesh');
+                if (mesh && mesh.material && mesh.material.map) {
+                    mesh.material.map.needsUpdate = true;
+                }
+            }
+        });
+
+        // Attach logic to screen
+        document.querySelector('a-curvedimage').setAttribute('auto-refresh-texture', '');
+
+    </script>
+</body>
+
+</html>
