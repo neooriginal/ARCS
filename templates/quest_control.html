@@ -18,9 +18,9 @@
             z-index: 1000;
             top: 10px;
             left: 10px;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 10px;
-            border-radius: 5px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
             pointer-events: none;
         }
     </style>
@@ -29,41 +29,82 @@
 <body>
     <div id="overlay">
         <h2>🤖 RoboCrew VR</h2>
-        <p>Enter <strong>AR/VR</strong> to control.</p>
-        <p><strong>Left Stick:</strong> Drive | <strong>Right Hand:</strong> Arm | <strong>Grip:</strong> Gripper</p>
+        <p><strong>Left Stick:</strong> Drive Robot</p>
+        <p><strong>Right Hand:</strong> Move Arm (Delta Control)</p>
+        <p><strong>Right Trigger:</strong> Close Gripper</p>
     </div>
 
     <a-scene background="color: transparent" renderer="alpha: true"
-        webxr="optionalFeatures: hit-test, local-floor, hand-tracking">
+        webxr="optionalFeatures: local-floor, hand-tracking">
         <a-assets>
             <img id="camera-feed" src="/video_feed" crossorigin="anonymous">
         </a-assets>
 
-        <!-- Video Screen - Flat plane directly in front -->
-        <a-plane src="#camera-feed" width="3.2" height="2.4" position="0 1.5 -2.0" auto-refresh-texture></a-plane>
+        <!-- Camera feed display -->
+        <a-plane src="#camera-feed" width="2.5" height="1.875" position="0 1.5 -1.8" auto-refresh-texture></a-plane>
 
         <!-- Camera Rig -->
         <a-entity id="rig" position="0 0 0">
             <a-camera position="0 1.6 0" look-controls="pointerLockEnabled: false"></a-camera>
-
-            <!-- Controllers -->
             <a-entity id="leftHand" oculus-touch-controls="hand: left" robot-drive-controller></a-entity>
             <a-entity id="rightHand" oculus-touch-controls="hand: right" robot-arm-controller></a-entity>
         </a-entity>
     </a-scene>
 
     <script>
-        const UPDATE_INTERVAL = 100;
+        const UPDATE_INTERVAL = 50; // 20Hz update rate
 
         // =============================================
-        // 1. DRIVE CONTROLLER (Left Hand)
+        // SIMPLE 2-LINK INVERSE KINEMATICS
+        // =============================================
+        const ARM_LINK1 = 0.10; // Shoulder to elbow length (meters, approximate)
+        const ARM_LINK2 = 0.12; // Elbow to wrist length (meters, approximate)
+
+        function inverseKinematics(x, y) {
+            // 2-link planar IK
+            // x = forward distance, y = height in arm plane
+            // Returns [shoulder_lift_deg, elbow_flex_deg]
+
+            const L1 = ARM_LINK1;
+            const L2 = ARM_LINK2;
+
+            const dist = Math.sqrt(x * x + y * y);
+
+            // Clamp to reachable workspace
+            const maxReach = L1 + L2 - 0.01;
+            const minReach = Math.abs(L1 - L2) + 0.01;
+            const clampedDist = Math.max(minReach, Math.min(maxReach, dist));
+
+            // Law of cosines for elbow angle
+            let cosElbow = (L1 * L1 + L2 * L2 - clampedDist * clampedDist) / (2 * L1 * L2);
+            cosElbow = Math.max(-1, Math.min(1, cosElbow));
+            const elbowAngle = Math.acos(cosElbow); // 0 = straight, PI = fully bent
+
+            // Shoulder angle
+            const beta = Math.atan2(y, x);
+            let cosAlpha = (L1 * L1 + clampedDist * clampedDist - L2 * L2) / (2 * L1 * clampedDist);
+            cosAlpha = Math.max(-1, Math.min(1, cosAlpha));
+            const alpha = Math.acos(cosAlpha);
+            const shoulderAngle = beta + alpha;
+
+            // Convert to degrees
+            // shoulder_lift: 0 = horizontal, positive = up
+            // elbow_flex: 0 = straight, negative = bent
+            const shoulderLiftDeg = THREE.MathUtils.radToDeg(shoulderAngle) - 90;
+            const elbowFlexDeg = -(180 - THREE.MathUtils.radToDeg(elbowAngle));
+
+            return [shoulderLiftDeg, elbowFlexDeg];
+        }
+
+        // =============================================
+        // DRIVE CONTROLLER (Left Hand)
         // =============================================
         AFRAME.registerComponent('robot-drive-controller', {
             init: function () {
                 this.lastUpdate = 0;
-                this.lastDirection = null;
+                this.lastMovement = null;
             },
-            tick: function (time, timeDelta) {
+            tick: function () {
                 if (!this.el.components['oculus-touch-controls']) return;
                 const controller = this.el.components['oculus-touch-controls'].controller;
                 if (!controller || !controller.gamepad) return;
@@ -71,15 +112,13 @@
                 const gp = controller.gamepad;
                 if (!gp.axes || gp.axes.length < 4) return;
 
-                // Quest thumbstick: axes[2] = X, axes[3] = Y
                 const x = gp.axes[2] || 0;
                 const y = gp.axes[3] || 0;
 
                 const now = Date.now();
                 if (now - this.lastUpdate > UPDATE_INTERVAL) {
-                    const DEADZONE = 0.25;
+                    const DEADZONE = 0.3;
 
-                    // Build movement object (backend expects boolean flags)
                     const movement = {
                         forward: y < -DEADZONE,
                         backward: y > DEADZONE,
@@ -89,15 +128,14 @@
                         slide_right: false
                     };
 
-                    // Only send if something changed
-                    const currentDir = JSON.stringify(movement);
-                    if (currentDir !== this.lastDirection) {
+                    const key = JSON.stringify(movement);
+                    if (key !== this.lastMovement) {
                         fetch('/move', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: currentDir
+                            body: key
                         }).catch(e => console.error('Move error:', e));
-                        this.lastDirection = currentDir;
+                        this.lastMovement = key;
                     }
 
                     this.lastUpdate = now;
@@ -106,18 +144,34 @@
         });
 
         // =============================================
-        // 2. ARM CONTROLLER (Right Hand)
+        // ARM CONTROLLER (Right Hand) - DELTA CONTROL
         // =============================================
         AFRAME.registerComponent('robot-arm-controller', {
             init: function () {
                 this.lastUpdate = 0;
-                this.gripperState = false;
                 this.lastGripperCheck = 0;
+                this.gripperClosed = false;
 
-                // Reference pose (captured when entering VR or first frame)
-                this.referenceY = null;
+                // Delta control state - track previous frame
+                this.prevPos = null;
+                this.prevRot = null;
+
+                // Current robot arm state (in degrees)
+                this.armState = {
+                    shoulder_pan: 0,
+                    shoulder_lift: 0,
+                    elbow_flex: 0,
+                    wrist_flex: 0,
+                    wrist_roll: 0
+                };
+
+                // Virtual "hand" position for IK (in arm workspace, meters)
+                this.handX = 0.15; // Forward distance
+                this.handY = 0.10; // Height above shoulder
+                this.pitch = 0;    // Wrist pitch offset
             },
-            tick: function (time, timeDelta) {
+
+            tick: function () {
                 const now = Date.now();
 
                 // Get world position and rotation
@@ -126,96 +180,118 @@
 
                 const worldQuat = new THREE.Quaternion();
                 this.el.object3D.getWorldQuaternion(worldQuat);
-
-                // Convert quaternion to euler
                 const euler = new THREE.Euler().setFromQuaternion(worldQuat, 'YXZ');
 
-                // --- GRIP BUTTON (Button index 2 is squeeze/grip on Quest) ---
-                let gripPressed = false;
+                // --- TRIGGER BUTTON FOR GRIPPER ---
+                let triggerValue = 0;
                 if (this.el.components['oculus-touch-controls']) {
                     const controller = this.el.components['oculus-touch-controls'].controller;
                     if (controller && controller.gamepad && controller.gamepad.buttons) {
-                        // Try multiple button indices - Quest grip is usually 1 or 2
-                        gripPressed = controller.gamepad.buttons[1]?.pressed ||
-                            controller.gamepad.buttons[2]?.pressed || false;
+                        // Button 0 is trigger on Quest
+                        triggerValue = controller.gamepad.buttons[0]?.value || 0;
                     }
                 }
 
-                // Toggle gripper on grip press
-                if (gripPressed !== this.gripperState && (now - this.lastGripperCheck > 300)) {
-                    this.gripperState = gripPressed;
-                    if (gripPressed) {
-                        // Only send on press, not release
-                        fetch('/gripper', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ closed: true })
-                        }).catch(e => console.error('Gripper error:', e));
-                    } else {
-                        fetch('/gripper', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ closed: false })
-                        }).catch(e => console.error('Gripper error:', e));
-                    }
+                // Gripper: close when trigger > 0.5
+                const shouldClose = triggerValue > 0.5;
+                if (shouldClose !== this.gripperClosed && (now - this.lastGripperCheck > 200)) {
+                    this.gripperClosed = shouldClose;
+                    fetch('/gripper', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ closed: shouldClose })
+                    }).catch(e => console.error('Gripper error:', e));
                     this.lastGripperCheck = now;
                 }
 
-                // --- ARM KINEMATICS ---
+                // --- DELTA-BASED ARM CONTROL ---
                 if (now - this.lastUpdate > UPDATE_INTERVAL) {
 
-                    // Capture reference height on first frame
-                    if (this.referenceY === null) {
-                        this.referenceY = worldPos.y;
+                    // Initialize previous position on first frame
+                    if (this.prevPos === null) {
+                        this.prevPos = worldPos.clone();
+                        this.prevRot = euler.clone();
+                        this.lastUpdate = now;
+                        return;
                     }
 
-                    // Shoulder anchor (approximate right shoulder position)
-                    const shoulderAnchor = { x: 0.2, y: 1.2, z: 0 };
+                    // Calculate delta from previous frame
+                    const deltaX = worldPos.x - this.prevPos.x;
+                    const deltaY = worldPos.y - this.prevPos.y;
+                    const deltaZ = worldPos.z - this.prevPos.z;
 
-                    const dx = worldPos.x - shoulderAnchor.x;
-                    const dy = worldPos.y - shoulderAnchor.y;
-                    const dz = worldPos.z - shoulderAnchor.z;
+                    const deltaRoll = euler.z - this.prevRot.z;
+                    const deltaPitch = euler.x - this.prevRot.x;
 
-                    // Distance from shoulder (for elbow calculation)
-                    const armLength = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                    // Update previous values
+                    this.prevPos.copy(worldPos);
+                    this.prevRot.copy(euler);
 
-                    // --- SHOULDER PAN (Left/Right) ---
-                    // X positive = right, X negative = left
-                    // Robot: positive = right rotation
-                    // NOT inverted: dx * 150
-                    let s_pan = Math.max(-90, Math.min(90, dx * 150));
+                    // --- APPLY DELTAS ---
 
-                    // --- SHOULDER LIFT (Up/Down) ---
-                    // Y positive = up
-                    // Robot: positive = up
-                    // NOT inverted: dy * 120
-                    let s_lift = Math.max(-60, Math.min(60, dy * 120));
+                    // Sensitivity scaling factors
+                    const POS_SCALE = 0.5;    // Position delta scaling
+                    const PAN_SCALE = 150;    // X movement -> shoulder pan (degrees per meter)
+                    const ROLL_SCALE = 0.3;   // Roll sensitivity
+                    const PITCH_SCALE = 0.3;  // Pitch sensitivity
 
-                    // --- ELBOW FLEX (Reach/Bend) ---
-                    // Use arm length: short distance = bent, long = straight
-                    // Typical arm reach: 0.3m (close) to 0.7m (extended)
-                    // Robot elbow: 0 = straight, negative = bent
-                    // Remap: 0.3 -> -60, 0.7 -> 0
-                    let e_flex = ((armLength - 0.3) / 0.4) * 60 - 60;
-                    e_flex = Math.max(-90, Math.min(0, e_flex));
+                    // Delta limits (prevent sudden jumps)
+                    const MAX_POS_DELTA = 0.02;  // Max 2cm per frame
+                    const MAX_ANGLE_DELTA = 5;  // Max 5 degrees per frame
 
-                    // --- WRIST ROLL (Controller Z-axis rotation) ---
-                    // Reduced sensitivity: divide by 2
-                    let w_roll = THREE.MathUtils.radToDeg(euler.z) * 0.5;
-                    w_roll = Math.max(-150, Math.min(150, w_roll));
+                    // Clamp deltas
+                    const clampedDX = Math.max(-MAX_POS_DELTA, Math.min(MAX_POS_DELTA, deltaX));
+                    const clampedDY = Math.max(-MAX_POS_DELTA, Math.min(MAX_POS_DELTA, deltaY));
+                    const clampedDZ = Math.max(-MAX_POS_DELTA, Math.min(MAX_POS_DELTA, deltaZ));
 
-                    // --- WRIST FLEX (Controller X-axis rotation / pitch) ---
-                    // Reduced sensitivity: divide by 2
-                    let w_flex = THREE.MathUtils.radToDeg(euler.x) * 0.5;
-                    w_flex = Math.max(-90, Math.min(90, w_flex));
+                    // Update virtual hand position for IK
+                    // VR X (left/right) -> shoulder_pan
+                    // VR Y (up/down) -> IK Y (height)
+                    // VR Z (forward/back) -> IK X (reach)
 
+                    this.handX += -clampedDZ * POS_SCALE; // Forward reach
+                    this.handY += clampedDY * POS_SCALE;  // Height (NOT inverted now)
+
+                    // Clamp hand position to reachable workspace
+                    this.handX = Math.max(0.05, Math.min(0.22, this.handX));
+                    this.handY = Math.max(-0.10, Math.min(0.15, this.handY));
+
+                    // Shoulder pan from X movement (delta-based)
+                    const panDelta = clampedDX * PAN_SCALE;
+                    this.armState.shoulder_pan += panDelta;
+                    this.armState.shoulder_pan = Math.max(-90, Math.min(90, this.armState.shoulder_pan));
+
+                    // Compute IK for shoulder_lift and elbow_flex
+                    const [ikShoulder, ikElbow] = inverseKinematics(this.handX, this.handY);
+
+                    // Smooth transition (alpha blending)
+                    const SMOOTH = 0.15;
+                    this.armState.shoulder_lift = (1 - SMOOTH) * this.armState.shoulder_lift + SMOOTH * ikShoulder;
+                    this.armState.elbow_flex = (1 - SMOOTH) * this.armState.elbow_flex + SMOOTH * ikElbow;
+
+                    // Wrist roll from controller roll
+                    const rollDelta = THREE.MathUtils.radToDeg(deltaRoll) * ROLL_SCALE;
+                    this.armState.wrist_roll += Math.max(-MAX_ANGLE_DELTA, Math.min(MAX_ANGLE_DELTA, rollDelta));
+                    this.armState.wrist_roll = Math.max(-150, Math.min(150, this.armState.wrist_roll));
+
+                    // Wrist pitch from controller pitch
+                    const pitchDelta = THREE.MathUtils.radToDeg(deltaPitch) * PITCH_SCALE;
+                    this.pitch += Math.max(-MAX_ANGLE_DELTA, Math.min(MAX_ANGLE_DELTA, pitchDelta));
+                    this.pitch = Math.max(-90, Math.min(90, this.pitch));
+
+                    // Compensate wrist_flex to keep end effector level
+                    // wrist_flex = -shoulder_lift - elbow_flex + pitch
+                    this.armState.wrist_flex = -this.armState.shoulder_lift - this.armState.elbow_flex + this.pitch;
+                    this.armState.wrist_flex = Math.max(-90, Math.min(90, this.armState.wrist_flex));
+
+                    // Send to robot
                     const payload = {
                         positions: {
-                            shoulder_pan: s_pan,
-                            shoulder_lift: s_lift,
-                            elbow_flex: e_flex,
-                            wrist_roll: w_roll,
-                            wrist_flex: w_flex
+                            shoulder_pan: this.armState.shoulder_pan,
+                            shoulder_lift: this.armState.shoulder_lift,
+                            elbow_flex: this.armState.elbow_flex,
+                            wrist_roll: this.armState.wrist_roll,
+                            wrist_flex: this.armState.wrist_flex
                         }
                     };
 
@@ -231,7 +307,7 @@
         });
 
         // =============================================
-        // 3. TEXTURE AUTO-REFRESH (for MJPEG stream)
+        // TEXTURE AUTO-REFRESH
         // =============================================
         AFRAME.registerComponent('auto-refresh-texture', {
             tick: function () {
