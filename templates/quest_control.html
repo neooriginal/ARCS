@@ -47,58 +47,41 @@
     </a-scene>
 
     <script>
-        // =============================================
-        // CONSTANTS - From example code
-        // =============================================
-        const UPDATE_INTERVAL = 50; // ~20Hz
-
-        // IK parameters (approximate SO101 arm)
-        const ARM_L1 = 0.10; // Link 1 length
-        const ARM_L2 = 0.12; // Link 2 length
-
-        // Scaling from example: delta * 220/70 * 0.01
-        const X_SCALE = 2.2;   // For shoulder_pan
-        const Y_SCALE = 0.7;   // For IK Y (height)
-        const Z_SCALE = 0.7;   // For IK X (reach)
-
-        // Angle scaling
-        const ANGLE_SCALE = 4.0;
-
-        // Limits
-        const DELTA_LIMIT = 0.01;  // Max positional delta per frame
-        const ANGLE_LIMIT = 8.0;   // Max angle delta per frame
-
-        // Smoothing
-        const SMOOTH_ALPHA = 0.1;
+        const UPDATE_INTERVAL = 50;
 
         // =============================================
-        // 2-LINK INVERSE KINEMATICS
+        // SO101 KINEMATICS - From the example code
         // =============================================
-        function inverseKinematics(x, y) {
-            const dist = Math.sqrt(x * x + y * y);
-            const maxReach = ARM_L1 + ARM_L2 - 0.005;
-            const minReach = Math.abs(ARM_L1 - ARM_L2) + 0.005;
-            const d = Math.max(minReach, Math.min(maxReach, dist));
+        // Link lengths in meters (approximate for SO101)
+        const L1 = 0.105;  // Upper arm
+        const L2 = 0.088;  // Forearm
+        const L3 = 0.170;  // Combined wrist+gripper
 
-            // Law of cosines for elbow
-            let cosElbow = (ARM_L1 * ARM_L1 + ARM_L2 * ARM_L2 - d * d) / (2 * ARM_L1 * ARM_L2);
+        function inverseKinematics2Link(x, y) {
+            // Simple 2-link IK for shoulder_lift and elbow_flex
+            // x = forward reach, y = height above shoulder pivot
+            const reach = Math.sqrt(x * x + y * y);
+            const maxReach = L1 + L2 - 0.01;
+            const minReach = 0.05;
+            const dist = Math.max(minReach, Math.min(maxReach, reach));
+
+            // Elbow angle via law of cosines
+            let cosElbow = (L1 * L1 + L2 * L2 - dist * dist) / (2 * L1 * L2);
             cosElbow = Math.max(-1, Math.min(1, cosElbow));
-            const elbowRad = Math.acos(cosElbow);
+            const elbowAngle = Math.acos(cosElbow);  // 0 = straight, PI = fully bent
 
             // Shoulder angle
-            const beta = Math.atan2(y, x);
-            let cosAlpha = (ARM_L1 * ARM_L1 + d * d - ARM_L2 * ARM_L2) / (2 * ARM_L1 * d);
+            const gamma = Math.atan2(y, x);
+            let cosAlpha = (L1 * L1 + dist * dist - L2 * L2) / (2 * L1 * dist);
             cosAlpha = Math.max(-1, Math.min(1, cosAlpha));
-            const alphaRad = Math.acos(cosAlpha);
-            const shoulderRad = beta - alphaRad;  // CHANGED: was beta + alphaRad
+            const alpha = Math.acos(cosAlpha);
 
-            // Convert to degrees
-            // When arm is horizontal (x>0, y=0): shoulderRad = 0 -> shoulderLift should be 0
-            const shoulderLift = THREE.MathUtils.radToDeg(shoulderRad);
-            // Elbow: 0 = straight, negative = bent inward
-            const elbowFlex = THREE.MathUtils.radToDeg(elbowRad) - 180;
+            // shoulder_lift: 0 = horizontal forward
+            const shoulderLift = THREE.MathUtils.radToDeg(gamma - alpha);
+            // elbow_flex: 0 = straight, negative = bent
+            const elbowFlex = THREE.MathUtils.radToDeg(elbowAngle - Math.PI);
 
-            return [shoulderLift, elbowFlex];
+            return { shoulderLift, elbowFlex };
         }
 
         // =============================================
@@ -146,55 +129,34 @@
         });
 
         // =============================================
-        // ARM CONTROLLER (Right Hand) - Based on example
+        // ARM CONTROLLER - ABSOLUTE POSITION MAPPING
         // =============================================
         AFRAME.registerComponent('robot-arm', {
             init: function () {
                 this.lastUpdate = 0;
-
-                // Previous VR position for delta calculation
-                this.prevVrPos = null;
-                this.prevWristFlex = null;
-                this.prevWristRoll = null;
-
-                // Current robot arm state (in IK space)
-                this.currentX = 0.1629;  // From example
-                this.currentY = 0.1131;  // From example
-                this.pitch = 0;
-
-                // Target joint positions (degrees)
-                this.targets = {
-                    shoulder_pan: 0,
-                    shoulder_lift: 0,
-                    elbow_flex: 0,
-                    wrist_flex: 0,
-                    wrist_roll: 0
-                };
-
-                // Gripper state
                 this.gripperClosed = false;
 
-                // Listen for trigger events from A-Frame
+                // Reference position (captured on first frame)
+                this.refPos = null;
+                this.refRot = null;
+
+                // Gripper via trigger events
                 this.el.addEventListener('triggerdown', () => {
-                    if (!this.gripperClosed) {
-                        this.gripperClosed = true;
-                        fetch('/gripper', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ closed: true })
-                        }).catch(() => { });
-                    }
+                    this.gripperClosed = true;
+                    fetch('/gripper', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ closed: true })
+                    }).catch(() => { });
                 });
 
                 this.el.addEventListener('triggerup', () => {
-                    if (this.gripperClosed) {
-                        this.gripperClosed = false;
-                        fetch('/gripper', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ closed: false })
-                        }).catch(() => { });
-                    }
+                    this.gripperClosed = false;
+                    fetch('/gripper', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ closed: false })
+                    }).catch(() => { });
                 });
             },
 
@@ -202,100 +164,84 @@
                 const now = Date.now();
                 if (now - this.lastUpdate < UPDATE_INTERVAL) return;
 
-                // Get world position
+                // Get world position and rotation
                 const pos = new THREE.Vector3();
                 this.el.object3D.getWorldPosition(pos);
 
-                // Get rotation as euler
                 const quat = new THREE.Quaternion();
                 this.el.object3D.getWorldQuaternion(quat);
                 const euler = new THREE.Euler().setFromQuaternion(quat, 'YXZ');
 
-                const wristFlexDeg = THREE.MathUtils.radToDeg(euler.x);
-                const wristRollDeg = THREE.MathUtils.radToDeg(euler.z);
-
-                // First frame - initialize previous values
-                if (this.prevVrPos === null) {
-                    this.prevVrPos = [pos.x, pos.y, pos.z];
-                    this.prevWristFlex = wristFlexDeg;
-                    this.prevWristRoll = wristRollDeg;
+                // Capture reference on first frame
+                if (this.refPos === null) {
+                    this.refPos = pos.clone();
+                    this.refRot = euler.clone();
                     this.lastUpdate = now;
                     return;
                 }
 
-                // Calculate deltas (as in example)
-                const vrDeltaX = (pos.x - this.prevVrPos[0]) * 220;
-                const vrDeltaY = (pos.y - this.prevVrPos[1]) * 70;
-                const vrDeltaZ = (pos.z - this.prevVrPos[2]) * 70;
+                // =============================================
+                // ABSOLUTE POSITION MAPPING
+                // =============================================
+                // Calculate offset from reference position
+                const dx = pos.x - this.refPos.x;  // Left/Right
+                const dy = pos.y - this.refPos.y;  // Up/Down
+                const dz = pos.z - this.refPos.z;  // Forward/Back (negative = forward)
 
-                // Update previous
-                this.prevVrPos = [pos.x, pos.y, pos.z];
+                // Map to IK workspace
+                // Reference = arm at neutral (slightly extended forward)
+                const BASE_REACH = 0.12;  // Neutral forward reach
+                const BASE_HEIGHT = 0.05; // Neutral height
 
-                // Apply pos_scale and limit
-                let deltaX = vrDeltaX * 0.01;
-                let deltaY = vrDeltaY * 0.01;
-                let deltaZ = vrDeltaZ * 0.01;
+                // Scale factors for mapping VR movement to robot workspace
+                const REACH_SCALE = 0.5;   // How much VR Z affects reach
+                const HEIGHT_SCALE = 0.5;  // How much VR Y affects height
+                const PAN_SCALE = 90;      // Degrees per meter of X movement
+                const ROLL_SCALE = 0.7;    // Wrist roll sensitivity
+                const FLEX_SCALE = 0.7;    // Wrist flex sensitivity
 
-                deltaX = Math.max(-DELTA_LIMIT, Math.min(DELTA_LIMIT, deltaX));
-                deltaY = Math.max(-DELTA_LIMIT, Math.min(DELTA_LIMIT, deltaY));
-                deltaZ = Math.max(-DELTA_LIMIT, Math.min(DELTA_LIMIT, deltaZ));
+                // Calculate arm workspace position
+                // Forward hand movement (negative Z) = more reach
+                const ikX = BASE_REACH + (-dz * REACH_SCALE);
+                const ikY = BASE_HEIGHT + (dy * HEIGHT_SCALE);
 
-                // Update IK workspace position
-                // VR Z forward (negative) -> increase reach
-                // VR Y up -> increase height
-                this.currentX += deltaZ;  // CHANGED: was -deltaZ. Now: forward = extend
-                this.currentY += deltaY;
+                // Clamp to valid workspace
+                const clampedX = Math.max(0.05, Math.min(0.18, ikX));
+                const clampedY = Math.max(-0.08, Math.min(0.12, ikY));
 
-                // Clamp to workspace
-                this.currentX = Math.max(0.05, Math.min(0.25, this.currentX));
-                this.currentY = Math.max(-0.10, Math.min(0.20, this.currentY));
+                // Compute IK
+                const { shoulderLift, elbowFlex } = inverseKinematics2Link(clampedX, clampedY);
 
-                // Handle wrist flex with delta control
-                if (this.prevWristFlex !== null) {
-                    let deltaPitch = (wristFlexDeg - this.prevWristFlex) * ANGLE_SCALE;
-                    deltaPitch = Math.max(-ANGLE_LIMIT, Math.min(ANGLE_LIMIT, deltaPitch));
-                    this.pitch += deltaPitch;
-                    this.pitch = Math.max(-90, Math.min(90, this.pitch));
-                }
-                this.prevWristFlex = wristFlexDeg;
+                // Shoulder pan from X offset
+                const shoulderPan = dx * PAN_SCALE;
+                const clampedPan = Math.max(-90, Math.min(90, shoulderPan));
 
-                // Handle wrist roll with delta control
-                if (this.prevWristRoll !== null) {
-                    let deltaRoll = (wristRollDeg - this.prevWristRoll) * ANGLE_SCALE;
-                    deltaRoll = Math.max(-ANGLE_LIMIT, Math.min(ANGLE_LIMIT, deltaRoll));
-                    this.targets.wrist_roll += deltaRoll;
-                    this.targets.wrist_roll = Math.max(-90, Math.min(90, this.targets.wrist_roll));
-                }
-                this.prevWristRoll = wristRollDeg;
+                // Wrist rotation from controller rotation (relative to reference)
+                const wristRoll = THREE.MathUtils.radToDeg(euler.z - this.refRot.z) * ROLL_SCALE;
+                const wristPitch = THREE.MathUtils.radToDeg(euler.x - this.refRot.x) * FLEX_SCALE;
 
-                // Shoulder pan from X movement (delta control)
-                if (Math.abs(deltaX) > 0.001) {
-                    let deltaPan = deltaX * 200;
-                    deltaPan = Math.max(-ANGLE_LIMIT, Math.min(ANGLE_LIMIT, deltaPan));
-                    this.targets.shoulder_pan += deltaPan;
-                    this.targets.shoulder_pan = Math.max(-180, Math.min(180, this.targets.shoulder_pan));
-                }
+                const clampedRoll = Math.max(-150, Math.min(150, wristRoll));
 
-                // Compute IK for shoulder_lift and elbow_flex
-                try {
-                    const [ikShoulder, ikElbow] = inverseKinematics(this.currentX, this.currentY);
-
-                    // Smooth transition (from example: alpha = 0.1)
-                    this.targets.shoulder_lift = (1 - SMOOTH_ALPHA) * this.targets.shoulder_lift + SMOOTH_ALPHA * ikShoulder;
-                    this.targets.elbow_flex = (1 - SMOOTH_ALPHA) * this.targets.elbow_flex + SMOOTH_ALPHA * ikElbow;
-                } catch (e) {
-                    console.error('IK failed:', e);
-                }
-
-                // Compensate wrist_flex to maintain end-effector orientation (from example)
-                this.targets.wrist_flex = -this.targets.shoulder_lift - this.targets.elbow_flex + this.pitch;
-                this.targets.wrist_flex = Math.max(-90, Math.min(90, this.targets.wrist_flex));
+                // Wrist flex compensates for arm angle to keep gripper level
+                // Plus user's pitch input
+                const wristFlex = -shoulderLift - elbowFlex + wristPitch;
+                const clampedFlex = Math.max(-90, Math.min(90, wristFlex));
 
                 // Send to robot
+                const payload = {
+                    positions: {
+                        shoulder_pan: clampedPan,
+                        shoulder_lift: shoulderLift,
+                        elbow_flex: elbowFlex,
+                        wrist_roll: clampedRoll,
+                        wrist_flex: clampedFlex
+                    }
+                };
+
                 fetch('/arm', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ positions: this.targets })
+                    body: JSON.stringify(payload)
                 }).catch(() => { });
 
                 this.lastUpdate = now;
