@@ -5,98 +5,181 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RoboCrew VR Control</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- A-Frame Library -->
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1a1a1a;
-            color: #eee;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            overflow: hidden;
+            background-color: #111;
+            color: #ccc;
+            font-family: sans-serif;
         }
 
-        h1 {
-            margin-bottom: 2rem;
-            color: #4CAF50;
-        }
-
-        #vr-button {
-            padding: 1rem 2rem;
-            font-size: 1.5rem;
-            background-color: #2196F3;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-
-        #vr-button:hover {
-            background-color: #1976D2;
-        }
-
-        #vr-button:disabled {
-            background-color: #555;
-            cursor: not-allowed;
-        }
-
-        #status {
-            margin-top: 2rem;
-            font-size: 1.2rem;
-        }
-
-        .instructions {
-            margin-top: 3rem;
-            max-width: 600px;
-            text-align: left;
-            background: #2d2d2d;
-            padding: 2rem;
-            border-radius: 10px;
-        }
-
-        .mapping {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-            margin-top: 1rem;
+        #overlay {
+            position: absolute;
+            z-index: 1000;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
         }
     </style>
 </head>
 
 <body>
-    <h1>🤖 RoboCrew VR Control</h1>
-
-    <button id="vr-button" disabled>XR Not Found</button>
-
-    <div id="status">Checking for WebXR...</div>
-
-    <div class="instructions">
-        <h3>Controls</h3>
-        <div class="mapping">
-            <div>
-                <strong>Left Controller</strong><br>
-                🕹️ Joystick: Drive Robot<br>
-            </div>
-            <div>
-                <strong>Right Controller</strong><br>
-                🖐️ Motion: Control Arm (Puppeteering)<br>
-                👆 Trigger: Gripper<br>
-                🕹️ Joystick: Head Control
-            </div>
-        </div>
-        <p style="margin-top: 1rem; font-size: 0.9em; color: #aaa;">
-            Note: Ensure you are connected via HTTPS to enable WebXR.
-        </p>
+    <div id="overlay">
+        <h2>🤖 RoboCrew VR</h2>
+        <p>Enter VR to see the camera feed and control the robot.</p>
+        <p><strong>Left Stick:</strong> Drive | <strong>Right Hand:</strong> Arm | <strong>Right Trigger:</strong>
+            Gripper</p>
     </div>
 
-    <!-- WebXR Polyfill (optional, but good for compatibility) -->
-    <script src="https://cdn.jsdelivr.net/npm/webxr-polyfill@latest/build/webxr-polyfill.js"></script>
-    <script src="{{ url_for('static', filename='js/webxr_robot.js') }}"></script>
+    <a-scene background="color: #111">
+        <a-assets>
+            <img id="camera-feed" src="/video_feed" crossorigin="anonymous">
+        </a-assets>
+
+        <!-- Video Screen (Curved for immersion) -->
+        <a-curvedimage src="#camera-feed" height="3.0" radius="2.5" theta-length="90" position="0 1.6 -2.5"
+            rotation="0 135 0" scale="1.5 1.5 1.5">
+        </a-curvedimage>
+
+        <!-- Camera Rig -->
+        <a-entity id="rig" position="0 0 0">
+            <a-camera position="0 1.6 0" look-controls="pointerLockEnabled: false"></a-camera>
+
+            <!-- Controllers -->
+            <!-- Left: Drive -->
+            <a-entity id="leftHand" oculus-touch-controls="hand: left" robot-drive-controller></a-entity>
+            <!-- Right: Arm -->
+            <a-entity id="rightHand" oculus-touch-controls="hand: right" robot-arm-controller></a-entity>
+        </a-entity>
+    </a-scene>
+
+    <script>
+        // --- Robot Control Logic (A-Frame Components) ---
+
+        // Throttle config
+        const UPDATE_INTERVAL = 100;
+
+        // 1. Drive Controller (Left Hand)
+        AFRAME.registerComponent('robot-drive-controller', {
+            init: function () {
+                this.lastUpdate = 0;
+            },
+            tick: function (time, timeDelta) {
+                // Get Gamepad
+                if (!this.el.components['oculus-touch-controls']) return;
+                const controller = this.el.components['oculus-touch-controls'].controller;
+                if (!controller || !controller.gamepad) return;
+
+                const gp = controller.gamepad;
+                if (!gp.axes) return;
+
+                // Quest: axes[2] = X, axes[3] = Y
+                const x = gp.axes[2] || 0;
+                const y = gp.axes[3] || 0;
+
+                const now = Date.now();
+                if (now - this.lastUpdate > UPDATE_INTERVAL) {
+                    let direction = 'stop';
+                    const DEADZONE = 0.2;
+
+                    if (y < -DEADZONE) direction = 'forward';
+                    else if (y > DEADZONE) direction = 'backward';
+                    else if (x < -DEADZONE) direction = 'left';
+                    else if (x > DEADZONE) direction = 'right';
+
+                    fetch('/move', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ direction: direction })
+                    }).catch(e => { });
+
+                    this.lastUpdate = now;
+                }
+            }
+        });
+
+        // 2. Arm Controller (Right Hand)
+        AFRAME.registerComponent('robot-arm-controller', {
+            init: function () {
+                this.lastUpdate = 0;
+                this.gripperState = false;
+                this.lastGripperCheck = 0;
+            },
+            tick: function (time, timeDelta) {
+                const now = Date.now();
+
+                // Get Pose
+                const position = this.el.object3D.position;
+
+                // Get Gamepad (for Trigger)
+                let triggerPressed = false;
+                if (this.el.components['oculus-touch-controls']) {
+                    const controller = this.el.components['oculus-touch-controls'].controller;
+                    if (controller && controller.gamepad && controller.gamepad.buttons) {
+                        triggerPressed = controller.gamepad.buttons[0]?.pressed || false;
+                    }
+                }
+
+                // Check Gripper
+                if (triggerPressed !== this.gripperState && (now - this.lastGripperCheck > 500)) {
+                    this.gripperState = triggerPressed;
+                    fetch('/gripper', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ closed: triggerPressed })
+                    }).catch(e => { });
+                    this.lastGripperCheck = now;
+                }
+
+                // Update Arm Position
+                if (now - this.lastUpdate > UPDATE_INTERVAL) {
+                    // Mapping A-Frame World Coords to Robot
+                    // User is at 0,0,0 usually (local-floor)
+                    // Hand Y: ~1.0m to 1.5m
+
+                    const baseHeight = 1.1;
+                    const dy = position.y - baseHeight;
+
+                    // Mappings
+                    let s_lift = Math.max(-60, Math.min(60, dy * 100));
+                    let s_pan = Math.max(-90, Math.min(90, position.x * -150));
+
+                    const payload = {
+                        positions: {
+                            shoulder_lift: s_lift,
+                            shoulder_pan: s_pan
+                        }
+                    };
+
+                    fetch('/arm', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    }).catch(e => { });
+
+                    this.lastUpdate = now;
+                }
+            }
+        });
+
+        // 3. Texture Auto-Update Fix
+        // Sometimes MJPEG on a texture needs manual refresh in WebGL
+        AFRAME.registerComponent('auto-refresh-texture', {
+            tick: function () {
+                const mesh = this.el.getObject3D('mesh');
+                if (mesh && mesh.material && mesh.material.map) {
+                    mesh.material.map.needsUpdate = true;
+                }
+            }
+        });
+
+        // Attach logic to screen
+        document.querySelector('a-curvedimage').setAttribute('auto-refresh-texture', '');
+
+    </script>
 </body>
 
 </html>
