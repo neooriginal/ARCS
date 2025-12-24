@@ -50,9 +50,9 @@
     </div>
     <div id="debug">Debug: Waiting for VR...</div>
 
-    <a-scene background="color: transparent" renderer="alpha: true"
-        webxr="optionalFeatures: local-floor, hand-tracking">
-        <a-assets>
+    <a-scene background="color: transparent" renderer="alpha: true; colorManagement: true"
+        webxr="requiredFeatures: local-floor; optionalFeatures: hand-tracking, layers; referenceSpaceType: local-floor"
+        vr-mode-ui="enterVRButton: #enterARButton"> <a-assets>
             <img id="camera-feed" src="/video_feed" crossorigin="anonymous">
         </a-assets>
 
