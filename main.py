@@ -178,23 +178,13 @@ def main():
         def open_display():
             import time
             time.sleep(2)  # Wait for server to start
-            
-            # Check for SSL
-            use_ssl = os.getenv('USE_SSL', 'false').lower() == 'true'
-            protocol = 'https' if use_ssl else 'http'
-            display_url = f'{protocol}://localhost:{WEB_PORT}/display'
-            
+            display_url = f'http://localhost:{WEB_PORT}/display'
             env = os.environ.copy()
             env['DISPLAY'] = ':0'  # Target the main display
             try:
                 # Try chromium-browser first (common on Raspberry Pi)
-                # Add flags to ignore SSL errors for localhost
-                cmd = ['chromium-browser', '--kiosk', '--noerrdialogs', '--disable-infobars', display_url]
-                if use_ssl:
-                    cmd.append('--ignore-certificate-errors')
-                
                 subprocess.Popen(
-                    cmd,
+                    ['chromium-browser', '--kiosk', '--noerrdialogs', '--disable-infobars', display_url],
                     env=env,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL
@@ -210,16 +200,8 @@ def main():
                     print("⚠ Could not auto-open display (no browser found)")
         threading.Thread(target=open_display, daemon=True).start()
     
-    # WebXR requires HTTPS (Secure Context)
-    # Use 'adhoc' SSL context if USE_SSL is true
-    ssl_context = 'adhoc' if os.getenv('USE_SSL', 'false').lower() == 'true' else None
-    
     try:
-        if ssl_context:
-            print(f"🔒 Running with {ssl_context} SSL context for WebXR support")
-            app.run(host='0.0.0.0', port=WEB_PORT, threaded=True, use_reloader=False, debug=False, ssl_context=ssl_context)
-        else:
-            app.run(host='0.0.0.0', port=WEB_PORT, threaded=True, use_reloader=False, debug=False)
+        app.run(host='0.0.0.0', port=WEB_PORT, threaded=True, use_reloader=False, debug=False)
     except KeyboardInterrupt:
         cleanup()
 

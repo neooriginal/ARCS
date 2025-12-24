@@ -36,6 +36,3 @@ langdetect>=1.0.9
 # QR Code
 qrcode[pil]
 gTTS>=2.5.4
-
-# WebXR / SSL Support
-pyopenssl>=23.0.0
