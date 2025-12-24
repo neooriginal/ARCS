@@ -19,10 +19,6 @@ bp = Blueprint('robot', __name__)
 def index():
     return render_template('index.html')
 
-@bp.route('/quest')
-def quest_control():
-    return render_template('quest_control.html')
-
 @bp.route('/status')
 def get_status():
     return jsonify({
