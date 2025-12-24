@@ -2,11 +2,13 @@
 /**
  * RoboCrew WebXR Control Logic
  * Handles VR session, controller tracking, and maps inputs to robot API.
+ * Updated to include WebGL layer for proper rendering loop.
  */
 
 let xrSession = null;
 let xrReferenceSpace = null;
 let animationFrameId = null;
+let gl = null; // WebGL Context
 
 // Throttle configuration
 const UPDATE_INTERVAL_MS = 100; // Send updates every 100ms
@@ -16,15 +18,6 @@ let lastHeadUpdate = 0;
 
 // State tracking
 const state = {
-    move: { x: 0, y: 0, rot: 0 }, // Robot base: x (strafe), y (fwd/back), rot (turn)
-    head: { yaw: 0, pitch: 0 },
-    arm: {
-        shoulder_pan: 0,
-        shoulder_lift: 0,
-        elbow_flex: 0,
-        wrist_flex: 0,
-        wrist_roll: 0
-    },
     gripper: false
 };
 
@@ -34,6 +27,7 @@ const statusDiv = document.getElementById('status');
 // Helper to update status
 function setStatus(msg) {
     statusDiv.textContent = msg;
+    console.log("[WebXR Status] " + msg);
 }
 
 // 1. Check for WebXR support
@@ -48,16 +42,26 @@ if (navigator.xr) {
             } else {
                 setStatus("WebXR not supported on this device/browser.");
             }
-        });
+        })
+        .catch(err => setStatus("Error checking WebXR support: " + err));
 } else {
-    setStatus("WebXR API not available (Requires HTTPS).");
+    setStatus("WebXR API not available (Requires HTTPS or Flag).");
 }
 
 function onButtonClicked() {
     if (!xrSession) {
+        setStatus("Requesting Session...");
+        // Initialize WebGL
+        const canvas = document.createElement('canvas');
+        gl = canvas.getContext('webgl', { xrCompatible: true });
+
         navigator.xr.requestSession('immersive-vr', {
             optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking']
-        }).then(onSessionStarted);
+        }).then(onSessionStarted)
+            .catch(err => {
+                setStatus("Session Request Failed: " + err);
+                gl = null;
+            });
     } else {
         xrSession.end();
     }
@@ -66,26 +70,56 @@ function onButtonClicked() {
 function onSessionStarted(session) {
     xrSession = session;
     vrButton.textContent = "Exit VR";
-    setStatus("VR Session Active");
+    setStatus("VR Session Active - Initializing Layer...");
 
     session.addEventListener('end', onSessionEnded);
 
+    // Create a WebGL layer (Required for immersive-vr)
+    try {
+        const glLayer = new XRWebGLLayer(session, gl);
+        session.updateRenderState({ baseLayer: glLayer });
+    } catch (e) {
+        setStatus("Failed to create XRWebGLLayer: " + e);
+        return;
+    }
+
     // Get reference space
-    session.requestReferenceSpace('local').then((refSpace) => {
-        xrReferenceSpace = refSpace;
-        animationFrameId = session.requestAnimationFrame(onXRFrame);
-    });
+    // Prefer 'local-floor' for standing/room scale, fallback to 'local'
+    session.requestReferenceSpace('local-floor')
+        .then((refSpace) => {
+            xrReferenceSpace = refSpace;
+            setStatus("Reference Space (local-floor) acquired. Starting Loop.");
+            animationFrameId = session.requestAnimationFrame(onXRFrame);
+        })
+        .catch(() => {
+            setStatus("local-floor failed, trying local...");
+            session.requestReferenceSpace('local')
+                .then((refSpace) => {
+                    xrReferenceSpace = refSpace;
+                    setStatus("Reference Space (local) acquired. Starting Loop.");
+                    animationFrameId = session.requestAnimationFrame(onXRFrame);
+                })
+                .catch(err => setStatus("Failed to get reference space: " + err));
+        });
 }
 
 function onSessionEnded() {
     xrSession = null;
     vrButton.textContent = "Enter VR";
     setStatus("VR Session Ended");
+    gl = null;
 }
 
 function onXRFrame(time, frame) {
     const session = frame.session;
     animationFrameId = session.requestAnimationFrame(onXRFrame);
+
+    // Clear the framebuffer (even if we don't draw 3D objects, we must clear)
+    // This tells the compositor we are active.
+    const glLayer = session.renderState.baseLayer;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, glLayer.framebuffer);
+    gl.clearColor(0.1, 0.1, 0.1, 1.0); // Dark Gray background
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     // Get Input Sources (Controllers)
     for (const source of session.inputSources) {
@@ -106,58 +140,24 @@ function handleLeftController(source) {
     if (!gp.axes) return;
 
     // Standard mapping: axes[2] = X (Left/Right), axes[3] = Y (Up/Down)
-    // Quest thumbstick
     const x = gp.axes[2] || 0;
     const y = gp.axes[3] || 0;
 
     // Deadzone
-    const DEADZONE = 0.1;
+    const DEADZONE = 0.2; // Slightly larger deadzone
     const finalX = Math.abs(x) > DEADZONE ? x : 0;
     const finalY = Math.abs(y) > DEADZONE ? y : 0;
 
-    // Update Movement
-    // Drive Scheme:
-    // Stick Y -> Forward/Backward
-    // Stick X -> Turn Left/Right (Standard Arcade)
-    // OR we can do Holonomic:
-    // Stick X -> Slide Left/Right?
-    // Let's implement Hybrid:
-    // If we have a slide button? No, let's stick to simple first.
-    // X -> Turn, Y -> Forward.
-
-    // Actually, user asked for "Integration cleanly".
-    // Let's try to infer intent or just map X to Turn for now.
-    // If the robot is holonomic, maybe X should slice?
-    // Let's stick to standard arcade drive for base.
-
-    // Wait, the prompt says "copy movement... remote control robot... movement via joysticks".
-
     const now = Date.now();
     if (now - lastMoveUpdate > UPDATE_INTERVAL_MS) {
-        // Send to API
-        // Mapping: -Y is Forward (WebXR Y is Down-Positive usually? No, Up is negative on stick usually).
-        // Gamepad API: Forward is -1 (usually).
-
-        // Let's assume:
-        // direction: "forward" if y < -0.5
-        // direction: "backward" if y > 0.5
-        // direction: "left" if x < -0.5
-        // direction: "right" if x > 0.5
-
-        // We can send raw values to /wheel/speed or better yet, update /move logic to accept joysticks.
-        // But current /move takes 'direction'.
-        // Let's implement a rudimentary discrete mapper for now, or update /move to support continuous?
-        // Updating /move is too risky for this task. Let's use discrete 'direction'.
-
         let direction = 'stop';
-        if (finalY < -0.3) direction = 'forward';
-        else if (finalY > 0.3) direction = 'backward';
-        else if (finalX < -0.3) direction = 'left';
-        else if (finalX > 0.3) direction = 'right';
+        if (finalY < -0.4) direction = 'forward';
+        else if (finalY > 0.4) direction = 'backward';
+        else if (finalX < -0.4) direction = 'left';
+        else if (finalX > 0.4) direction = 'right';
 
-        // Only send if changed or keep alive?
-        // The current remote sends onPress.
-        // We will send only if direction is valid.
+        // Send even if stop, to ensure we don't get stuck moving
+        // But only send if it changes? No, heartbeat is good.
 
         fetch('/move', {
             method: 'POST',
@@ -171,49 +171,34 @@ function handleLeftController(source) {
 
 
 function handleRightController(source, frame) {
-    // 1. Inputs (Buttons/Stick)
     const gp = source.gamepad;
 
-    // Gripper (Trigger Button - usually button 0)
-    const triggerPressed = gp.buttons[0]?.pressed || false; // Trigger
+    // Gripper (Trigger)
+    const triggerPressed = gp.buttons[0]?.pressed || false;
 
     // Head Control (Stick)
     const stickX = gp.axes[2] || 0;
     const stickY = gp.axes[3] || 0;
 
-    // 2. Pose (Arm Puppeteering)
+    // Pose (Arm)
     const pose = frame.getPose(source.gripSpace, xrReferenceSpace);
 
     const now = Date.now();
 
     // Check Gripper
-    if (triggerPressed !== state.gripper && (now - lastArmUpdate > 500)) { // Debounce gripper
+    if (triggerPressed !== state.gripper && (now - lastArmUpdate > 500)) {
         state.gripper = triggerPressed;
         fetch('/gripper', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ closed: triggerPressed })
         }).catch(e => console.error(e));
-        lastArmUpdate = now; // Shared timer? No, separate
+        lastArmUpdate = now;
     }
 
     // Update Head
     if ((Math.abs(stickX) > 0.1 || Math.abs(stickY) > 0.1) && (now - lastHeadUpdate > 200)) {
-        // Increment current head pos?
-        // We need to fetch current state or just send increments?
-        // Existing API /head takes absolute yaw/pitch.
-        // We need to track local state or just guess.
-        // Better: assume we start at 0? No.
-        // Let's just map stick to range? No, user wants to look around.
-        // Simple approach: Joystick controls velocity?
-
-        // Let's fetch status once then update local?
-        // Too complex for JS loop blocking.
-        // Let's just map Stick directly to range [-90, 90]... simpler.
-        // Right Stick X -> Yaw [-90, 90]
-        // Right Stick Y -> Pitch [-45, 45]
-
-        const targetYaw = stickX * -90; // Invert X? depends on convention.
+        const targetYaw = stickX * -90;
         const targetPitch = stickY * -60;
 
         fetch('/head', {
@@ -225,65 +210,32 @@ function handleRightController(source, frame) {
         lastHeadUpdate = now;
     }
 
-    // Update Arm (IK / Mapping)
+    // Update Arm
     if (pose && (now - lastArmUpdate > UPDATE_INTERVAL_MS)) {
         const pos = pose.transform.position; // x, y, z (meters)
-        const rot = pose.transform.orientation; // x, y, z, w (quaternion)
 
-        // Map Controller Position to Robot Arm Joints
-        // Origin logic: We need a "zero" point.
-        // Let's assume the user stands and defines "zero" when entering VR?
-        // Or just map absolute height?
+        // Mapping Logic
+        // Quest: Y is Up, Z is Back, X is Right
+        // baseHeight: assumed shoulder height ~1.3m standing
 
-        // Simple mapping:
-        // Height (y) -> Shoulder Lift
-        // Distance (z) -> Elbow Flex (Extension)
-        // Side (x) -> Shoulder Pan
-        // Rotation (wrist) -> Wrist Rotate
-
-        // Tuning needed here.
-        // Let's standard "Desk" height ~ 1.0m?
-        const baseHeight = 1.0;
+        const baseHeight = 1.3;
         const dy = pos.y - baseHeight;
 
         // Map Y (-0.5m to +0.5m) -> Shoulder Lift (-45 to 45)
-        let s_lift = Math.max(-60, Math.min(60, dy * 100)); // Scale factor
+        let s_lift = Math.max(-60, Math.min(60, dy * 100));
 
         // Map X (-0.5m to 0.5m) -> Shoulder Pan (-90 to 90)
-        let s_pan = Math.max(-90, Math.min(90, pos.x * -150)); // Invert?
+        let s_pan = Math.max(-90, Math.min(90, pos.x * -150));
 
-        // Map Z (Depth)
-        // Closer to body = Flexed Elbow?
-        // Further = Extended?
-        // Users head is at ~0,0,0 (local floor)? check ref space.
-        // Local floor: user is at 0,0,0 usually? No, head moves.
-        // We need relative to headset? 
-        // For 'local', 0,0,0 is start position.
+        // Map Z (Depth) - Robot Arm Extension
+        // User reaches out (-Z increases). 
+        // Arm should extend.
+        // Let's assume neutral hand position is ~30cm in front of face.
 
-        // Let's try absolute Z mapping for now.
-        // Z < -0.3 (Forward) -> Extension
-        // Z > 0 (Back) -> Retraction
-        let dist = -pos.z; // Forward is negative Z in WebXR?
-        // Actually Forward is -Z. So larger negative is further away.
-        // dist: 0.3m (close) to 0.8m (far)
-        // map to elbow -90 (flexed) to 0 (straight)
-
-        // Heuristic:
-        // Elbow 0 is straight?
-        // Robot elbow: 
-        // 90 = Flexed? (Check arm.py logic)
-        // arm.py: elbow += -> Flex?
-
-        // Let's send a position dictionary
-        // We need to convert quaternion to wrist roll.
-        // Complex. Let's just map Controller Roll to Wrist Roll.
-
-        // Send
         const armPayload = {
             positions: {
                 shoulder_lift: s_lift,
                 shoulder_pan: s_pan
-                // elbow_flex: ... (leaving for refinement)
             }
         };
 
