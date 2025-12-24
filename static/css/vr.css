@@ -1,0 +1,178 @@
+/* VR Control Page Styles */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    min-height: 100vh;
+    color: #fff;
+}
+
+#desktopInterface {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.status-panel {
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 40px;
+    max-width: 500px;
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.status-panel h1 {
+    font-size: 2rem;
+    margin-bottom: 24px;
+    text-align: center;
+    background: linear-gradient(90deg, #4CAF50, #2196F3);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.status-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+}
+
+.status-item {
+    text-align: center;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+.status-label {
+    display: block;
+    font-size: 0.75rem;
+    color: #888;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #555;
+    transition: all 0.3s ease;
+}
+
+.status-indicator.connected {
+    background: #4CAF50;
+    box-shadow: 0 0 12px #4CAF50;
+}
+
+.status-indicator.error {
+    background: #f44336;
+    box-shadow: 0 0 12px #f44336;
+}
+
+.instructions {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.instructions h3 {
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+    color: #fff;
+}
+
+.control-section {
+    margin-bottom: 16px;
+}
+
+.control-section:last-child {
+    margin-bottom: 0;
+}
+
+.control-section h4 {
+    font-size: 0.9rem;
+    color: #4CAF50;
+    margin-bottom: 8px;
+}
+
+.control-section ul {
+    list-style: none;
+    padding-left: 8px;
+}
+
+.control-section li {
+    font-size: 0.85rem;
+    color: #bbb;
+    margin-bottom: 4px;
+    line-height: 1.5;
+}
+
+.control-section strong {
+    color: #fff;
+}
+
+.back-link {
+    display: block;
+    text-align: center;
+    color: #888;
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: color 0.3s ease;
+}
+
+.back-link:hover {
+    color: #fff;
+}
+
+/* Hide desktop interface when in VR */
+.a-fullscreen #desktopInterface {
+    display: none;
+}
+
+.enter-vr-btn {
+    display: none;
+    width: 100%;
+    padding: 15px;
+    margin-bottom: 20px;
+    background: linear-gradient(45deg, #2196F3, #9C27B0);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(33, 150, 243, 0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.enter-vr-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(33, 150, 243, 0.6);
+}
+
+.enter-vr-btn:active {
+    transform: translateY(0);
+}
+
+.xr-status {
+    text-align: center;
+    color: #888;
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+}

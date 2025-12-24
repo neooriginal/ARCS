@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARCS VR Control</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/vr.css') }}">
+    <style>
+        /* Override A-Frame defaults */
+        .a-enter-vr-button,
+        .a-enter-ar-button {
+            display: none !important;
+        }
+
+        a-scene {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+        }
+
+        #sceneContainer {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #sceneContainer.active {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Desktop Interface (shown before VR) -->
+    <div id="desktopInterface">
+        <div class="status-panel">
+            <h1>🥽 ARCS VR Control</h1>
+
+            <button id="enterVrBtn" class="enter-vr-btn">ENTER VR MODE</button>
+            <p id="xrStatus" class="xr-status">Checking WebXR support...</p>
+
+            <div class="status-grid">
+                <div class="status-item">
+                    <span class="status-label">VR Status</span>
+                    <span class="status-indicator" id="vrStatus"></span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Robot</span>
+                    <span class="status-indicator" id="robotStatus"></span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">WebSocket</span>
+                    <span class="status-indicator" id="wsStatus"></span>
+                </div>
+            </div>
+            <div class="instructions">
+                <h3>🎮 VR Controller Instructions</h3>
+                <div class="control-section">
+                    <h4>Right Controller (Arm)</h4>
+                    <ul>
+                        <li><strong>Hold Grip</strong> → Enable arm tracking</li>
+                        <li><strong>Move Controller</strong> → Move robot arm</li>
+                        <li><strong>Trigger</strong> → Close gripper</li>
+                        <li><strong>Rotate Controller</strong> → Wrist roll</li>
+                    </ul>
+                </div>
+                <div class="control-section">
+                    <h4>Left Controller (Movement)</h4>
+                    <ul>
+                        <li><strong>Thumbstick ↑↓</strong> → Forward/Backward</li>
+                        <li><strong>Thumbstick ←→</strong> → Turn Left/Right</li>
+                    </ul>
+                </div>
+            </div>
+            <a href="/" class="back-link">← Back to Main Control</a>
+        </div>
+    </div>
+
+    <!-- Scene container - A-Frame will be injected here when button is clicked -->
+    <div id="sceneContainer"></div>
+
+    <script>
+        // Check WebXR support on page load
+        const enterVrBtn = document.getElementById('enterVrBtn');
+        const xrStatus = document.getElementById('xrStatus');
+        const desktopInterface = document.getElementById('desktopInterface');
+        const sceneContainer = document.getElementById('sceneContainer');
+
+        let aframeLoaded = false;
+        let sceneCreated = false;
+
+        // Always show button
+        enterVrBtn.style.display = 'block';
+
+        // Check WebXR availability
+        async function checkWebXR() {
+            if (!navigator.xr) {
+                xrStatus.textContent = "WebXR not available (HTTP? Check flags)";
+                xrStatus.style.color = "#FF9800";
+                return false;
+            }
+
+            try {
+                const supported = await navigator.xr.isSessionSupported('immersive-vr');
+                if (supported) {
+                    xrStatus.textContent = "✓ WebXR Ready - Click to Enter VR";
+                    xrStatus.style.color = "#4CAF50";
+                    return true;
+                } else {
+                    xrStatus.textContent = "VR not supported on this device";
+                    xrStatus.style.color = "#FF9800";
+                    return false;
+                }
+            } catch (err) {
+                xrStatus.textContent = `WebXR Error: ${err.message}`;
+                xrStatus.style.color = "#f44336";
+                return false;
+            }
+        }
+
+        // Load A-Frame dynamically
+        function loadAFrame() {
+            return new Promise((resolve, reject) => {
+                if (aframeLoaded) {
+                    resolve();
+                    return;
+                }
+                const script = document.createElement('script');
+                script.src = 'https://aframe.io/releases/1.5.0/aframe.min.js';
+                script.onload = () => {
+                    aframeLoaded = true;
+                    // Load our VR app script after A-Frame
+                    const vrScript = document.createElement('script');
+                    vrScript.src = '{{ url_for("static", filename="js/vr_app.js") }}';
+                    vrScript.onload = resolve;
+                    vrScript.onerror = reject;
+                    document.body.appendChild(vrScript);
+                };
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        // Create A-Frame scene
+        function createScene() {
+            if (sceneCreated) return document.querySelector('a-scene');
+
+            const sceneHTML = `
+                <a-scene id="vrScene" 
+                    webxr="optionalFeatures: local-floor, hand-tracking, bounded-floor"
+                    vr-mode-ui="enabled: false" 
+                    background="color: #000" 
+                    renderer="antialias: true; colorManagement: true"
+                    embedded
+                    controller-updater>
+
+                    <a-entity id="headset" camera position="0 1.6 0" look-controls="enabled: false">
+                        <a-text id="headsetInfo" value="Headset" position="0 0.15 -0.5" align="center" 
+                                color="#fff" width="0.8" visible="false"></a-text>
+                    </a-entity>
+
+                    <a-entity id="leftHand" oculus-touch-controls="hand: left" laser-controls="hand: left">
+                        <a-text id="leftHandInfo" value="Left" position="0 0.08 0" align="center"
+                                color="#4CAF50" width="0.5"></a-text>
+                    </a-entity>
+
+                    <a-entity id="rightHand" oculus-touch-controls="hand: right" laser-controls="hand: right">
+                        <a-text id="rightHandInfo" value="Right" position="0 0.08 0" align="center"
+                                color="#2196F3" width="0.5"></a-text>
+                    </a-entity>
+
+                    <a-plane id="videoPanel" position="0 1.4 -1.5" width="1.6" height="0.9"
+                        material="shader: flat; transparent: true; opacity: 0.95"></a-plane>
+                    
+                    <a-box position="0 1.4 -1.51" width="1.62" height="0.92" depth="0.02" 
+                           color="#333" material="shader: flat"></a-box>
+
+                    <a-text id="statusText" value="Connecting..." 
+                        position="0 2.0 -1.5" align="center" color="#fff" width="2"></a-text>
+
+                    <a-text id="armModeText" value="" 
+                        position="0.8 1.9 -1.5" align="center" color="#4CAF50" width="1.5"></a-text>
+                    <a-text id="gripperText" value="" 
+                        position="-0.8 1.9 -1.5" align="center" color="#FF9800" width="1.5"></a-text>
+                </a-scene>
+            `;
+
+            sceneContainer.innerHTML = sceneHTML;
+            sceneContainer.classList.add('active');
+            sceneCreated = true;
+
+            return document.querySelector('a-scene');
+        }
+
+        // Enter VR button handler
+        enterVrBtn.addEventListener('click', async () => {
+            xrStatus.textContent = "Loading VR environment...";
+            enterVrBtn.disabled = true;
+
+            try {
+                // 1. Load A-Frame
+                await loadAFrame();
+
+                // 2. Hide desktop interface
+                desktopInterface.style.display = 'none';
+
+                // 3. Create scene
+                const scene = createScene();
+
+                // 4. Wait for scene to be ready
+                if (scene.hasLoaded) {
+                    scene.enterVR();
+                } else {
+                    scene.addEventListener('loaded', () => {
+                        scene.enterVR();
+                    });
+                }
+
+            } catch (err) {
+                console.error('Failed to start VR:', err);
+                xrStatus.textContent = `Error: ${err.message}`;
+                xrStatus.style.color = "#f44336";
+                enterVrBtn.disabled = false;
+                desktopInterface.style.display = 'flex';
+            }
+        });
+
+        // Initial check
+        checkWebXR();
+
+        // Robot status check
+        fetch('/status')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('robotStatus')?.classList.toggle('connected', data.controller_connected);
+            })
+            .catch(() => { });
+    </script>
+</body>
+
+</html>

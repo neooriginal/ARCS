@@ -22,6 +22,7 @@ from config import WEB_PORT
 from core.robot_system import RobotSystem
 from core.navigation_agent import NavigationAgent
 from core.vins_slam import VinsSlam
+from vr_server import start_vr_server, stop_vr_server
 from robots.xlerobot.tools import (
     create_move_forward, 
     create_move_backward, 
@@ -161,6 +162,10 @@ def main():
     threading.Thread(target=slam_loop, daemon=True).start()
     print("🗺️ SLAM ready")
     
+    # VR WebSocket server
+    if start_vr_server():
+        print("🥽 VR server ready on port 8442")
+    
     # TTS Startup Announcement
     tts.speak("System ready")
     
@@ -170,6 +175,7 @@ def main():
     print()
     print(f"🌐 http://0.0.0.0:{WEB_PORT}")
     print(f"📺 Display: http://localhost:{WEB_PORT}/display")
+    print(f"🥽 VR Control: http://localhost:{WEB_PORT}/vr")
     print("Press Ctrl+C to stop")
     print("-" * 50)
     
