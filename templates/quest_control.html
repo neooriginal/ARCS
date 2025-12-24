@@ -21,22 +21,6 @@
             background: rgba(0, 0, 0, 0.7);
             padding: 15px;
             border-radius: 8px;
-            pointer-events: none;
-            font-size: 14px;
-        }
-
-        #debug {
-            position: absolute;
-            z-index: 1000;
-            bottom: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.8);
-            padding: 10px;
-            border-radius: 5px;
-            font-family: monospace;
-            font-size: 12px;
-            max-width: 400px;
-            pointer-events: none;
         }
     </style>
 </head>
@@ -44,15 +28,12 @@
 <body>
     <div id="overlay">
         <h2>🤖 RoboCrew VR</h2>
-        <p><strong>Left Stick:</strong> Drive Robot</p>
-        <p><strong>Right Hand:</strong> Move Arm</p>
-        <p><strong>Right Trigger:</strong> Gripper</p>
+        <p><strong>Left Stick:</strong> Drive | <strong>Right Hand:</strong> Arm | <strong>Trigger:</strong> Gripper</p>
     </div>
-    <div id="debug">Debug: Waiting for VR...</div>
 
-    <a-scene background="color: transparent" renderer="alpha: true; colorManagement: true"
-        webxr="requiredFeatures: local-floor; optionalFeatures: hand-tracking, layers; referenceSpaceType: local-floor"
-        vr-mode-ui="enterVRButton: #enterARButton"> <a-assets>
+    <a-scene background="color: transparent" renderer="alpha: true"
+        webxr="optionalFeatures: local-floor, hand-tracking">
+        <a-assets>
             <img id="camera-feed" src="/video_feed" crossorigin="anonymous">
         </a-assets>
 
@@ -60,110 +41,127 @@
 
         <a-entity id="rig" position="0 0 0">
             <a-camera position="0 1.6 0" look-controls="pointerLockEnabled: false"></a-camera>
-            <a-entity id="leftHand" oculus-touch-controls="hand: left" robot-drive-controller></a-entity>
-            <a-entity id="rightHand" oculus-touch-controls="hand: right" robot-arm-controller></a-entity>
+            <a-entity id="leftHand" oculus-touch-controls="hand: left" robot-drive></a-entity>
+            <a-entity id="rightHand" oculus-touch-controls="hand: right" robot-arm></a-entity>
         </a-entity>
     </a-scene>
 
     <script>
-        const UPDATE_INTERVAL = 50;
-        const debugEl = document.getElementById('debug');
+        // =============================================
+        // CONSTANTS - From example code
+        // =============================================
+        const UPDATE_INTERVAL = 50; // ~20Hz
 
-        function debugLog(msg) {
-            debugEl.textContent = msg;
-            console.log(msg);
-        }
+        // IK parameters (approximate SO101 arm)
+        const ARM_L1 = 0.10; // Link 1 length
+        const ARM_L2 = 0.12; // Link 2 length
+
+        // Scaling from example: delta * 220/70 * 0.01
+        const X_SCALE = 2.2;   // For shoulder_pan
+        const Y_SCALE = 0.7;   // For IK Y (height)
+        const Z_SCALE = 0.7;   // For IK X (reach)
+
+        // Angle scaling
+        const ANGLE_SCALE = 4.0;
+
+        // Limits
+        const DELTA_LIMIT = 0.01;  // Max positional delta per frame
+        const ANGLE_LIMIT = 8.0;   // Max angle delta per frame
+
+        // Smoothing
+        const SMOOTH_ALPHA = 0.1;
 
         // =============================================
         // 2-LINK INVERSE KINEMATICS
         // =============================================
-        const ARM_LINK1 = 0.10;
-        const ARM_LINK2 = 0.12;
-
         function inverseKinematics(x, y) {
-            const L1 = ARM_LINK1;
-            const L2 = ARM_LINK2;
             const dist = Math.sqrt(x * x + y * y);
-            const maxReach = L1 + L2 - 0.01;
-            const minReach = Math.abs(L1 - L2) + 0.01;
-            const clampedDist = Math.max(minReach, Math.min(maxReach, dist));
+            const maxReach = ARM_L1 + ARM_L2 - 0.005;
+            const minReach = Math.abs(ARM_L1 - ARM_L2) + 0.005;
+            const d = Math.max(minReach, Math.min(maxReach, dist));
 
-            let cosElbow = (L1 * L1 + L2 * L2 - clampedDist * clampedDist) / (2 * L1 * L2);
+            // Law of cosines for elbow
+            let cosElbow = (ARM_L1 * ARM_L1 + ARM_L2 * ARM_L2 - d * d) / (2 * ARM_L1 * ARM_L2);
             cosElbow = Math.max(-1, Math.min(1, cosElbow));
-            const elbowAngle = Math.acos(cosElbow);
+            const elbowRad = Math.acos(cosElbow);
 
+            // Shoulder angle
             const beta = Math.atan2(y, x);
-            let cosAlpha = (L1 * L1 + clampedDist * clampedDist - L2 * L2) / (2 * L1 * clampedDist);
+            let cosAlpha = (ARM_L1 * ARM_L1 + d * d - ARM_L2 * ARM_L2) / (2 * ARM_L1 * d);
             cosAlpha = Math.max(-1, Math.min(1, cosAlpha));
-            const alpha = Math.acos(cosAlpha);
-            const shoulderAngle = beta + alpha;
+            const alphaRad = Math.acos(cosAlpha);
+            const shoulderRad = beta + alphaRad;
 
-            const shoulderLiftDeg = THREE.MathUtils.radToDeg(shoulderAngle) - 90;
-            const elbowFlexDeg = -(180 - THREE.MathUtils.radToDeg(elbowAngle));
+            // Convert to degrees matching robot conventions
+            const shoulderLift = THREE.MathUtils.radToDeg(shoulderRad) - 90;
+            const elbowFlex = -(180 - THREE.MathUtils.radToDeg(elbowRad));
 
-            return [shoulderLiftDeg, elbowFlexDeg];
+            return [shoulderLift, elbowFlex];
         }
 
         // =============================================
         // DRIVE CONTROLLER (Left Hand)
         // =============================================
-        AFRAME.registerComponent('robot-drive-controller', {
+        AFRAME.registerComponent('robot-drive', {
             init: function () {
                 this.lastUpdate = 0;
-                this.lastMovement = null;
+                this.lastState = '';
             },
             tick: function () {
-                if (!this.el.components['oculus-touch-controls']) return;
-                const controller = this.el.components['oculus-touch-controls'].controller;
-                if (!controller || !controller.gamepad) return;
+                const ctrl = this.el.components['oculus-touch-controls'];
+                if (!ctrl || !ctrl.controller || !ctrl.controller.gamepad) return;
 
-                const gp = controller.gamepad;
+                const gp = ctrl.controller.gamepad;
                 if (!gp.axes || gp.axes.length < 4) return;
+
+                const now = Date.now();
+                if (now - this.lastUpdate < UPDATE_INTERVAL) return;
 
                 const x = gp.axes[2] || 0;
                 const y = gp.axes[3] || 0;
+                const DZ = 0.3;
 
-                const now = Date.now();
-                if (now - this.lastUpdate > UPDATE_INTERVAL) {
-                    const DEADZONE = 0.3;
+                const state = {
+                    forward: y < -DZ,
+                    backward: y > DZ,
+                    left: x < -DZ,
+                    right: x > DZ,
+                    slide_left: false,
+                    slide_right: false
+                };
 
-                    const movement = {
-                        forward: y < -DEADZONE,
-                        backward: y > DEADZONE,
-                        left: x < -DEADZONE,
-                        right: x > DEADZONE,
-                        slide_left: false,
-                        slide_right: false
-                    };
-
-                    const key = JSON.stringify(movement);
-                    if (key !== this.lastMovement) {
-                        fetch('/move', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: key
-                        }).catch(e => console.error('Move error:', e));
-                        this.lastMovement = key;
-                    }
-
-                    this.lastUpdate = now;
+                const stateStr = JSON.stringify(state);
+                if (stateStr !== this.lastState) {
+                    fetch('/move', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: stateStr
+                    }).catch(() => { });
+                    this.lastState = stateStr;
                 }
+                this.lastUpdate = now;
             }
         });
 
         // =============================================
-        // ARM CONTROLLER (Right Hand) - DELTA CONTROL
+        // ARM CONTROLLER (Right Hand) - Based on example
         // =============================================
-        AFRAME.registerComponent('robot-arm-controller', {
+        AFRAME.registerComponent('robot-arm', {
             init: function () {
                 this.lastUpdate = 0;
-                this.lastGripperCheck = 0;
-                this.gripperClosed = false;
 
-                this.prevPos = null;
-                this.prevRot = null;
+                // Previous VR position for delta calculation
+                this.prevVrPos = null;
+                this.prevWristFlex = null;
+                this.prevWristRoll = null;
 
-                this.armState = {
+                // Current robot arm state (in IK space)
+                this.currentX = 0.1629;  // From example
+                this.currentY = 0.1131;  // From example
+                this.pitch = 0;
+
+                // Target joint positions (degrees)
+                this.targets = {
                     shoulder_pan: 0,
                     shoulder_lift: 0,
                     elbow_flex: 0,
@@ -171,140 +169,133 @@
                     wrist_roll: 0
                 };
 
-                this.handX = 0.15;
-                this.handY = 0.10;
-                this.pitch = 0;
+                // Gripper state
+                this.gripperClosed = false;
+
+                // Listen for trigger events from A-Frame
+                this.el.addEventListener('triggerdown', () => {
+                    if (!this.gripperClosed) {
+                        this.gripperClosed = true;
+                        fetch('/gripper', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ closed: true })
+                        }).catch(() => { });
+                    }
+                });
+
+                this.el.addEventListener('triggerup', () => {
+                    if (this.gripperClosed) {
+                        this.gripperClosed = false;
+                        fetch('/gripper', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ closed: false })
+                        }).catch(() => { });
+                    }
+                });
             },
 
             tick: function () {
                 const now = Date.now();
+                if (now - this.lastUpdate < UPDATE_INTERVAL) return;
 
-                const worldPos = new THREE.Vector3();
-                this.el.object3D.getWorldPosition(worldPos);
+                // Get world position
+                const pos = new THREE.Vector3();
+                this.el.object3D.getWorldPosition(pos);
 
-                const worldQuat = new THREE.Quaternion();
-                this.el.object3D.getWorldQuaternion(worldQuat);
-                const euler = new THREE.Euler().setFromQuaternion(worldQuat, 'YXZ');
+                // Get rotation as euler
+                const quat = new THREE.Quaternion();
+                this.el.object3D.getWorldQuaternion(quat);
+                const euler = new THREE.Euler().setFromQuaternion(quat, 'YXZ');
 
-                // --- GET ALL BUTTONS AND FIND TRIGGER ---
-                let triggerValue = 0;
-                let allButtons = [];
-                if (this.el.components['oculus-touch-controls']) {
-                    const controller = this.el.components['oculus-touch-controls'].controller;
-                    if (controller && controller.gamepad && controller.gamepad.buttons) {
-                        const buttons = controller.gamepad.buttons;
-                        allButtons = buttons.map((b, i) => `${i}:${b.value.toFixed(2)}`);
+                const wristFlexDeg = THREE.MathUtils.radToDeg(euler.x);
+                const wristRollDeg = THREE.MathUtils.radToDeg(euler.z);
 
-                        // Quest Touch: Button 0 = trigger, Button 1 = grip
-                        triggerValue = buttons[0]?.value || 0;
-                    }
-                }
-
-                // Debug output
-                debugLog(`Pos: ${worldPos.x.toFixed(2)}, ${worldPos.y.toFixed(2)}, ${worldPos.z.toFixed(2)} | Trigger: ${triggerValue.toFixed(2)} | Btns: [${allButtons.join(', ')}]`);
-
-                // --- GRIPPER (Trigger button) ---
-                const shouldClose = triggerValue > 0.5;
-                if (shouldClose !== this.gripperClosed && (now - this.lastGripperCheck > 300)) {
-                    this.gripperClosed = shouldClose;
-                    console.log(`GRIPPER: Sending closed=${shouldClose}`);
-                    fetch('/gripper', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ closed: shouldClose })
-                    })
-                        .then(r => r.json())
-                        .then(data => console.log('Gripper response:', data))
-                        .catch(e => console.error('Gripper error:', e));
-                    this.lastGripperCheck = now;
-                }
-
-                // --- DELTA ARM CONTROL ---
-                if (now - this.lastUpdate > UPDATE_INTERVAL) {
-
-                    if (this.prevPos === null) {
-                        this.prevPos = worldPos.clone();
-                        this.prevRot = euler.clone();
-                        this.lastUpdate = now;
-                        return;
-                    }
-
-                    // Calculate deltas
-                    const deltaX = worldPos.x - this.prevPos.x;
-                    const deltaY = worldPos.y - this.prevPos.y;
-                    const deltaZ = worldPos.z - this.prevPos.z;
-                    const deltaRoll = euler.z - this.prevRot.z;
-                    const deltaPitch = euler.x - this.prevRot.x;
-
-                    this.prevPos.copy(worldPos);
-                    this.prevRot.copy(euler);
-
-                    // Sensitivity - INCREASED
-                    const POS_SCALE = 1.0;
-                    const PAN_SCALE = 200;      // Shoulder pan sensitivity
-                    const ROLL_SCALE = 2.0;     // Wrist roll - INCREASED from 0.3
-                    const PITCH_SCALE = 1.0;    // Wrist pitch
-
-                    const MAX_POS_DELTA = 0.03;
-                    const MAX_ANGLE_DELTA = 10;
-
-                    const clampedDX = Math.max(-MAX_POS_DELTA, Math.min(MAX_POS_DELTA, deltaX));
-                    const clampedDY = Math.max(-MAX_POS_DELTA, Math.min(MAX_POS_DELTA, deltaY));
-                    const clampedDZ = Math.max(-MAX_POS_DELTA, Math.min(MAX_POS_DELTA, deltaZ));
-
-                    // --- AXIS MAPPING (INVERTED from before) ---
-                    // VR Z forward (negative) -> Robot arm reach forward (positive handX)
-                    this.handX += clampedDZ * POS_SCALE;  // INVERTED: was -clampedDZ
-                    // VR Y up -> Robot arm height (positive handY)
-                    this.handY += -clampedDY * POS_SCALE;  // INVERTED: was clampedDY
-
-                    this.handX = Math.max(0.05, Math.min(0.22, this.handX));
-                    this.handY = Math.max(-0.10, Math.min(0.15, this.handY));
-
-                    // Shoulder pan from X movement (INVERTED)
-                    const panDelta = -clampedDX * PAN_SCALE;  // INVERTED: was clampedDX
-                    this.armState.shoulder_pan += panDelta;
-                    this.armState.shoulder_pan = Math.max(-90, Math.min(90, this.armState.shoulder_pan));
-
-                    // IK for shoulder_lift and elbow_flex
-                    const [ikShoulder, ikElbow] = inverseKinematics(this.handX, this.handY);
-
-                    const SMOOTH = 0.2;
-                    this.armState.shoulder_lift = (1 - SMOOTH) * this.armState.shoulder_lift + SMOOTH * ikShoulder;
-                    this.armState.elbow_flex = (1 - SMOOTH) * this.armState.elbow_flex + SMOOTH * ikElbow;
-
-                    // Wrist roll - INCREASED SENSITIVITY
-                    const rollDelta = THREE.MathUtils.radToDeg(deltaRoll) * ROLL_SCALE;
-                    this.armState.wrist_roll += Math.max(-MAX_ANGLE_DELTA, Math.min(MAX_ANGLE_DELTA, -rollDelta)); // INVERTED
-                    this.armState.wrist_roll = Math.max(-150, Math.min(150, this.armState.wrist_roll));
-
-                    // Wrist pitch
-                    const pitchDelta = THREE.MathUtils.radToDeg(deltaPitch) * PITCH_SCALE;
-                    this.pitch += Math.max(-MAX_ANGLE_DELTA, Math.min(MAX_ANGLE_DELTA, -pitchDelta)); // INVERTED
-                    this.pitch = Math.max(-90, Math.min(90, this.pitch));
-
-                    // Wrist compensation
-                    this.armState.wrist_flex = -this.armState.shoulder_lift - this.armState.elbow_flex + this.pitch;
-                    this.armState.wrist_flex = Math.max(-90, Math.min(90, this.armState.wrist_flex));
-
-                    const payload = {
-                        positions: {
-                            shoulder_pan: this.armState.shoulder_pan,
-                            shoulder_lift: this.armState.shoulder_lift,
-                            elbow_flex: this.armState.elbow_flex,
-                            wrist_roll: this.armState.wrist_roll,
-                            wrist_flex: this.armState.wrist_flex
-                        }
-                    };
-
-                    fetch('/arm', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    }).catch(e => console.error('Arm error:', e));
-
+                // First frame - initialize previous values
+                if (this.prevVrPos === null) {
+                    this.prevVrPos = [pos.x, pos.y, pos.z];
+                    this.prevWristFlex = wristFlexDeg;
+                    this.prevWristRoll = wristRollDeg;
                     this.lastUpdate = now;
+                    return;
                 }
+
+                // Calculate deltas (as in example)
+                const vrDeltaX = (pos.x - this.prevVrPos[0]) * 220;
+                const vrDeltaY = (pos.y - this.prevVrPos[1]) * 70;
+                const vrDeltaZ = (pos.z - this.prevVrPos[2]) * 70;
+
+                // Update previous
+                this.prevVrPos = [pos.x, pos.y, pos.z];
+
+                // Apply pos_scale and limit
+                let deltaX = vrDeltaX * 0.01;
+                let deltaY = vrDeltaY * 0.01;
+                let deltaZ = vrDeltaZ * 0.01;
+
+                deltaX = Math.max(-DELTA_LIMIT, Math.min(DELTA_LIMIT, deltaX));
+                deltaY = Math.max(-DELTA_LIMIT, Math.min(DELTA_LIMIT, deltaY));
+                deltaZ = Math.max(-DELTA_LIMIT, Math.min(DELTA_LIMIT, deltaZ));
+
+                // Update IK workspace position (from example)
+                // VR Z maps to robot X (reach), VR Y maps to robot Y (height)
+                this.currentX += -deltaZ;  // VR Z -> robot reach
+                this.currentY += deltaY;   // VR Y -> robot height
+
+                // Clamp to workspace
+                this.currentX = Math.max(0.05, Math.min(0.25, this.currentX));
+                this.currentY = Math.max(-0.10, Math.min(0.20, this.currentY));
+
+                // Handle wrist flex with delta control
+                if (this.prevWristFlex !== null) {
+                    let deltaPitch = (wristFlexDeg - this.prevWristFlex) * ANGLE_SCALE;
+                    deltaPitch = Math.max(-ANGLE_LIMIT, Math.min(ANGLE_LIMIT, deltaPitch));
+                    this.pitch += deltaPitch;
+                    this.pitch = Math.max(-90, Math.min(90, this.pitch));
+                }
+                this.prevWristFlex = wristFlexDeg;
+
+                // Handle wrist roll with delta control
+                if (this.prevWristRoll !== null) {
+                    let deltaRoll = (wristRollDeg - this.prevWristRoll) * ANGLE_SCALE;
+                    deltaRoll = Math.max(-ANGLE_LIMIT, Math.min(ANGLE_LIMIT, deltaRoll));
+                    this.targets.wrist_roll += deltaRoll;
+                    this.targets.wrist_roll = Math.max(-90, Math.min(90, this.targets.wrist_roll));
+                }
+                this.prevWristRoll = wristRollDeg;
+
+                // Shoulder pan from X movement (delta control)
+                if (Math.abs(deltaX) > 0.001) {
+                    let deltaPan = deltaX * 200;
+                    deltaPan = Math.max(-ANGLE_LIMIT, Math.min(ANGLE_LIMIT, deltaPan));
+                    this.targets.shoulder_pan += deltaPan;
+                    this.targets.shoulder_pan = Math.max(-180, Math.min(180, this.targets.shoulder_pan));
+                }
+
+                // Compute IK for shoulder_lift and elbow_flex
+                try {
+                    const [ikShoulder, ikElbow] = inverseKinematics(this.currentX, this.currentY);
+
+                    // Smooth transition (from example: alpha = 0.1)
+                    this.targets.shoulder_lift = (1 - SMOOTH_ALPHA) * this.targets.shoulder_lift + SMOOTH_ALPHA * ikShoulder;
+                    this.targets.elbow_flex = (1 - SMOOTH_ALPHA) * this.targets.elbow_flex + SMOOTH_ALPHA * ikElbow;
+                } catch (e) {
+                    console.error('IK failed:', e);
+                }
+
+                // Compensate wrist_flex to maintain end-effector orientation (from example)
+                this.targets.wrist_flex = -this.targets.shoulder_lift - this.targets.elbow_flex + this.pitch;
+                this.targets.wrist_flex = Math.max(-90, Math.min(90, this.targets.wrist_flex));
+
+                // Send to robot
+                fetch('/arm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ positions: this.targets })
+                }).catch(() => { });
+
+                this.lastUpdate = now;
             }
         });
 
