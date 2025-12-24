@@ -22,14 +22,6 @@
             background: rgba(0, 0, 0, 0.5);
             padding: 10px;
             border-radius: 5px;
-            pointer-events: none;
-        }
-
-        #debug-info {
-            color: #f0f000;
-            font-family: monospace;
-            font-size: 0.8em;
-            margin-top: 5px;
         }
     </style>
 </head>
@@ -37,8 +29,9 @@
 <body>
     <div id="overlay">
         <h2>🤖 RoboCrew VR</h2>
-        <p><strong>Left Stick:</strong> Drive | <strong>Right Hand:</strong> Arm | <strong>Grip:</strong> Grab</p>
-        <div id="debug-info">Waiting for VR...</div>
+        <p>Enter VR to see the camera feed and control the robot.</p>
+        <p><strong>Left Stick:</strong> Drive | <strong>Right Hand:</strong> Arm | <strong>Right Trigger:</strong>
+            Gripper</p>
     </div>
 
     <a-scene background="color: #111">
@@ -56,24 +49,26 @@
             <a-camera position="0 1.6 0" look-controls="pointerLockEnabled: false"></a-camera>
 
             <!-- Controllers -->
+            <!-- Left: Drive -->
             <a-entity id="leftHand" oculus-touch-controls="hand: left" robot-drive-controller></a-entity>
+            <!-- Right: Arm -->
             <a-entity id="rightHand" oculus-touch-controls="hand: right" robot-arm-controller></a-entity>
         </a-entity>
     </a-scene>
 
     <script>
-        const debugEl = document.getElementById('debug-info');
-        function log(msg) { debugEl.textContent = msg; }
+        // --- Robot Control Logic (A-Frame Components) ---
 
+        // Throttle config
         const UPDATE_INTERVAL = 100;
 
         // 1. Drive Controller (Left Hand)
         AFRAME.registerComponent('robot-drive-controller', {
             init: function () {
                 this.lastUpdate = 0;
-                log("Drive Controller Init");
             },
-            tick: function () {
+            tick: function (time, timeDelta) {
+                // Get Gamepad
                 if (!this.el.components['oculus-touch-controls']) return;
                 const controller = this.el.components['oculus-touch-controls'].controller;
                 if (!controller || !controller.gamepad) return;
@@ -81,6 +76,7 @@
                 const gp = controller.gamepad;
                 if (!gp.axes) return;
 
+                // Quest: axes[2] = X, axes[3] = Y
                 const x = gp.axes[2] || 0;
                 const y = gp.axes[3] || 0;
 
@@ -94,15 +90,11 @@
                     else if (x < -DEADZONE) direction = 'left';
                     else if (x > DEADZONE) direction = 'right';
 
-                    // Only send if active? Or heartbeat? existing API expects constant updates?
-                    // Let's send.
-                    if (direction !== 'stop') {
-                        fetch('/move', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ direction: direction })
-                        }).catch(e => { });
-                    }
+                    fetch('/move', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ direction: direction })
+                    }).catch(e => { });
 
                     this.lastUpdate = now;
                 }
@@ -115,22 +107,25 @@
                 this.lastUpdate = 0;
                 this.gripperState = false;
                 this.lastGripperCheck = 0;
-                log("Arm Controller Init");
             },
-            tick: function () {
-                if (!this.el.components['oculus-touch-controls']) return;
-                const controller = this.el.components['oculus-touch-controls'].controller;
-                if (!controller || !controller.gamepad) return;
-
-                // Debug: Show we are tracking
-                if (Math.random() < 0.05) log(`Tracking Right Hand...`);
-
+            tick: function (time, timeDelta) {
                 const now = Date.now();
-                const gp = controller.gamepad;
 
-                // 1. Grip Button (Button 1)
-                const gripPressed = gp.buttons[1]?.pressed || false;
+                // Get Pose
+                const position = this.el.object3D.position;
+                const rotation = this.el.object3D.rotation; // Euler radians
 
+                // Get Gamepad
+                let gripPressed = false;
+                if (this.el.components['oculus-touch-controls']) {
+                    const controller = this.el.components['oculus-touch-controls'].controller;
+                    if (controller && controller.gamepad && controller.gamepad.buttons) {
+                        // Button 1 is Grip/Squeeze on Quest
+                        gripPressed = controller.gamepad.buttons[1]?.pressed || false;
+                    }
+                }
+
+                // Check Gripper (Grip Button)
                 if (gripPressed !== this.gripperState && (now - this.lastGripperCheck > 200)) {
                     this.gripperState = gripPressed;
                     fetch('/gripper', {
@@ -141,35 +136,70 @@
                     this.lastGripperCheck = now;
                 }
 
-                // 2. Arms (Heuristic IK)
+                // Update Arm Position
                 if (now - this.lastUpdate > UPDATE_INTERVAL) {
-                    const position = this.el.object3D.position;
-                    const rotation = this.el.object3D.rotation;
 
-                    // Anchor: Shoulder
+                    // --- Heuristic Kinematics ---
+
+                    // Reference Frame:
+                    // Origin (0,0,0) is usually user's feet (local-floor).
+                    // Shoulder Pivot approximate world pos: (0.2, 1.4, 0)
+                    // We map relative to an assumed shoulder anchor.
                     const shoulderAnchor = { x: 0.2, y: 1.3, z: -0.2 };
 
                     const dx = position.x - shoulderAnchor.x;
                     const dy = position.y - shoulderAnchor.y;
+                    const dz = position.z - shoulderAnchor.z; // negative is forward in WebXR? 
+                    // In A-Frame/WebXR, -Z is forward. +Z is back towards user.
 
-                    // Inverted Mappings
-                    let s_pan = Math.max(-90, Math.min(90, dx * -200));
-                    let s_lift = Math.max(-90, Math.min(90, dy * -150));
+                    // 1. Shoulder Pan (Left/Right)
+                    // Map X: -0.4 (Left) to 0.4 (Right) -> -90 to 90
+                    let s_pan = Math.max(-90, Math.min(90, dx * 200));
 
-                    // Elbow Reach (Z)
-                    // -Z is forward. 
+                    // 2. Shoulder Lift (Up/Down)
+                    // Map Y: -0.4 (Down) to 0.4 (Up) -> -60 to 60
+                    let s_lift = Math.max(-90, Math.min(90, dy * 150));
+
+                    // 3. Elbow Flex (Reach)
+                    // Calculate extension distance (from shoulder anchor)
+                    // dist = sqrt(dx*dx + dy*dy + dz*dz)
+                    // But mostly Z matters for simple reaching.
+                    // -Z increases as we reach forward.
+                    // Hand near body (z ~ 0.1) -> Flexed
+                    // Hand extended (z ~ -0.5) -> Straight
+
+                    // Elbow: -90 (Flexed) to 0 (Straight)? 
+                    // Or 0 (Flexed) to 90? Need to check robot config.
+                    // Assuming standard: 
+                    // Let's trying mapping -Z (reach):
+                    // z = 0 (close) -> Elbow Flex -90
+                    // z = -0.5 (far) -> Elbow Flex 0
+
+                    // Z is usually negative in front.
+                    // reach = -position.z (approx 0.0 to 0.6)
                     const reach = -position.z;
-                    // map 0.0 -> -90 (Flexed), 0.6 -> 0 (Straight)
+                    // map 0.1 -> -90, 0.6 -> 0
                     let e_flex = (reach - 0.6) * 180;
+                    // e_flex clamped -90 to 0
                     e_flex = Math.max(-90, Math.min(0, e_flex));
+                    // Wait, if elbow step is positive -> flex?
+                    // arm.py: elbow += -> Flex?
+                    // If so, 90 is max flex, 0 is straight?
+                    // Let's assume 0 is home (Safe).
 
-                    // Wrist Roll (Z Rotation)
+
+                    // 4. Wrist Roll (Rotation around Z axis of controller)
+                    // Rotation.z is roll in Radians
                     let w_roll = THREE.MathUtils.radToDeg(rotation.z);
-                    w_roll = Math.max(-150, Math.min(150, w_roll)); // Positive scalar
+                    // Clamp -150 to 150
+                    w_roll = Math.max(-150, Math.min(150, -w_roll)); // Invert?
 
-                    // Wrist Flex (X Rotation) - Inverted
+                    // 5. Wrist Flex (Pitch)
+                    // Rotation.x is pitch
                     let w_flex = THREE.MathUtils.radToDeg(rotation.x);
-                    w_flex = Math.max(-90, Math.min(90, -w_flex)); // Inverted
+                    // Usually controller flat = 0.
+                    // Tip down = negative?
+                    w_flex = Math.max(-90, Math.min(90, w_flex));
 
                     const payload = {
                         positions: {
@@ -192,7 +222,8 @@
             }
         });
 
-        // Auto-refresh texture component
+        // 3. Texture Auto-Update Fix
+        // Sometimes MJPEG on a texture needs manual refresh in WebGL
         AFRAME.registerComponent('auto-refresh-texture', {
             tick: function () {
                 const mesh = this.el.getObject3D('mesh');
@@ -201,7 +232,10 @@
                 }
             }
         });
+
+        // Attach logic to screen
         document.querySelector('a-curvedimage').setAttribute('auto-refresh-texture', '');
+
     </script>
 </body>
 
