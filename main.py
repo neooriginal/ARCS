@@ -178,13 +178,23 @@ def main():
         def open_display():
             import time
             time.sleep(2)  # Wait for server to start
-            display_url = f'http://localhost:{WEB_PORT}/display'
+            
+            # Check for SSL
+            use_ssl = os.getenv('USE_SSL', 'false').lower() == 'true'
+            protocol = 'https' if use_ssl else 'http'
+            display_url = f'{protocol}://localhost:{WEB_PORT}/display'
+            
             env = os.environ.copy()
             env['DISPLAY'] = ':0'  # Target the main display
             try:
                 # Try chromium-browser first (common on Raspberry Pi)
+                # Add flags to ignore SSL errors for localhost
+                cmd = ['chromium-browser', '--kiosk', '--noerrdialogs', '--disable-infobars', display_url]
+                if use_ssl:
+                    cmd.append('--ignore-certificate-errors')
+                
                 subprocess.Popen(
-                    ['chromium-browser', '--kiosk', '--noerrdialogs', '--disable-infobars', display_url],
+                    cmd,
                     env=env,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL
