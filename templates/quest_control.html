@@ -62,6 +62,61 @@
         // Throttle config
         const UPDATE_INTERVAL = 100;
 
+        // Settings State
+        const settings = {
+            invertPan: true, // Default based on user feedback (was inverted)
+            invertLift: true,
+            invertElbow: false,
+            invertRoll: false,
+            invertFlex: true
+        };
+
+        // Create UI Overlay for Settings
+        const settingsDiv = document.createElement('div');
+        settingsDiv.style.position = 'absolute';
+        settingsDiv.style.top = '10px';
+        settingsDiv.style.right = '10px';
+        settingsDiv.style.background = 'rgba(0,0,0,0.7)';
+        settingsDiv.style.padding = '10px';
+        settingsDiv.style.borderRadius = '5px';
+        settingsDiv.style.zIndex = '1001';
+        settingsDiv.innerHTML = `
+            <h3 style="margin:0 0 10px 0">Settings</h3>
+            <div id="status-indicator" style="color: yellow">Waiting for Robot...</div>
+            <br>
+            <label><input type="checkbox" id="inv-pan" checked> Invert Pan (L/R)</label><br>
+            <label><input type="checkbox" id="inv-lift" checked> Invert Lift (U/D)</label><br>
+            <label><input type="checkbox" id="inv-elbow"> Invert Elbow</label><br>
+            <label><input type="checkbox" id="inv-roll"> Invert Roll</label><br>
+            <label><input type="checkbox" id="inv-flex" checked> Invert Flex</label><br>
+            <br>
+            <button id="force-start">Force Start (Debug)</button>
+        `;
+        document.body.appendChild(settingsDiv);
+
+        // Bind Settings
+        document.getElementById('inv-pan').onchange = e => settings.invertPan = e.target.checked;
+        document.getElementById('inv-lift').onchange = e => settings.invertLift = e.target.checked;
+        document.getElementById('inv-elbow').onchange = e => settings.invertElbow = e.target.checked;
+        document.getElementById('inv-roll').onchange = e => settings.invertRoll = e.target.checked;
+        document.getElementById('inv-flex').onchange = e => settings.invertFlex = e.target.checked;
+
+        document.getElementById('force-start').onclick = () => {
+            // Debug bypass
+            const armRig = document.querySelector('[robot-arm-controller]');
+            if (armRig && armRig.components['robot-arm-controller']) {
+                const comp = armRig.components['robot-arm-controller'];
+                console.warn("Forcing start without calibration!");
+                comp.dataLoaded = true;
+                const indicator = document.getElementById('status-indicator');
+                if (indicator) {
+                    indicator.textContent = "Forced Start (Warning)";
+                    indicator.style.color = "red";
+                }
+            }
+        };
+
+
         // 1. Drive Controller (Left Hand)
         AFRAME.registerComponent('robot-drive-controller', {
             init: function () {
@@ -101,7 +156,7 @@
             }
         });
 
-        // 2. Arm Controller (Right Hand) - WITH SMOOTHING, SAFETY & RACE CONDITION FIX
+        // 2. Arm Controller (Right Hand) - WITH SMOOTHING, SAFETY & SETTINGS
         AFRAME.registerComponent('robot-arm-controller', {
             init: function () {
                 this.lastUpdate = 0;
@@ -128,10 +183,15 @@
                 fetch('/arm_position')
                     .then(r => r.json())
                     .then(data => {
-                        if (data.positions) {
+                        if (data.positions && Object.keys(data.positions).length > 0) {
                             console.log("Initial Robot Arm State:", data.positions);
                             Object.assign(this.currentArmState, data.positions);
-                            this.dataLoaded = true; // ENABLE LOOP
+                            this.dataLoaded = true;
+                            const indicator = document.getElementById('status-indicator');
+                            if (indicator) {
+                                indicator.textContent = "Connected & Ready";
+                                indicator.style.color = "#0f0";
+                            }
                         } else {
                             console.error("No positions in response:", data);
                         }
@@ -172,7 +232,7 @@
 
                 if (now - this.lastUpdate > UPDATE_INTERVAL) {
 
-                    // --- Heuristic Kinematics Calculation (INVERTED) ---
+                    // --- Heuristic Kinematics Calculation ---
 
                     // Reference Frame:
                     // Origin (0,0,0) is usually user's feet (local-floor).
@@ -182,22 +242,30 @@
                     const dx = position.x - shoulderAnchor.x;
                     const dy = position.y - shoulderAnchor.y;
 
-                    // 1. Pan (Inverted: dx * -200)
-                    let raw_pan = dx * -200;
+                    // 1. Pan
+                    // Normal: dx * 200 (Right is positive)
+                    // Inverted: dx * -200
+                    let raw_pan = dx * (settings.invertPan ? -200 : 200);
 
-                    // 2. Lift (Inverted: dy * -150)
-                    let raw_lift = dy * -150;
+                    // 2. Lift
+                    // Normal: dy * 150 (Up is positive)
+                    // Inverted: dy * -150
+                    let raw_lift = dy * (settings.invertLift ? -150 : 150);
 
                     // 3. Elbow (Reach)
                     // Reach = -Z. 0.0 (Close) -> 0.6 (Far)
                     const reach = -position.z;
                     let raw_elbow = (reach - 0.6) * 180;
+                    if (settings.invertElbow) raw_elbow = -raw_elbow;
 
-                    // 4. Wrist Roll (No Negation based on previous fix)
+                    // 4. Wrist Roll
                     let raw_roll = THREE.MathUtils.radToDeg(rotation.z);
+                    if (settings.invertRoll) raw_roll = -raw_roll;
 
-                    // 5. Wrist Flex (Inverted: Negated)
-                    let raw_flex = -THREE.MathUtils.radToDeg(rotation.x);
+                    // 5. Wrist Flex
+                    let raw_flex = THREE.MathUtils.radToDeg(rotation.x);
+                    // Usually we inverted this before (-flex)
+                    if (settings.invertFlex) raw_flex = -raw_flex;
 
                     // --- CALIBRATION (First Frame) ---
                     if (!this.calibrated) {
@@ -229,8 +297,8 @@
                     target_flex = Math.max(-90, Math.min(90, target_flex));
 
                     // --- SMOOTHING (LERP) ---
-                    // Factor: 0.05 = Very Slow/Smooth
-                    const SMOOTH_FACTOR = 0.05;
+                    // Factor: 0.1 = Slow/Smooth (Increased slightly from 0.05 for responsiveness)
+                    const SMOOTH_FACTOR = 0.1;
 
                     this.currentArmState.shoulder_pan += (target_pan - this.currentArmState.shoulder_pan) * SMOOTH_FACTOR;
                     this.currentArmState.shoulder_lift += (target_lift - this.currentArmState.shoulder_lift) * SMOOTH_FACTOR;

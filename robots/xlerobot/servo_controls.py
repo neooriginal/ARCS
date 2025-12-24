@@ -390,7 +390,8 @@ class ServoControler:
         return result.get(joint_name, 0.0)
 
     def set_gripper(self, closed: bool) -> float:
-        angle = -30.0 if closed else 90.0
+        # Use -5.0 for closed (safer than -30, closer to arm.py's 2 but with some force)
+        angle = -5.0 if closed else 90.0
         return self.set_arm_joint("gripper", angle)
 
     # Stall Detection
