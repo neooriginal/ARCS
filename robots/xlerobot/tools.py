@@ -11,6 +11,7 @@ import time
 import threading
 
 from state import state as robot_state
+from typing import Optional
 
 
 def create_end_task():
