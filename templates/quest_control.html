@@ -117,10 +117,14 @@
 
                 // Get Gamepad
                 let gripPressed = false;
+                let triggerPressed = false; // Deadman's switch
+
                 if (this.el.components['oculus-touch-controls']) {
                     const controller = this.el.components['oculus-touch-controls'].controller;
                     if (controller && controller.gamepad && controller.gamepad.buttons) {
-                        // Button 1 is Grip/Squeeze on Quest
+                        // Button 0: Index Trigger (Safety Enable)
+                        triggerPressed = controller.gamepad.buttons[0]?.pressed || false;
+                        // Button 1: Grip/Squeeze (Gripper)
                         gripPressed = controller.gamepad.buttons[1]?.pressed || false;
                     }
                 }
@@ -136,8 +140,8 @@
                     this.lastGripperCheck = now;
                 }
 
-                // Update Arm Position
-                if (now - this.lastUpdate > UPDATE_INTERVAL) {
+                // Update Arm Position - ONLY IF DEADMAN'S SWITCH (TRIGGER) IS HELD
+                if (triggerPressed && (now - this.lastUpdate > UPDATE_INTERVAL)) {
 
                     // --- Heuristic Kinematics ---
 
