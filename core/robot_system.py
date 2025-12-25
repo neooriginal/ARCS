@@ -28,9 +28,8 @@ class RobotSystem:
         state.robot_system = self
         
     def _init_camera(self):
-        """Initialize the camera using the threaded camera module."""
+    def _init_camera(self):
         try:
-            # Delegate to central camera module which handles threading
             from camera import init_camera
             if init_camera():
                 self.camera = state.camera
@@ -76,12 +75,9 @@ class RobotSystem:
             self.controller = None
 
     def get_frame(self):
-        """Thread-safe frame capture."""
-        # Use the threaded latest_frame if available for zero latency
         if hasattr(state, 'latest_frame') and state.latest_frame is not None:
              return state.latest_frame
              
-        # Fallback (though init_camera should have started the thread)
         if not self.camera:
             return None
         with self.camera_lock:

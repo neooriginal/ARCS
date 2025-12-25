@@ -120,9 +120,7 @@ class VRSocketHandler:
         
         trigger_active = trigger > 0.5
         
-        # Safety: Only allow INITITAL gripper close if side-grip matches strict requirements
-        # If already closed (trigger_active=True), allow holding it even if side-grip is released ("Freeze" state)
-        # But prevent starting a new grab (False -> True) without side-grip.
+        # Safety: Only allow INITITAL gripper close if side-grip matches requirements
         if trigger_active and not ctrl.trigger_active:
              if not (grip_active or ctrl.grip_active):
                  trigger_active = False
@@ -169,13 +167,10 @@ class VRSocketHandler:
     def _handle_joystick(self, stick: Dict, right_grip=False, left_grip=False):
         x, y = stick.get('x', 0), stick.get('y', 0)
         
-        # Check for precision mode (EITHER stick held)
         precision_mode = right_grip or left_grip
         scale = 0.3 if precision_mode else 1.0
         
-        # Apply deadzone then scale
         if abs(x) > 0.1 or abs(y) > 0.1:
-            # Invert x (rotation) and apply scaling
             final_fwd = -y * scale
             final_rot = -x * 0.8 * scale
             self._send_goal(ControlGoal(move_forward=final_fwd, move_rotation=final_rot))

@@ -17,8 +17,6 @@ def execute_movement(movement):
         return False
     
     try:
-        # Calculate net movement vector
-        # Support both boolean (True=1.0) and float (analog) values
         fwd = 0.0
         fwd += float(movement.get('forward', 0.0))
         fwd -= float(movement.get('backward', 0.0))

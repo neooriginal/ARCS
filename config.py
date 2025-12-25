@@ -8,11 +8,15 @@ HEAD_USB = "/dev/robot_acm1"
 # Web server
 WEB_PORT = 5000
 
-# Camera
+# Camera Capture (AI/Robot Vision)
 CAMERA_WIDTH = 1280
 CAMERA_HEIGHT = 720
 CAMERA_BUFFER_SIZE = 1
-JPEG_QUALITY = 35
+
+# Video Stream (Web/VR - Optimized for Latency)
+STREAM_WIDTH = 320
+STREAM_HEIGHT = 180
+STREAM_JPEG_QUALITY = 20
 
 # Control intervals (ms)
 MOVEMENT_LOOP_INTERVAL = 0.05
