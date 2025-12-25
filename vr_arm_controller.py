@@ -143,7 +143,8 @@ class VRArmController:
             new[WRIST_FLEX_INDEX] = self.origin_wrist_flex + goal.wrist_flex_deg
         
         new = np.clip(new, -120, 120)
-        new[GRIPPER_INDEX] = -45 if self.gripper_closed else 90
+        # Use -55 for tighter closure
+        new[GRIPPER_INDEX] = -55 if self.gripper_closed else 90
         
         self._send_arm(new)
         self.current_angles = new
@@ -151,11 +152,14 @@ class VRArmController:
     
     def _handle_gripper(self, closed: bool):
         self.gripper_closed = closed
-        if self.servo_controller:
-            try:
-                self.servo_controller.set_gripper(closed)
-            except Exception as e:
-                logger.error(f"Gripper error: {e}")
+        # If in position control, the loop will handle the write (prevents bus collision).
+        # Only write immediately if we are IDLE (loop not running).
+        if self.mode != ControlMode.POSITION_CONTROL:
+            if self.servo_controller:
+                try:
+                    self.servo_controller.set_gripper(closed)
+                except Exception as e:
+                    logger.error(f"Gripper error: {e}")
     
     def _send_arm(self, angles: np.ndarray):
         if not self.servo_controller:

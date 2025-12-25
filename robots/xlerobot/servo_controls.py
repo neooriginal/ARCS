@@ -41,7 +41,7 @@ ARM_LIMITS = {
     "elbow_flex": (-90, 90),
     "wrist_flex": (-90, 90),
     "wrist_roll": (-150, 150),
-    "gripper": (-45, 90),
+    "gripper": (-60, 90),
 }
 
 
@@ -390,7 +390,7 @@ class ServoControler:
         return result.get(joint_name, 0.0)
 
     def set_gripper(self, closed: bool) -> float:
-        angle = -45.0 if closed else 90.0
+        angle = -55.0 if closed else 90.0
         return self.set_arm_joint("gripper", angle)
 
     # Stall Detection
