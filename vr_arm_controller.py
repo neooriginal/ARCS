@@ -82,18 +82,6 @@ class VRArmController:
         fwd = goal.move_forward
         rot = goal.move_rotation
         
-        # Use analog callback if available (smoother VR control)
-        if self.movement_callback:
-            # forward, lateral (0), rotation
-            try:
-                self.movement_callback(fwd, 0, rot)
-                state.last_remote_activity = now
-                state.last_movement_activity = now
-                return
-            except Exception as e:
-                logger.error(f"Movement callback error: {e}")
-        
-        # Fallback to boolean state flags
         state.movement = {
             'forward': fwd > 0.3,
             'backward': fwd < -0.3,
