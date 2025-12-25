@@ -93,17 +93,14 @@ class VRArmController:
             return
         self.last_movement_time = now
         
-        fwd = goal.move_forward
-        rot = goal.move_rotation
+        fwd = goal.move_forward * 0.4  # dampen for VR precision
+        rot = goal.move_rotation * 0.4 # dampen for VR precision
+        lat = goal.move_lateral * 0.4  # reserved for slide control if added
 
-        state.movement = {
-            'forward': fwd > 0.3,
-            'backward': fwd < -0.3,
-            'left': rot > 0.3,
-            'right': rot < -0.3,
-            'slide_left': False,
-            'slide_right': False
-        }
+        # Directly use the movement callback with floats for analog control
+        if self.movement_callback:
+            self.movement_callback(fwd, lat, rot)
+        
         state.last_movement_activity = now
         state.last_remote_activity = now
     
@@ -143,7 +140,7 @@ class VRArmController:
             new[WRIST_FLEX_INDEX] = self.origin_wrist_flex + goal.wrist_flex_deg
         
         new = np.clip(new, -120, 120)
-        new[GRIPPER_INDEX] = 2 if self.gripper_closed else 90
+        new[GRIPPER_INDEX] = -30 if self.gripper_closed else 90
         
         self._send_arm(new)
         self.current_angles = new

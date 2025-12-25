@@ -390,6 +390,8 @@ class ServoControler:
         return result.get(joint_name, 0.0)
 
     def set_gripper(self, closed: bool) -> float:
+        # Full range: -30 (closed) to 90 (open)
+        # The L-shape gripper pivots; -30 provides a tight hold
         angle = -30.0 if closed else 90.0
         return self.set_arm_joint("gripper", angle)
 
