@@ -51,19 +51,19 @@ AFRAME.registerComponent('vr-controller-updater', {
 
         this.rightHand.addEventListener('triggerdown', () => {
             this.rightTriggerDown = true;
-            // Animate pivoting gripper: Rotate fingers to center (0 deg)
-            const pivotL = document.querySelector('#fingerL_pivot');
-            const pivotR = document.querySelector('#fingerR_pivot');
-            if (pivotL) pivotL.setAttribute('rotation', '0 0 0');
-            if (pivotR) pivotR.setAttribute('rotation', '0 0 0');
+            // Animate visual gripper on controller
+            const fingerL = document.querySelector('#fingerL');
+            const fingerR = document.querySelector('#fingerR');
+            if (fingerL) fingerL.setAttribute('position', '-0.002 0 -0.11');
+            if (fingerR) fingerR.setAttribute('position', '0.002 0 -0.11');
         });
         this.rightHand.addEventListener('triggerup', () => {
             this.rightTriggerDown = false;
-            // Reset pivoting gripper (30 deg outward)
-            const pivotL = document.querySelector('#fingerL_pivot');
-            const pivotR = document.querySelector('#fingerR_pivot');
-            if (pivotL) pivotL.setAttribute('rotation', '0 -30 0');
-            if (pivotR) pivotR.setAttribute('rotation', '0 30 0');
+            // Reset visual gripper
+            const fingerL = document.querySelector('#fingerL');
+            const fingerR = document.querySelector('#fingerR');
+            if (fingerL) fingerL.setAttribute('position', '-0.015 0 -0.11');
+            if (fingerR) fingerR.setAttribute('position', '0.015 0 -0.11');
 
             if (this.socket?.connected) this.socket.emit('vr_data', { triggerReleased: true });
         });
