@@ -159,10 +159,19 @@ class VRSocketHandler:
     
     def _handle_joystick(self, stick: Dict):
         x, y = stick.get('x', 0), stick.get('y', 0)
+        
+        # Precision Mode: Reduce speed if grip is active (arm control mode)
+        # This allows precise positioning while manipulating the arm
+        scale = 0.3 if self.right_controller.grip_active else 1.0
+        
         # Send goal if outside deadzone, OR if we need to send a final stop command (0,0)
         if abs(x) > 0.1 or abs(y) > 0.1:
             # Invert x (rotation) to fix direction, and use y for forward/back
-            self._send_goal(ControlGoal(move_forward=-y, move_rotation=-x * 0.8))
+            # Apply precision scale
+            self._send_goal(ControlGoal(
+                move_forward=-y * scale, 
+                move_rotation=-x * 0.8 * scale
+            ))
         else:
             # Send stop command when stick is centered to prevent "moving too much"
             self._send_goal(ControlGoal(move_forward=0.0, move_rotation=0.0))

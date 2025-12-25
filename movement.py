@@ -18,17 +18,27 @@ def execute_movement(movement):
     
     try:
         # Calculate net movement vector
+        # Calculate net movement vector considering analog values (0.0 to 1.0) or booleans (1.0)
         fwd = 0.0
-        if movement.get('forward'): fwd += 1.0
-        if movement.get('backward'): fwd -= 1.0
+        val = movement.get('forward')
+        fwd += float(val) if isinstance(val, (int, float)) and not isinstance(val, bool) else (1.0 if val else 0.0)
+        
+        val = movement.get('backward')
+        fwd -= float(val) if isinstance(val, (int, float)) and not isinstance(val, bool) else (1.0 if val else 0.0)
         
         rot = 0.0
-        if movement.get('left'): rot += 1.0
-        if movement.get('right'): rot -= 1.0
+        val = movement.get('left')
+        rot += float(val) if isinstance(val, (int, float)) and not isinstance(val, bool) else (1.0 if val else 0.0)
+        
+        val = movement.get('right')
+        rot -= float(val) if isinstance(val, (int, float)) and not isinstance(val, bool) else (1.0 if val else 0.0)
         
         lat = 0.0
-        if movement.get('slide_left'): lat += 1.0
-        if movement.get('slide_right'): lat -= 1.0
+        val = movement.get('slide_left')
+        lat += float(val) if isinstance(val, (int, float)) and not isinstance(val, bool) else (1.0 if val else 0.0)
+        
+        val = movement.get('slide_right')
+        lat -= float(val) if isinstance(val, (int, float)) and not isinstance(val, bool) else (1.0 if val else 0.0)
         
         # Use vector control if available
         if hasattr(state.controller, 'set_velocity_vector'):
