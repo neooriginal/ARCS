@@ -5,6 +5,7 @@ import threading
 from collections import deque
 import time
 from state import state
+from config import CAMERA_WIDTH, CAMERA_HEIGHT
 
 logger = logging.getLogger(__name__)
 
@@ -19,15 +20,28 @@ class ObstacleDetector:
     - Continuous safety history to prevent flickering/hysteresis.
     """
     
-    def __init__(self, width=640, height=480):
-        self.width = width
-        self.height = height
+    def __init__(self, width=None, height=None):
+        self.width = width or CAMERA_WIDTH
+        self.height = height or CAMERA_HEIGHT
         
         # Detection Thresholds
-        # Y-coordinate thresholds (0=top, 480=bottom)
-        self.obstacle_threshold_y = 420  # Stop when obstacle is very close
-        self.center_x_threshold = 310
-        self.min_edge_pixels = 200      # Minimum edge pixels to consider valid visual input
+        # Calculated based on resolution (ratios derived from original 640x480 tuning)
+        self.obstacle_threshold_y = int(self.height * 0.875)    # ~420 @ 480
+        self.approach_threshold_y = int(self.height * 0.98)     # ~470 @ 480
+        
+        # Precision Mode Thresholds
+        self.precision_fwd_limit = int(self.height * 0.96)      # ~460 @ 480
+        self.precision_padding = int(self.height * 0.0625)      # ~30 @ 480
+        self.precision_align_limit = int(self.height * 0.92)    # ~440 @ 480
+        
+        # Gap Detection Thresholds
+        self.passable_limit_y = int(self.height * 0.73)         # ~350 @ 480
+        self.side_padding = int(self.height * 0.105)            # ~50 @ 480
+        
+        # Horizontal Tolerances
+        self.min_edge_pixels = int(200 * (self.width / 640.0))
+        self.min_gap_width = int(20 * (self.width / 640.0))
+        self.align_tolerance = int(20 * (self.width / 640.0))
         
         # Hysteresis / Safety History
         self.history_len = 12  # Approx 0.5-1.0s buffer
@@ -173,19 +187,19 @@ class ObstacleDetector:
         
         threshold = self.obstacle_threshold_y
         if state.precision_mode:
-             threshold += 30
+             threshold += self.precision_padding
         
         # In Approach Mode, we allow obstacles to come VERY close (bottom of screen)
         if state.approach_mode:
-             threshold = 470 # Almost 480 (bottom)
+             threshold = self.approach_threshold_y
              
-        side_threshold = threshold + 50
+        side_threshold = threshold + self.side_padding
         
         if is_blind:
             blocked.add("FORWARD")
         else:
             if state.precision_mode:
-                 if c_fwd > 460:
+                 if c_fwd > self.precision_fwd_limit:
                      blocked.add("FORWARD")
                      # Provide rotation hint based on clearance
                      if c_left < c_right:
@@ -272,8 +286,8 @@ class ObstacleDetector:
             smoothed_ys.append(sorted([prev_y, raw_ys[i], next_y])[1]) # Median
             
         # 2. Identify "Passable" Columns (Obstacle is far away)
-        passable_limit_y = 350
-        is_very_close = c_fwd > 420
+        # 2. Identify "Passable" Columns (Obstacle is far away)
+        is_very_close = c_fwd > self.obstacle_threshold_y
         
         # CLOSE-RANGE BYPASS: When very close, gap detection is unreliable
         if is_very_close:
@@ -282,10 +296,10 @@ class ObstacleDetector:
         passable_indices = []
         for i, y in enumerate(smoothed_ys):
              effective_y = y
-             if state.precision_mode and y > 420:
+             if state.precision_mode and y > self.obstacle_threshold_y:
                  effective_y = 0 
                  
-             if effective_y < passable_limit_y:
+             if effective_y < self.passable_limit_y:
                  passable_indices.append(edge_points[i][0])
         
         if not passable_indices:
@@ -304,8 +318,8 @@ class ObstacleDetector:
         clusters.append(current_cluster)
         
         # Filter small gaps (noise) and find cluster closest to center
-        # Minimum gap width approx 20px
-        valid_clusters = [c for c in clusters if (c[-1] - c[0]) > 20]
+        # Minimum gap width approx 20px (scaled)
+        valid_clusters = [c for c in clusters if (c[-1] - c[0]) > self.min_gap_width]
         
         if not valid_clusters:
             return ""
@@ -349,8 +363,8 @@ class ObstacleDetector:
         
         # 4. Generate Guidance
         center_offset = gap_center - (w // 2)
-        is_aligned = abs(center_offset) < 20
-        is_too_close_to_align = c_fwd > 440
+        is_aligned = abs(center_offset) < self.align_tolerance
+        is_too_close_to_align = c_fwd > self.precision_align_limit
         
         if is_aligned:
             cv2.line(overlay, (gap_center, h//2), (gap_center, h), (0, 255, 0), 3)
