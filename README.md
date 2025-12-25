@@ -12,6 +12,7 @@ Full guides available in [`docs/`](docs/):
 
 - **[🚀 Setup Guide](docs/setup.md)**: Install & Calibrate.
 - **[🧭 Navigation](docs/navigation.md)**: Obstacle Detection, Precision Mode, & Holonomic Control.
+- **[🥽 VR Control](docs/vr_control.md)**: Quest 3 teleoperation for arm manipulation.
 - **[🛡️ Safety Architecture](docs/safety.md)**: Active perception & reflex systems.
 - **[👁️ Visual Intelligence](docs/visual_intelligence.md)**: Computer Vision & Semantic Memory.
 - **[🔐 Security](docs/security.md)**: Network & Privacy.

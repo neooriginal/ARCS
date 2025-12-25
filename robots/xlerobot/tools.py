@@ -1,6 +1,7 @@
 import base64
 import cv2
 from pathlib import Path
+from typing import Optional
 from langchain_core.tools import tool  # type: ignore[import]
 from lerobot.async_inference.robot_client import RobotClient 
 from lerobot.async_inference.configs import RobotClientConfig

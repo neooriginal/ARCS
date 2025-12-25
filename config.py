@@ -35,3 +35,10 @@ STALL_CHECK_INTERVAL = 0.5
 TTS_ENABLED = True
 TTS_AUDIO_DEVICE = "plughw:1,0"  # ALSA device (plughw:1,0 = HDMI 1)
 TTS_TLD = "com"  # Google TLD for voice variant (com, co.uk, com.au, etc.)
+
+# VR Control
+VR_ENABLED = True
+VR_WEBSOCKET_PORT = 8442
+VR_TO_ROBOT_SCALE = 1.0
+VR_SEND_INTERVAL = 0.05
+

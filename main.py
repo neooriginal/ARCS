@@ -13,6 +13,13 @@ load_dotenv()
 
 from flask import Flask
 
+try:
+    from flask_socketio import SocketIO
+    SOCKETIO_AVAILABLE = True
+except ImportError:
+    SOCKETIO_AVAILABLE = False
+    print("⚠ flask-socketio not installed, VR control disabled")
+
 from state import state
 from movement import movement_loop, stop_movement
 import routes
@@ -22,6 +29,7 @@ from config import WEB_PORT
 from core.robot_system import RobotSystem
 from core.navigation_agent import NavigationAgent
 from core.vins_slam import VinsSlam
+from config import WEB_PORT, VR_ENABLED
 from robots.xlerobot.tools import (
     create_move_forward, 
     create_move_backward, 
@@ -50,7 +58,11 @@ logger.setLevel(logging.INFO)
 def create_app():
     app = Flask(__name__)
     app.register_blueprint(routes.bp)
+    app.config['SECRET_KEY'] = 'robocrew-vr-secret'
     return app
+
+# Global SocketIO instance
+socketio = None
 
 def agent_loop():
     """Background thread for AI Agent."""
@@ -161,14 +173,67 @@ def main():
     threading.Thread(target=slam_loop, daemon=True).start()
     print("🗺️ SLAM ready")
     
+    # Initialize VR Control (if enabled)
+    vr_controller = None
+    arm_available = robot.controller and hasattr(robot.controller, 'arm_enabled') and robot.controller.arm_enabled
+    
+    if VR_ENABLED and SOCKETIO_AVAILABLE and robot.controller:
+        if arm_available:
+            print("🥽 Initializing VR Control...")
+            try:
+                from vr_arm_controller import VRArmController
+                import vr_arm_controller as vr_module
+                
+                # Movement callback for joystick
+                def vr_movement_callback(forward, lateral, rotation):
+                    if robot.controller:
+                        robot.controller.set_velocity_vector(forward, lateral, rotation)
+                
+                vr_controller = VRArmController(robot.controller, vr_movement_callback)
+                vr_module.vr_arm_controller = vr_controller
+                print("✓ VR Control initialized")
+            except Exception as e:
+                print(f"⚠ VR Control init failed: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print("⚠ VR Control disabled (arm not enabled on controller)")
+    elif VR_ENABLED and not SOCKETIO_AVAILABLE:
+        print("⚠ VR Control disabled (flask-socketio not installed)")
+        print("   Install with: pip install flask-socketio")
+    
     # TTS Startup Announcement
     tts.speak("System ready")
     
     # Start Web Server
     app = create_app()
     
+    # Setup Socket.IO for VR if available
+    global socketio
+    if SOCKETIO_AVAILABLE:
+        socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+        
+        # Register VR socket events
+        if vr_controller:
+            @socketio.on('connect')
+            def handle_connect():
+                vr_controller.vr_handler.on_connect()
+            
+            @socketio.on('disconnect')
+            def handle_disconnect():
+                vr_controller.vr_handler.on_disconnect()
+            
+            @socketio.on('vr_connect')
+            def handle_vr_connect():
+                print("🥽 VR client connected")
+            
+            @socketio.on('vr_data')
+            def handle_vr_data(data):
+                vr_controller.vr_handler.on_vr_data(data)
+    
     print()
-    print(f"🌐 http://0.0.0.0:{WEB_PORT}")
+    print(f"🌐 http://localhost:{WEB_PORT}")
+    print(f"🥽 VR: http://localhost:{WEB_PORT}/vr")
     print(f"📺 Display: http://localhost:{WEB_PORT}/display")
     print("Press Ctrl+C to stop")
     print("-" * 50)
@@ -201,7 +266,10 @@ def main():
         threading.Thread(target=open_display, daemon=True).start()
     
     try:
-        app.run(host='0.0.0.0', port=WEB_PORT, threaded=True, use_reloader=False, debug=False)
+        if socketio:
+            socketio.run(app, host='0.0.0.0', port=WEB_PORT, debug=False, allow_unsafe_werkzeug=True)
+        else:
+            app.run(host='0.0.0.0', port=WEB_PORT, threaded=True, use_reloader=False, debug=False)
     except KeyboardInterrupt:
         cleanup()
 

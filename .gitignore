@@ -143,3 +143,7 @@ robocrew_memory.db
 /core/__pycache__
 /robots/xlerobot/__pycache__
 /robots/__pycache__
+
+./start.sh
+.env
+./logs.sh

@@ -521,3 +521,31 @@ def slam_reset():
         state.vins_slam.reset()
     return jsonify({'status': 'ok'})
 
+
+# VR Control Routes
+
+@bp.route('/vr')
+def vr_page():
+    """VR control page for Quest 3."""
+    return render_template('vr_control.html')
+
+
+@bp.route('/api/vr/status')
+def vr_status():
+    """Get VR server status."""
+    from vr_arm_controller import vr_arm_controller
+    
+    connected = False
+    arm_mode = 'idle'
+    
+    if vr_arm_controller:
+        if vr_arm_controller.vr_server:
+            connected = vr_arm_controller.vr_server.is_running
+        arm_mode = vr_arm_controller.mode.value if vr_arm_controller.mode else 'idle'
+    
+    return jsonify({
+        'server_running': connected,
+        'arm_mode': arm_mode,
+        'arm_connected': state.arm_connected
+    })
+

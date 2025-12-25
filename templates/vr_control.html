@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>RoboCrew VR Control</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <link rel="stylesheet" href="/static/css/vr_styles.css">
+</head>
+
+<body>
+    <div id="statusPanel" class="status-panel">
+        <h2>🤖 RoboCrew VR Control</h2>
+        <div class="status-grid">
+            <div class="status-item">
+                <div class="status-indicator" id="wsStatus"></div>
+                <span>Connection</span>
+            </div>
+            <div class="status-item">
+                <div class="status-indicator" id="armStatus"></div>
+                <span>Arm Control</span>
+            </div>
+        </div>
+        <div class="instructions">
+            <h3>🎮 Controls</h3>
+            <div class="instruction-item grip"><strong>Grip:</strong> Hold to move arm</div>
+            <div class="instruction-item trigger"><strong>Trigger:</strong> Close gripper</div>
+            <div class="instruction-item joystick"><strong>Thumbstick:</strong> Move robot</div>
+        </div>
+    </div>
+
+    <div id="cameraOverlay" class="camera-overlay">
+        <img id="cameraFeed" src="/video_feed" alt="Camera" onerror="this.style.display='none'">
+    </div>
+
+    <a-scene vr-mode-ui="enabled: false;">
+        <a-entity webxr-passthrough="referenceSpaceType: local-floor"></a-entity>
+
+        <a-entity id="cameraPanel" position="0 1.5 -0.8">
+            <a-plane id="cameraPlane" width="0.5" height="0.375"
+                material="shader: flat; src: #cameraTexture; transparent: true; opacity: 0.95"></a-plane>
+            <a-text value="Camera" position="0 0.22 0" align="center" scale="0.08 0.08 0.08" color="#00d2ff"></a-text>
+        </a-entity>
+
+        <a-entity id="rightHand" oculus-touch-controls="hand: right">
+            <a-text id="rightHandInfo" value="Ready" position="0 0.04 -0.05" scale="0.05 0.05 0.05" color="white"
+                align="center"></a-text>
+            <a-cylinder height="0.08" radius="0.003" color="#ff0000" position="0.04 0 0" rotation="0 0 90"></a-cylinder>
+            <a-cylinder height="0.08" radius="0.003" color="#00ff00" position="0 0.04 0"></a-cylinder>
+            <a-cylinder height="0.08" radius="0.003" color="#0000ff" position="0 0 0.04" rotation="90 0 0"></a-cylinder>
+        </a-entity>
+
+        <a-entity id="leftHand" oculus-touch-controls="hand: left">
+            <a-text id="leftHandInfo" value="Move" position="0 0.04 -0.05" scale="0.05 0.05 0.05" color="white"
+                align="center"></a-text>
+        </a-entity>
+
+        <a-assets>
+            <img id="cameraTexture" crossorigin="anonymous">
+        </a-assets>
+    </a-scene>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const cameraImg = document.getElementById('cameraTexture');
+            const cameraPlane = document.getElementById('cameraPlane');
+            cameraImg.src = '/video_feed';
+
+            setInterval(() => {
+                if (cameraPlane && cameraPlane.getObject3D('mesh')) {
+                    const mat = cameraPlane.getObject3D('mesh').material;
+                    if (mat.map) mat.map.needsUpdate = true;
+                }
+            }, 100);
+        });
+    </script>
+
+    <script src="/static/js/vr_app.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const scene = document.querySelector('a-scene');
+            if (scene) {
+                const init = () => scene.setAttribute('vr-controller-updater', '');
+                scene.hasLoaded ? init() : scene.addEventListener('loaded', init);
+            }
+
+            if (!navigator.xr) return;
+
+            Promise.all([
+                navigator.xr.isSessionSupported('immersive-ar').catch(() => false),
+                navigator.xr.isSessionSupported('immersive-vr').catch(() => false)
+            ]).then(([ar, vr]) => {
+                if (!ar && !vr) return;
+
+                const btn = document.createElement('button');
+                btn.className = 'start-vr-btn';
+                btn.textContent = '🥽 Start VR';
+                btn.onclick = async () => {
+                    btn.textContent = 'Starting...';
+                    btn.disabled = true;
+                    try {
+                        await document.querySelector('a-scene').enterVR(true);
+                    } catch (e) {
+                        btn.textContent = '🥽 Start VR';
+                        btn.disabled = false;
+                    }
+                };
+                document.body.appendChild(btn);
+
+                const scene = document.querySelector('a-scene');
+                scene.addEventListener('enter-vr', () => {
+                    btn.style.display = 'none';
+                    document.getElementById('statusPanel').style.display = 'none';
+                });
+                scene.addEventListener('exit-vr', () => {
+                    btn.style.display = 'block';
+                    document.getElementById('statusPanel').style.display = 'block';
+                });
+            });
+        });
+    </script>
+</body>
+
+</html>
