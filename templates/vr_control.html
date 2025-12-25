@@ -56,16 +56,20 @@
             <a-text id="rightHandInfo" value="Ready" position="0 0.04 -0.05" scale="0.05 0.05 0.05" color="white"
                 align="center"></a-text>
 
-            <!-- Gripper Visual Overlay -->
-            <a-entity id="gripperVisual" position="0 0 0" rotation="0 0 0">
+            <!-- Gripper Visual Overlay (L-shaped like SO-100) -->
+            <a-entity id="gripperVisual" position="0 0 -0.08" rotation="0 0 0">
                 <!-- Wrist base -->
-                <a-box width="0.04" height="0.04" depth="0.06" color="#333" position="0 0 -0.05"></a-box>
-                <!-- Left finger -->
-                <a-box id="fingerL" width="0.005" height="0.03" depth="0.06" color="#666"
-                    position="-0.015 0 -0.11"></a-box>
-                <!-- Right finger -->
-                <a-box id="fingerR" width="0.005" height="0.03" depth="0.06" color="#666"
-                    position="0.015 0 -0.11"></a-box>
+                <a-box width="0.05" height="0.025" depth="0.03" color="#444" position="0 0 0"></a-box>
+                <!-- Left L-finger: vertical arm + horizontal tip -->
+                <a-entity id="fingerL" position="-0.022 0 0">
+                    <a-box width="0.006" height="0.02" depth="0.06" color="#666" position="0 0 -0.045"></a-box>
+                    <a-box width="0.006" height="0.02" depth="0.015" color="#888" position="0.008 0 -0.0825"></a-box>
+                </a-entity>
+                <!-- Right L-finger: vertical arm + horizontal tip -->
+                <a-entity id="fingerR" position="0.022 0 0">
+                    <a-box width="0.006" height="0.02" depth="0.06" color="#666" position="0 0 -0.045"></a-box>
+                    <a-box width="0.006" height="0.02" depth="0.015" color="#888" position="-0.008 0 -0.0825"></a-box>
+                </a-entity>
             </a-entity>
 
             <a-cylinder height="0.08" radius="0.003" color="#ff0000" position="0.04 0 0" rotation="0 0 90"></a-cylinder>

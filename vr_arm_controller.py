@@ -96,14 +96,9 @@ class VRArmController:
         fwd = goal.move_forward
         rot = goal.move_rotation
 
-        state.movement = {
-            'forward': fwd > 0.3,
-            'backward': fwd < -0.3,
-            'left': rot > 0.3,
-            'right': rot < -0.3,
-            'slide_left': False,
-            'slide_right': False
-        }
+        if self.servo_controller and hasattr(self.servo_controller, 'set_velocity_vector'):
+            self.servo_controller.set_velocity_vector(fwd, 0.0, rot)
+        
         state.last_movement_activity = now
         state.last_remote_activity = now
     
@@ -143,7 +138,7 @@ class VRArmController:
             new[WRIST_FLEX_INDEX] = self.origin_wrist_flex + goal.wrist_flex_deg
         
         new = np.clip(new, -120, 120)
-        new[GRIPPER_INDEX] = 2 if self.gripper_closed else 90
+        new[GRIPPER_INDEX] = -30 if self.gripper_closed else 90
         
         self._send_arm(new)
         self.current_angles = new

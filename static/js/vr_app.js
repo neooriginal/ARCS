@@ -51,19 +51,17 @@ AFRAME.registerComponent('vr-controller-updater', {
 
         this.rightHand.addEventListener('triggerdown', () => {
             this.rightTriggerDown = true;
-            // Animate visual gripper on controller
             const fingerL = document.querySelector('#fingerL');
             const fingerR = document.querySelector('#fingerR');
-            if (fingerL) fingerL.setAttribute('position', '-0.002 0 -0.11');
-            if (fingerR) fingerR.setAttribute('position', '0.002 0 -0.11');
+            if (fingerL) fingerL.setAttribute('position', '-0.005 0 0');
+            if (fingerR) fingerR.setAttribute('position', '0.005 0 0');
         });
         this.rightHand.addEventListener('triggerup', () => {
             this.rightTriggerDown = false;
-            // Reset visual gripper
             const fingerL = document.querySelector('#fingerL');
             const fingerR = document.querySelector('#fingerR');
-            if (fingerL) fingerL.setAttribute('position', '-0.015 0 -0.11');
-            if (fingerR) fingerR.setAttribute('position', '0.015 0 -0.11');
+            if (fingerL) fingerL.setAttribute('position', '-0.022 0 0');
+            if (fingerR) fingerR.setAttribute('position', '0.022 0 0');
 
             if (this.socket?.connected) this.socket.emit('vr_data', { triggerReleased: true });
         });

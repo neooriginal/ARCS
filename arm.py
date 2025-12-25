@@ -65,7 +65,7 @@ class ArmController:
         return self.targets['elbow_flex']
     
     def set_gripper(self, closed):
-        self.targets['gripper'] = 2 if closed else 90
+        self.targets['gripper'] = -30 if closed else 90
         return self.targets['gripper']
     
     def get_targets(self):
