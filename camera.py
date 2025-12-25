@@ -56,7 +56,7 @@ def generate_frames():
                     continue
             
             # Resize for efficient streaming (960x540 qHD) while keeping capture high-res for AI
-            stream_frame = cv2.resize(frame, (960, 540), interpolation=cv2.INTER_NEAREST)
+            stream_frame = frame # cv2.resize(frame, (960, 540), interpolation=cv2.INTER_NEAREST)
 
             # Lower quality = faster encoding = lower latency
             _, buffer = cv2.imencode('.jpg', stream_frame, [
@@ -66,6 +66,7 @@ def generate_frames():
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
         except Exception as e:
+            print(f"Camera Loop Error: {e}")
             state.last_error = f"Camera error: {str(e)}"
             time.sleep(0.05)
 
