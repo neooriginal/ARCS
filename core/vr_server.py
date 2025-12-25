@@ -93,6 +93,10 @@ class VRSocketHandler:
                 
                 if 'thumbstick' in right:
                     self._handle_joystick(right['thumbstick'])
+                
+                left = data.get('leftController', {})
+                if 'thumbstick' in left:
+                    self._handle_joystick(left['thumbstick'])
                 return
             
             if data.get('gripReleased'):
@@ -123,7 +127,6 @@ class VRSocketHandler:
                 ctrl.grip_active = True
                 ctrl.origin_position = position.copy()
                 
-                # Store quaternion
                 if quaternion:
                     ctrl.origin_quaternion = np.array([
                         quaternion.get('x', 0), quaternion.get('y', 0),
@@ -132,12 +135,10 @@ class VRSocketHandler:
                     ctrl.accumulated_rotation_quat = ctrl.origin_quaternion
                 
                 self._send_goal(ControlGoal(mode=ControlMode.POSITION_CONTROL))
-                logger.info("VR grip activated")
             
             if ctrl.origin_position:
                 delta = compute_relative_position(position, ctrl.origin_position, scale)
                 
-                # Check for quaternion update
                 if quaternion and R:
                     current_quat = np.array([
                         quaternion.get('x', 0), quaternion.get('y', 0),
@@ -159,14 +160,12 @@ class VRSocketHandler:
     def _handle_joystick(self, stick: Dict):
         x, y = stick.get('x', 0), stick.get('y', 0)
         if abs(x) > 0.1 or abs(y) > 0.1:
-            logger.info(f"VR Joystick: x={x:.2f}, y={y:.2f}")
             self._send_goal(ControlGoal(move_forward=-y, move_rotation=x * 0.8))
     
     def _handle_grip_release(self):
         if self.right_controller.grip_active:
             self.right_controller.reset_grip()
             self._send_goal(ControlGoal(mode=ControlMode.IDLE))
-            logger.info("VR grip released")
     
     def _handle_trigger_release(self):
         if self.right_controller.trigger_active:

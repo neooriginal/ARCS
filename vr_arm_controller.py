@@ -27,6 +27,9 @@ class VRArmController:
         self.last_movement_time = 0
         self.movement_interval = 0.1
         
+        self.last_arm_update_time = 0
+        self.arm_update_interval = 0.05  # 20Hz max for arm updates
+        
         self.config = {'vr_scale': 1.0}
         self.vr_handler = VRSocketHandler(self._handle_goal, self.config)
         
@@ -57,15 +60,12 @@ class VRArmController:
                     pos.get('gripper', 0)
                 ])
                 
-                # Sanity check: If all angles are close to -180 (within 5 deg), it's likely a read error/overflow
-                # -180 is roughly -3.14 rad. 
                 if np.all(new_angles < -170):
-                    logger.error(f"Sync rejected: Suspicious servo values (near -180): {new_angles}")
+                    logger.error(f"Sync rejected: Suspicious servo values (near -180)")
                     return False
 
                 self.current_angles = new_angles
                 vr_kinematics.update_current_angles(self.current_angles)
-                logger.info(f"Synced arm angles: {self.current_angles}")
                 return True
             else:
                 logger.warning("Synced arm failed: Empty position data")
@@ -95,8 +95,6 @@ class VRArmController:
         
         fwd = goal.move_forward
         rot = goal.move_rotation
-        
-        logger.info(f"VR Controller Movement: fwd={fwd}, rot={rot}")
 
         state.movement = {
             'forward': fwd > 0.3,
@@ -116,19 +114,22 @@ class VRArmController:
                 self.origin_wrist_roll = self.current_angles[WRIST_ROLL_INDEX]
                 self.origin_wrist_flex = self.current_angles[WRIST_FLEX_INDEX]
                 self.mode = ControlMode.POSITION_CONTROL
-                logger.info(f"Position control on, origin: {self.origin_position}")
             else:
-                logger.error("Failed to sync arm position, blocking VR control safety engagement")
+                logger.error("Failed to sync arm, blocking VR engagement")
                 self.mode = ControlMode.IDLE
                 
         elif goal.mode == ControlMode.IDLE:
             self.mode = ControlMode.IDLE
             self.origin_position = None
-            logger.info("Position control off")
     
     def _handle_position(self, goal: ControlGoal):
         if self.origin_position is None:
             return
+        
+        now = time.time()
+        if now - self.last_arm_update_time < self.arm_update_interval:
+            return
+        self.last_arm_update_time = now
         
         target = self.origin_position + goal.target_position
         ik = vr_kinematics.solve_ik(target, self.current_angles)
@@ -153,7 +154,6 @@ class VRArmController:
         if self.servo_controller:
             try:
                 self.servo_controller.set_gripper(closed)
-                logger.info(f"Gripper {'closed' if closed else 'open'}")
             except Exception as e:
                 logger.error(f"Gripper error: {e}")
     
