@@ -28,22 +28,19 @@ class RobotSystem:
         state.robot_system = self
         
     def _init_camera(self):
-        """Initialize the camera."""
+        """Initialize the camera using the threaded camera module."""
         try:
-            self.camera = cv2.VideoCapture(CAMERA_PORT)
-            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
-            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
-            self.camera.set(cv2.CAP_PROP_BUFFERSIZE, CAMERA_BUFFER_SIZE)
-            if not self.camera.isOpened():
-                logger.error(f"Failed to open camera on {CAMERA_PORT}")
-                self.camera = None
+            # Delegate to central camera module which handles threading
+            from camera import init_camera
+            if init_camera():
+                self.camera = state.camera
+                logger.info(f"Camera initialized via camera module")
             else:
-                logger.info(f"Camera initialized on {CAMERA_PORT}")
-            state.camera = self.camera
+                logger.error("Failed to initialize camera module")
+                self.camera = None
         except Exception as e:
             logger.error(f"Camera init error: {e}")
             self.camera = None
-            state.camera = None
 
     def _init_servos(self):
         """Initialize servo controller."""
@@ -80,6 +77,11 @@ class RobotSystem:
 
     def get_frame(self):
         """Thread-safe frame capture."""
+        # Use the threaded latest_frame if available for zero latency
+        if hasattr(state, 'latest_frame') and state.latest_frame is not None:
+             return state.latest_frame
+             
+        # Fallback (though init_camera should have started the thread)
         if not self.camera:
             return None
         with self.camera_lock:
@@ -97,8 +99,8 @@ class RobotSystem:
             except Exception as e:
                 logger.error(f"Error disconnecting servos: {e}")
         
-        if self.camera:
-            self.camera.release()
+        from camera import release_camera
+        release_camera()
             
     def emergency_stop(self):
         """Immediate stop of all movement."""
