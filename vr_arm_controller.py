@@ -143,7 +143,7 @@ class VRArmController:
             new[WRIST_FLEX_INDEX] = self.origin_wrist_flex + goal.wrist_flex_deg
         
         new = np.clip(new, -120, 120)
-        new[GRIPPER_INDEX] = 2 if self.gripper_closed else 90
+        new[GRIPPER_INDEX] = -45 if self.gripper_closed else 90
         
         self._send_arm(new)
         self.current_angles = new

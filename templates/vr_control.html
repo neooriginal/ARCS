@@ -60,12 +60,17 @@
             <a-entity id="gripperVisual" position="0 0 0" rotation="0 0 0">
                 <!-- Wrist base -->
                 <a-box width="0.04" height="0.04" depth="0.06" color="#333" position="0 0 -0.05"></a-box>
-                <!-- Left finger -->
-                <a-box id="fingerL" width="0.005" height="0.03" depth="0.06" color="#666"
-                    position="-0.015 0 -0.11"></a-box>
-                <!-- Right finger -->
-                <a-box id="fingerR" width="0.005" height="0.03" depth="0.06" color="#666"
-                    position="0.015 0 -0.11"></a-box>
+
+                <!-- Fixed Finger (Straight) -->
+                <a-box width="0.008" height="0.08" depth="0.02" color="#666" position="-0.02 0 -0.10"></a-box>
+
+                <!-- Moving Finger (Inverted L-Shape) -->
+                <a-entity id="fingerMoving" position="0.02 0 -0.10">
+                    <!-- Vertical part -->
+                    <a-box width="0.008" height="0.08" depth="0.02" color="#666" position="0 0 0"></a-box>
+                    <!-- Horizontal tip (forming the L closing in) -->
+                    <a-box width="0.02" height="0.008" depth="0.02" color="#666" position="-0.01 0.036 0"></a-box>
+                </a-entity>
             </a-entity>
 
             <a-cylinder height="0.08" radius="0.003" color="#ff0000" position="0.04 0 0" rotation="0 0 90"></a-cylinder>
