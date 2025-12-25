@@ -93,9 +93,9 @@ class VRArmController:
             return
         self.last_movement_time = now
         
-        fwd = goal.move_forward * 0.4  # dampen for VR precision
-        rot = goal.move_rotation * 0.4 # dampen for VR precision
-        lat = goal.move_lateral * 0.4  # reserved for slide control if added
+        fwd = goal.move_forward * 0.85  # increased sensitivity
+        rot = goal.move_rotation * 0.85 # increased sensitivity
+        lat = goal.move_lateral * 0.85  # reserved for slide control if added
 
         # Directly use the movement callback with floats for analog control
         if self.movement_callback:

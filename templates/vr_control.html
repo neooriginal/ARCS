@@ -57,15 +57,28 @@
                 align="center"></a-text>
 
             <!-- Gripper Visual Overlay -->
-            <a-entity id="gripperVisual" position="0 0 0" rotation="0 0 0">
+            <!-- Realistic L-Shape Gripper Visual Overlay -->
+            <a-entity id="gripperVisual" position="0 0 -0.05">
                 <!-- Wrist base -->
-                <a-box width="0.04" height="0.04" depth="0.06" color="#333" position="0 0 -0.05"></a-box>
-                <!-- Left finger -->
-                <a-box id="fingerL" width="0.005" height="0.03" depth="0.06" color="#666"
-                    position="-0.015 0 -0.11"></a-box>
-                <!-- Right finger -->
-                <a-box id="fingerR" width="0.005" height="0.03" depth="0.06" color="#666"
-                    position="0.015 0 -0.11"></a-box>
+                <a-box width="0.04" height="0.04" depth="0.04" color="#222"></a-box>
+
+                <!-- Left Finger Group (Pivoting) -->
+                <a-entity id="fingerL_pivot" position="-0.015 0 -0.02" rotation="0 -30 0">
+                    <!-- Base leg -->
+                    <a-box width="0.005" height="0.03" depth="0.04" color="#555" position="0 0 -0.02"></a-box>
+                    <!-- Forward claw (L-shape part) -->
+                    <a-box width="0.005" height="0.03" depth="0.02" color="#777" position="0.008 0 -0.05"
+                        rotation="0 90 0"></a-box>
+                </a-entity>
+
+                <!-- Right Finger Group (Pivoting) -->
+                <a-entity id="fingerR_pivot" position="0.015 0 -0.02" rotation="0 30 0">
+                    <!-- Base leg -->
+                    <a-box width="0.005" height="0.03" depth="0.04" color="#555" position="0 0 -0.02"></a-box>
+                    <!-- Forward claw (L-shape part) -->
+                    <a-box width="0.005" height="0.03" depth="0.02" color="#777" position="-0.008 0 -0.05"
+                        rotation="0 -90 0"></a-box>
+                </a-entity>
             </a-entity>
 
             <a-cylinder height="0.08" radius="0.003" color="#ff0000" position="0.04 0 0" rotation="0 0 90"></a-cylinder>
