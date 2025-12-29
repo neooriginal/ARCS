@@ -31,6 +31,8 @@ class ControlGoal:
     move_forward: float = 0.0
     move_lateral: float = 0.0
     move_rotation: float = 0.0
+    head_yaw_delta: float = 0.0
+    head_pitch_delta: float = 0.0
     metadata: Dict = field(default_factory=dict)
 
 
@@ -98,6 +100,9 @@ class VRSocketHandler:
                 left_grip = left.get('gripActive', False)
                 if 'thumbstick' in left:
                     self._handle_joystick(left['thumbstick'], right_grip=self.right_controller.grip_active, left_grip=left_grip)
+                
+                if 'thumbstick' in right:
+                    self._handle_head_control(right['thumbstick'])
                 return
             
             if data.get('gripReleased'):
@@ -173,6 +178,14 @@ class VRSocketHandler:
             self._send_goal(ControlGoal(move_forward=final_fwd, move_rotation=final_rot))
         else:
             self._send_goal(ControlGoal(move_forward=0.0, move_rotation=0.0))
+    
+    def _handle_head_control(self, stick: Dict):
+        x, y = stick.get('x', 0), stick.get('y', 0)
+        
+        if abs(x) > 0.15 or abs(y) > 0.15:
+            yaw_delta = -x * 2.0
+            pitch_delta = y * 2.0
+            self._send_goal(ControlGoal(head_yaw_delta=yaw_delta, head_pitch_delta=pitch_delta))
     
     def _handle_grip_release(self):
         if self.right_controller.grip_active:

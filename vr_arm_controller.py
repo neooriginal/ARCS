@@ -78,6 +78,8 @@ class VRArmController:
         try:
             if goal.move_forward != 0 or goal.move_rotation != 0:
                 self._handle_movement(goal)
+            if goal.head_yaw_delta != 0 or goal.head_pitch_delta != 0:
+                self._handle_head(goal)
             if goal.mode is not None:
                 self._handle_mode_change(goal)
             if goal.target_position is not None and self.mode == ControlMode.POSITION_CONTROL:
@@ -148,6 +150,27 @@ class VRArmController:
         self._send_arm(new)
         self.current_angles = new
         vr_kinematics.update_current_angles(self.current_angles)
+    
+    def _handle_head(self, goal: ControlGoal):
+        if not self.servo_controller:
+            return
+        try:
+            current_yaw = state.head_yaw
+            current_pitch = state.head_pitch
+            
+            new_yaw = current_yaw + goal.head_yaw_delta
+            new_pitch = current_pitch + goal.head_pitch_delta
+            
+            new_yaw = max(-60, min(60, new_yaw))
+            new_pitch = max(-30, min(60, new_pitch))
+            
+            self.servo_controller.turn_head_yaw(new_yaw)
+            self.servo_controller.turn_head_pitch(new_pitch)
+            
+            state.head_yaw = new_yaw
+            state.head_pitch = new_pitch
+        except Exception as e:
+            logger.error(f"Head control error: {e}")
     
     def _handle_gripper(self, closed: bool):
         self.gripper_closed = closed
