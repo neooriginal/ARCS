@@ -2,6 +2,9 @@
 
 Control the robot arm using Quest 3 VR controllers.
 
+> [!NOTE]
+> **Compatibility**: Designed and tested for **Meta Quest 3 / 3S** using the standalone onboard browser (WebXR). Other headsets or PCVR setups are not guaranteed to work.
+
 ## Usage
 
 1. Start the robot: `python main.py`

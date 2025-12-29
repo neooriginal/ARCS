@@ -5,7 +5,7 @@
 > Use the `main` branch for the latest tested version. Use the `exp` branch to try the latest features.
 
 <p align="center">
-  <strong>AI Agent • Remote Manipulation • Active Safety</strong>
+  <strong>AI Agent • Remote Manipulation • Active Safety • Mobile Ready</strong>
 </p>
 
 <p align="center">
