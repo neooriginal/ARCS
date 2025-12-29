@@ -24,15 +24,17 @@
 {% endblock %}
 
 {% block content %}
-<div class="panels mobile-restricted">
-    <!-- Mobile Restriction Overlay -->
-    <div class="mobile-restricted-overlay">
-        <div class="mobile-restricted-icon">📱</div>
-        <div class="mobile-restricted-title">Desktop Required</div>
-        <p class="mobile-restricted-msg">
-            Remote teleoperation requires precise controls and keyboard inputs effectively supported only on desktop
-            devices.
-        </p>
+<div class="panels">
+    <!-- Touch Controls Layer (Mobile Only) -->
+    <div class="touch-controls-layer">
+        <div id="joystick-left" class="joystick-zone"></div>
+        <div id="joystick-right" class="joystick-zone"></div>
+
+        <!-- Mobile Action Buttons -->
+        <div class="mobile-actions">
+            <button id="btn-toggle-arm" class="mobile-btn">🦾 Toggle Arm</button>
+            <button id="btn-mobile-gripper" class="mobile-btn" data-action="gripper">🖐️ Grip</button>
+        </div>
     </div>
 
     <!-- Drive Mode Panel (Left) -->
@@ -150,4 +152,126 @@
 </div>
 
 <div class="debug-panel" id="debug-panel"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
+<script>
+    // Mobile Touch Control Logic
+    document.addEventListener('DOMContentLoaded', () => {
+        // Only initialize on touch devices or small screens
+        if (window.innerWidth > 768 && !('ontouchstart' in window)) return;
+
+        console.log('Initializing Mobile Controls');
+
+        // Left Joystick - Drive (WASD)
+        const driveManager = nipplejs.create({
+            zone: document.getElementById('joystick-left'),
+            mode: 'static',
+            position: { left: '80px', bottom: '80px' },
+            color: 'cyan',
+            size: 100
+        });
+
+        // Right Joystick - Head (Mouse Look)
+        const headManager = nipplejs.create({
+            zone: document.getElementById('joystick-right'),
+            mode: 'static',
+            position: { right: '80px', bottom: '80px' },
+            color: 'magenta',
+            size: 100
+        });
+
+        // Drive Logic
+        driveManager.on('move', (evt, data) => {
+            if (!data.vector) return;
+
+            // Map vector to WASD keys globally defined in app.js
+            // Thresholds for directional activation
+            const threshold = 0.3;
+            const x = data.vector.x;
+            const y = data.vector.y;
+
+            // Update global keysPressed object from app.js
+            if (typeof keysPressed !== 'undefined') {
+                keysPressed.w = y > threshold;
+                keysPressed.s = y < -threshold;
+                keysPressed.a = x < -threshold;
+                keysPressed.d = x > threshold; // Fixed: d is positive x
+
+                // Trigger movement update
+                if (typeof sendMovement === 'function') sendMovement();
+            }
+        });
+
+        driveManager.on('end', () => {
+            if (typeof keysPressed !== 'undefined') {
+                keysPressed.w = false;
+                keysPressed.s = false;
+                keysPressed.a = false;
+                keysPressed.d = false;
+                if (typeof sendMovement === 'function') sendMovement();
+            }
+        });
+
+        // Head Logic
+        let headInterval;
+        headManager.on('move', (evt, data) => {
+            if (!data.vector) return;
+
+            // Continuous update while holding
+            clearInterval(headInterval);
+            headInterval = setInterval(() => {
+                if (typeof currentYaw !== 'undefined' && typeof currentPitch !== 'undefined') {
+                    // Adjust sensitivity here
+                    const sensitivity = 2.0;
+                    const deltaYaw = data.vector.x * sensitivity;
+                    const deltaPitch = -data.vector.y * sensitivity; // Invert Y for natural look
+
+                    currentYaw = Math.max(YAW_MIN, Math.min(YAW_MAX, currentYaw + deltaYaw));
+                    currentPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, currentPitch + deltaPitch));
+
+                    if (typeof updateCompass === 'function') updateCompass();
+                    if (typeof scheduleHeadUpdate === 'function') scheduleHeadUpdate();
+                }
+            }, 33); // ~30fps
+        });
+
+        headManager.on('end', () => {
+            clearInterval(headInterval);
+        });
+
+        // Mobile Buttons
+        const gripBtn = document.getElementById('btn-mobile-gripper');
+        if (gripBtn) {
+            gripBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (typeof setGripper === 'function') setGripper(true);
+                gripBtn.classList.add('active');
+            });
+            gripBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                if (typeof setGripper === 'function') setGripper(false);
+                gripBtn.classList.remove('active');
+            });
+        }
+
+        const modeBtn = document.getElementById('btn-toggle-arm');
+        if (modeBtn) {
+            modeBtn.addEventListener('click', () => {
+                // Toggle between drive/arm modes if needed, currently sets focus
+                // For now, mobile assumes 'drive' mode mostly, but we can toggle view
+                if (typeof setMode === 'function') {
+                    const newMode = (currentMode === 'drive') ? 'arm' : 'drive';
+                    setMode(newMode);
+                }
+            });
+        }
+
+        // Force Drive Mode on touch interaction start if not set
+        document.getElementById('joystick-left').addEventListener('touchstart', () => {
+            if (currentMode !== 'drive' && typeof setMode === 'function') setMode('drive');
+        });
+    });
+</script>
 {% endblock %}
