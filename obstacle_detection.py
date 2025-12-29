@@ -158,7 +158,7 @@ class ObstacleDetector:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         
         # Blur slightly to reduce noise
-        blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
         
         # Sobel-X: Gradient in X direction (detects vertical lines)
         sobelx = cv2.Sobel(blurred, cv2.CV_64F, 1, 0, ksize=3)
@@ -167,6 +167,10 @@ class ObstacleDetector:
         # Threshold
         _, edges = cv2.threshold(abs_sobelx, OBSTACLE_SOBEL_THRESHOLD, 255, cv2.THRESH_BINARY)
         edges = np.uint8(edges)
+        
+        # Morphological Open to remove noise (small specks)
+        kernel = np.ones((3,3), np.uint8)
+        edges = cv2.morphologyEx(edges, cv2.MORPH_OPEN, kernel)
         
         total_pixels = np.count_nonzero(edges)
         return edges, total_pixels

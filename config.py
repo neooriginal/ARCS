@@ -14,7 +14,7 @@ CAMERA_HEIGHT = 720
 CAMERA_BUFFER_SIZE = 1
 
 # Obstacle Detection
-OBSTACLE_SOBEL_THRESHOLD = 30 # Magnitude threshold for vertical edges (Lower = more sensitive)
+OBSTACLE_SOBEL_THRESHOLD = 65 # Magnitude threshold for vertical edges (Lower = more sensitive)
 OBSTACLE_THRESHOLD_RATIO = 0.875 # Forward safety line (0.0=top, 1.0=bottom)
 
 # Video Stream (Web/VR)
