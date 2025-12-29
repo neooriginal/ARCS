@@ -158,7 +158,7 @@ class ObstacleDetector:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         
         # Blur slightly to reduce noise
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        blurred = cv2.GaussianBlur(gray, (3, 3), 0)
         
         # Sobel-X: Gradient in X direction (detects vertical lines)
         sobelx = cv2.Sobel(blurred, cv2.CV_64F, 1, 0, ksize=3)
