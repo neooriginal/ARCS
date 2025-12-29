@@ -6,7 +6,7 @@ The RoboCrew Control System uses a modular computer vision stack to understand i
 **File**: `obstacle_detection.py`
 
 The primary safety layer is a deterministic vision algorithm that prevents collisions.
-*   **Edge Detection**: We use Sobel-X operator (OpenCV) to detect vertical edges (walls, furniture), ignoring horizontal textures like carpets.
+*   **Edge Detection**: We use **Gradient Magnitude** (Sobel-X + Sobel-Y) to detect strong edges in any direction. This captures vertical objects (walls, furniture) as well as horizontal boundaries (wall-floor panels).
 *   **Column Scanning**: The image is scanned in vertical columns to find the lowest (closest) edge pixel.
 *   **Safety Zones**: The image is divided into `Left`, `Forward`, and `Right` zones.
 *   **Reflex Action**: If the average distance to obstacles in any zone is below a threshold (too close), that direction is marked as **BLOCKED**. The `NavigationAgent` is physically unable to command a move in a blocked direction.

@@ -1,15 +1,20 @@
 # 🤖 ARCS (Autonomous Robot Control System)
 
-# Very, very experimental as of now, it's still a work in progress.
-## You can use the "main" branch for the latest, tested version. If you want to try the latest features, use the "exp" branch.
+> [!IMPORTANT]
+> **Experimental Work in Progress**
+> Use the `main` branch for the latest tested version. Use the `exp` branch to try the latest features.
 
-**AI Agent • Remote Manipulation • Active Safety**
+<p align="center">
+  <strong>AI Agent • Remote Manipulation • Active Safety</strong>
+</p>
 
-<img width="1916" height="1072" alt="remote-control-webui" src="https://github.com/user-attachments/assets/5cb2a44a-04e2-43a9-b22a-0b9a5cece027" />
+<p align="center">
+  <img width="100%" alt="remote-control-webui" src="https://github.com/user-attachments/assets/5cb2a44a-04e2-43a9-b22a-0b9a5cece027" />
+</p>
 
-DEMO COMING SOON
-
-A robust control framework for ARCS. Feature-rich, safe, and ready for autonomy.
+<p align="center">
+  A robust control framework for ARCS. Feature-rich, safe, and ready for autonomy.
+</p>
 
 ## 📚 Documentation
 Full guides available in [`docs/`](docs/):

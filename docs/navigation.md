@@ -7,7 +7,7 @@ The ARCS navigation system provides robust obstacle detection, safety reflexes, 
 ### 1. Vision-Based Obstacle Detection
 The system analyzes video frames in real-time to detect physical obstacles.
 - **Preprocessing**: Converts to grayscale and applies `Gaussian Blur` to reduce noise.
-- **Edge Detection**: Uses `Sobel-X` operator to detect vertical edges (ignores horizontal textures like carpets).
+- **Edge Detection**: Uses **Gradient Magnitude** (Sobel-X + Sobel-Y) to detect edges in *any* direction. This allows detection of both vertical obstacles (walls, legs) and horizontal boundaries (baseboards).
 - **Column Scanning**: The frame is scanned vertically to find the lowest (closest) edge points, creating a depth-map approximation where lower pixels in the frame (higher Y-values) represent closer obstacles.
 
 ### 2. Safety Reflex
@@ -21,15 +21,7 @@ Designed for navigating narrow doorways or tight gaps where standard safety thre
 - **Gap Alignment**: The system identifies the widest contiguous gap in the field of view.
 - **Visual Guidance**: Overlays alignment targets and text instructions (e.g., "ALIGNMENT: TARGET LEFT") on the video feed to assist the operator or AI agent in aligning perfectly with the opening.
 
-### 4. SLAM & Mapping
-The system includes a lightweight VINS-SLAM (Visual-Inertial Simultaneous Localization and Mapping) module (`VinsSlam` in `core/vins_slam.py`) to estimate the robot's trajectory and build a 3D point cloud.
-- **Visual Odometry**: Uses Lucas-Kanade optical flow to track features between frames. It estimates:
-    - **Rotation**: From Essential Matrix decomposition.
-    - **Translation**: Fused with simulated IMU data for metric-scale estimation.
-- **3D Point Cloud**: Triangulates points from tracked features to build a sparse 3D map.
-    - **Input**: Video frames (camera resolution from `config.py`).
-    - **Output**: Trajectory history and 3D point cloud chunks for visualization.
-    - **Update**: As the robot moves, new obstacle observations are drawn onto the map, and the robot's pose path is traced.
+
 
 ## Usage & Features
  
