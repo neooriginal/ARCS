@@ -169,7 +169,7 @@ class VRSocketHandler:
         
         if abs(x) > 0.1 or abs(y) > 0.1:
             final_fwd = -y
-            final_rot = -x * 0.3
+            final_rot = -x * 0.1
             self._send_goal(ControlGoal(move_forward=final_fwd, move_rotation=final_rot))
         else:
             self._send_goal(ControlGoal(move_forward=0.0, move_rotation=0.0))
