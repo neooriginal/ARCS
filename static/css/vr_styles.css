@@ -26,3 +26,14 @@
 .a-enter-vr {
     z-index: 9999 !important;
 }
+
+/* VR Status Indicators */
+.status-indicator {
+    background: #555 !important;
+    transition: background 0.2s ease;
+}
+
+.status-indicator.connected {
+    background: #00d4aa !important;
+    box-shadow: 0 0 8px rgba(0, 212, 170, 0.5);
+}

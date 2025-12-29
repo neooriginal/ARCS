@@ -4,7 +4,7 @@ The system uses a multi-layered architecture to ensure safe operation during aut
 
 ## 1. Active Reflex System
 The system's "reflexes" operate faster than the AI loop to block unsafe actions proactively.
-- **Wall Detection**: Halts forward movement if an obstacle is closer than the safety threshold (Y > 420).
+- **Wall Detection**: Halts forward movement if an obstacle is closer than the safety threshold (set via `OBSTACLE_THRESHOLD_RATIO` in `config.py`).
 - **Blindness Check**: Blocks movement if the camera is obstructed or viewing a featureless surface.
 
 ## 2. State Synchronization

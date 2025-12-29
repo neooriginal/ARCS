@@ -1,6 +1,6 @@
 import threading
-import time
-import cv2
+
+
 import logging
 from typing import Optional, Dict, Any
 
@@ -29,10 +29,11 @@ class RobotSystem:
         
     def _init_camera(self):
         try:
+            # Lazy import to avoid circular dependency
             from camera import init_camera
             if init_camera():
                 self.camera = state.camera
-                logger.info(f"Camera initialized via camera module")
+                logger.info("Camera initialized via camera module")
             else:
                 logger.error("Failed to initialize camera module")
                 self.camera = None
@@ -97,6 +98,7 @@ class RobotSystem:
             except Exception as e:
                 logger.error(f"Error disconnecting servos: {e}")
         
+        # Lazy import to avoid circular dependency
         from camera import release_camera
         release_camera()
             

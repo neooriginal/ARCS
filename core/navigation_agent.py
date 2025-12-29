@@ -19,7 +19,7 @@ from core.utils import capture_image
 try:
     from core.memory_store import memory_store
 except ImportError:
-    print("DEBUG: Absolute import failed, trying relative...")
+    logger.debug("Absolute import failed, trying relative...")
     from .memory_store import memory_store
 
 from state import state
@@ -318,7 +318,7 @@ PERSISTENT NOTES:
         if brightness < AI_MIN_BRIGHTNESS:
             logger.warning(f"Too dark for AI: {brightness:.1f} < {AI_MIN_BRIGHTNESS}")
             
-            # Use import inside method to avoid circular imports layout issues
+            # Lazy import to avoid circular dependency
             import tts
             tts.speak("It is too dark to see.")
             return "Too Dark - Navigation Aborted"
@@ -385,9 +385,8 @@ PERSISTENT NOTES:
             reflex_msg += f"\nVISUAL GUIDANCE: {guidance}"
             reflex_msg += "\nPRECISION MODE: ON. Use the guidance to align with the gap."
             
-            # Hint to disable if path is clear (c_fwd < 250 means obstacles are far away/top of screen)
-            # REMOVED: This was causing early disables while still in the doorway (since center is clear).
-            # The AI must judge "space opening up" visually effectively.
+            # Note: Auto-disable logic removed to prevent premature disabling while in doorway.
+            # AI must judge "space opening up" visually.
         else:
             reflex_msg += "\nPRECISION MODE: OFF."
             if "FORWARD" not in safe_actions:
@@ -405,8 +404,7 @@ PERSISTENT NOTES:
             
         if forced_action == "FORCE_TURN_AROUND":
             reflex_msg += "\nCRITICAL: YOU ARE STUCK. IGNORING YOUR OUTPUT. FORCING A TURN."
-            # We don't return here because we want to log this to history, but we could skip LLM.
-            # actually, let's skip LLM to save tokens and time if we are forcing it.
+            # Skip LLM to save tokens/time since we are forcing action.
             
         content.append({
              "type": "text", 

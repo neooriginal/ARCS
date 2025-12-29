@@ -311,7 +311,6 @@ class ObstacleDetector:
             smoothed_ys.append(sorted([prev_y, raw_ys[i], next_y])[1]) # Median
             
         # 2. Identify "Passable" Columns (Obstacle is far away)
-        # 2. Identify "Passable" Columns (Obstacle is far away)
         is_very_close = c_fwd > self.obstacle_threshold_y
         
         # CLOSE-RANGE BYPASS: When very close, gap detection is unreliable

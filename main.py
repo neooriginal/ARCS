@@ -18,14 +18,12 @@ try:
     SOCKETIO_AVAILABLE = True
 except ImportError:
     SOCKETIO_AVAILABLE = False
-    print("⚠ flask-socketio not installed, VR control disabled")
+    # Will warn later if VR_ENABLED is True
 
 from state import state
 from movement import movement_loop, stop_movement
 import routes
 import tts
-from config import WEB_PORT
-
 from core.robot_system import RobotSystem
 from core.navigation_agent import NavigationAgent
 from core.vins_slam import VinsSlam
@@ -47,12 +45,16 @@ from robots.xlerobot.tools import (
     create_speak
 )
 
-# Configure logging - reduce verbosity
-logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%H:%M:%S'
+)
+# Reduce noise from libraries
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
 logging.getLogger('urllib3').setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 def create_app():
     app = Flask(__name__)
@@ -153,9 +155,9 @@ def main():
             state.agent = agent
             print("✓ AI Agent ready")
         except Exception as e:
-            print(f"⚠ AI Agent init failed: {e}")
+            logger.warning(f"AI Agent init failed: {e}")
     else:
-        print("⚠ Robot controller not ready, AI disabled")
+        logger.warning("Robot controller not ready, AI disabled")
 
     # Start Threads
     print("🔄 Starting background threads...", end=" ", flush=True)
@@ -191,13 +193,12 @@ def main():
                 vr_module.vr_arm_controller = vr_controller
                 print("✓ VR Control initialized")
             except Exception as e:
-                print(f"⚠ VR Control init failed: {e}")
-                import traceback
-                traceback.print_exc()
+                logger.warning(f"VR Control init failed: {e}")
+                logger.debug(sys.exc_info()) # Log trace to debug
         else:
-            print("⚠ VR Control disabled (arm not enabled on controller)")
+            logger.warning("VR Control disabled (arm not enabled on controller)")
     elif VR_ENABLED and not SOCKETIO_AVAILABLE:
-        print("⚠ VR Control disabled (flask-socketio not installed)")
+        logger.warning("VR Control disabled (flask-socketio not installed)")
         print("   Install with: pip install flask-socketio")
     
     # TTS Startup Announcement

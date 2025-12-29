@@ -22,7 +22,7 @@ Control the robot arm using Quest 3 VR controllers.
 In `config.py`:
 ```python
 VR_ENABLED = True         # Enable/disable VR
-VR_WEBSOCKET_PORT = 5000  # Same as web port (Socket.IO)
+VR_WEBSOCKET_PORT = 8442  # VR WebSocket port
 VR_TO_ROBOT_SCALE = 1.0   # Movement sensitivity
 ```
 

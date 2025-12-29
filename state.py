@@ -11,10 +11,9 @@ class RobotState:
     
     def __init__(self):
         self.camera = None
-        self.controller = None  # Restoring missing attribute
-        self.latest_frame = None  # Threaded capture frame buffer
-        self.frame_id = 0 # Counter for frame synchronization
-        self.last_error = None
+        self.controller = None
+        self.latest_frame = None       # Threaded capture frame buffer
+        self.frame_id = 0              # Synchronization counter
         self.running = True
         self.movement = {
             'forward': False,
@@ -60,13 +59,13 @@ class RobotState:
         self.agent = None
         
         # Remote control tracking
-        self.last_remote_activity = 0  # timestamp of last remote input
-        self.last_movement_activity = 0 # timestamp of last movement command
+        self.last_remote_activity = 0   # Last input timestamp
+        self.last_movement_activity = 0 # Last movement command timestamp
         
         # Wheel speed control
-        self.default_wheel_speed = 10000  # Default speed from servo_controls.py
-        self.manual_wheel_speed = None  # When None, use controller's default
-        self.safety_warning_triggered = False  # Track if safety warning was given
+        self.default_wheel_speed = 10000 
+        self.manual_wheel_speed = None  # None = use default
+        self.safety_warning_triggered = False
         
         # Shared Obstacle Detector
         self.detector = None
@@ -136,7 +135,7 @@ class RobotState:
         with self.lock:
             if self.detector is None:
                 try:
-                    # Import here to avoid circular dependencies
+                    # Lazy import to avoid circular dependency
                     import sys, os
                     if os.getcwd() not in sys.path:
                         sys.path.append(os.getcwd())
@@ -156,7 +155,7 @@ class RobotState:
             # Trigger safety warning if exceeding 13000
             if self.manual_wheel_speed > 13000 and not self.safety_warning_triggered:
                 self.safety_warning_triggered = True
-                # Import here to avoid circular dependency
+                # Lazy import to avoid circular dependency
                 import tts
                 tts.speak("Safety limiters off")
             elif self.manual_wheel_speed <= 13000 and self.safety_warning_triggered:

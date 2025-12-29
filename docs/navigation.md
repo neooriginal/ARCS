@@ -6,14 +6,14 @@ The ARCS navigation system provides robust obstacle detection, safety reflexes, 
 
 ### 1. Vision-Based Obstacle Detection
 The system analyzes video frames in real-time to detect physical obstacles.
-- **Preprocessing**: Applies `Bilateral Filtering` to reduce noise while preserving edges.
-- **Edge Detection**: Uses `Canny Edge Detection` to identify structural boundaries.
+- **Preprocessing**: Converts to grayscale and applies `Gaussian Blur` to reduce noise.
+- **Edge Detection**: Uses `Sobel-X` operator to detect vertical edges (ignores horizontal textures like carpets).
 - **Column Scanning**: The frame is scanned vertically to find the lowest (closest) edge points, creating a depth-map approximation where lower pixels in the frame (higher Y-values) represent closer obstacles.
 
 ### 2. Safety Reflex
 A low-level safety layer runs continuously during autonomous movement commands.
 - **Monitoring**: While moving, the system checks the obstacle detector at 10Hz.
-- **Emergency Stop**: If an obstacle appears within the critical threshold (default Y > 420), the robot triggers an immediate "Safety Reflex" brake, canceling the current action to prevent collision.
+- **Emergency Stop**: If an obstacle appears within the critical threshold (calculated from `OBSTACLE_THRESHOLD_RATIO` in `config.py`), the robot triggers an immediate "Safety Reflex" brake, canceling the current action to prevent collision.
 
 ### 3. Precision Mode
 Designed for navigating narrow doorways or tight gaps where standard safety thresholds would prevent movement.
@@ -22,13 +22,13 @@ Designed for navigating narrow doorways or tight gaps where standard safety thre
 - **Visual Guidance**: Overlays alignment targets and text instructions (e.g., "ALIGNMENT: TARGET LEFT") on the video feed to assist the operator or AI agent in aligning perfectly with the opening.
 
 ### 4. SLAM & Mapping
-The system includes a lightweight monocular SLAM (Simultaneous Localization and Mapping) module (`SimpleSLAM`) to estimate the robot's trajectory and build a local occupancy grid.
+The system includes a lightweight VINS-SLAM (Visual-Inertial Simultaneous Localization and Mapping) module (`VinsSlam` in `core/vins_slam.py`) to estimate the robot's trajectory and build a 3D point cloud.
 - **Visual Odometry**: Uses Lucas-Kanade optical flow to track features between frames. It estimates:
-    - **Rotation**: From horizontal pixel shifts.
-    - **Translation**: From vertical pixel shifts (assuming ground plane motion).
-- **Occupancy Map**: Projects vision-detected obstacles onto a 2D top-down grid map.
-    - **Input**: Video frames (640x480).
-    - **Output**: 800x800 pixel grid map (5cm/pixel resolution) with the robot centered.
+    - **Rotation**: From Essential Matrix decomposition.
+    - **Translation**: Fused with simulated IMU data for metric-scale estimation.
+- **3D Point Cloud**: Triangulates points from tracked features to build a sparse 3D map.
+    - **Input**: Video frames (camera resolution from `config.py`).
+    - **Output**: Trajectory history and 3D point cloud chunks for visualization.
     - **Update**: As the robot moves, new obstacle observations are drawn onto the map, and the robot's pose path is traced.
 
 ## Usage & Features
@@ -61,6 +61,6 @@ The AI maintains a persistent mental map of the environment:
 - **Persistent Notes**: The AI uses `save_note()` to record observations (e.g., "The hallway ends in a dead end"). These notes are retrieved in future sessions when relevant.
 
 ### Calibration
-Key parameters in `obstacle_detection.py`:
-- `obstacle_threshold_y` (Default: 420): The Y-coordinate limit for forward obstacles. Increase to allow closer approach (max 480).
-- `min_edge_pixels` (Default: 200): Minimum visual detail required to consider the camera "active" (prevents movement if camera is covered/dark).
+Key parameters in `config.py`:
+- `OBSTACLE_THRESHOLD_RATIO` (Default: 0.875): Fraction of frame height for forward obstacle threshold. Higher values allow closer approach (max 1.0).
+- `OBSTACLE_SOBEL_THRESHOLD` (Default: 30): Edge detection sensitivity. Lower values detect more edges (more sensitive).
