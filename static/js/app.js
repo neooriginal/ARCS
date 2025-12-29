@@ -120,14 +120,21 @@ async function init() {
             updateArmDisplay();
         }
 
-        if (connectionDot) connectionDot.classList.remove('error');
+        // Set connection indicator to active (green)
+        if (connectionDot) {
+            connectionDot.classList.remove('error');
+            connectionDot.classList.add('active');
+        }
         updateStatus('Ready', 'active');
 
         console.log('Initialized:', { headYaw: currentYaw, armConnected });
 
     } catch (e) {
         showDebug('Connection error: ' + e.message);
-        if (connectionDot) connectionDot.classList.add('error');
+        if (connectionDot) {
+            connectionDot.classList.remove('active');
+            connectionDot.classList.add('error');
+        }
         updateStatus('Offline', 'error');
     }
 }

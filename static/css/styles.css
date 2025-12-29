@@ -190,6 +190,13 @@ body {
     box-shadow: 0 0 8px var(--error);
 }
 
+/* VR app uses .connected class for status indicators */
+.status-indicator.connected,
+.connection-dot.connected {
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+}
+
 
 /* Main Content */
 .main-content {
