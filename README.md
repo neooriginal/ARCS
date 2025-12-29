@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img width="100%" alt="remote-control-webui" src="https://github.com/user-attachments/assets/5cb2a44a-04e2-43a9-b22a-0b9a5cece027" />
+  <img width="100%" alt="remote-control-webui" src="https://github.com/user-attachments/assets/64a978bc-f0ca-496d-a325-dee9dd3e7171" />
 </p>
 
 <p align="center">
