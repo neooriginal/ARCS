@@ -85,8 +85,7 @@ class VRSocketHandler:
     def on_vr_data(self, data: Dict):
         try:
             if 'rightController' in data:
-                # DEBUG: Trace data receipt
-                # logger.info(f"VR Data: {data.keys()}") 
+
                 right = data['rightController']
                 if right.get('position'):
                     self._process_controller(right)
@@ -156,8 +155,8 @@ class VRSocketHandler:
                     
                     if ctrl.origin_quaternion is not None:
                         ctrl.accumulated_rotation_quat = current_quat
-                        ctrl.z_axis_rotation = self._extract_roll_from_quaternion(current_quat, ctrl.origin_quaternion)
-                        ctrl.x_axis_rotation = self._extract_pitch_from_quaternion(current_quat, ctrl.origin_quaternion)
+                        ctrl.z_axis_rotation = self._extract_relative_angle(current_quat, ctrl.origin_quaternion, 2, negate=True)
+                        ctrl.x_axis_rotation = self._extract_relative_angle(current_quat, ctrl.origin_quaternion, 0)
 
                 self._send_goal(ControlGoal(
                     mode=ControlMode.POSITION_CONTROL,
@@ -204,8 +203,8 @@ class VRSocketHandler:
             except Exception as e:
                 logger.error(f"Goal callback error: {e}")
 
-    def _extract_roll_from_quaternion(self, current_quat: np.ndarray, origin_quat: np.ndarray) -> float:
-        """Extract roll (around Z) from relative rotation."""
+    def _extract_relative_angle(self, current_quat: np.ndarray, origin_quat: np.ndarray, axis: int, negate: bool = False) -> float:
+        """Extract rotation angle around specific axis (0=x, 1=y, 2=z) from relative rotation."""
         if current_quat is None or origin_quat is None or not R:
             return 0.0
         try:
@@ -214,26 +213,10 @@ class VRSocketHandler:
             current_rotation = R.from_quat(current_quat)
             relative_rotation = current_rotation * origin_rotation.inv()
             
-            # Z-component of rotation vector is roll around Z
+            # Extract component
             rotvec = relative_rotation.as_rotvec()
-            return -np.degrees(rotvec[2])
+            angle = np.degrees(rotvec[axis])
+            return -angle if negate else angle
         except Exception as e:
-            logger.warning(f"Error extracting roll: {e}")
-            return 0.0
-
-    def _extract_pitch_from_quaternion(self, current_quat: np.ndarray, origin_quat: np.ndarray) -> float:
-        """Extract pitch (around X) from relative rotation."""
-        if current_quat is None or origin_quat is None or not R:
-            return 0.0
-        try:
-            # Same relative rotation
-            origin_rotation = R.from_quat(origin_quat)
-            current_rotation = R.from_quat(current_quat)
-            relative_rotation = current_rotation * origin_rotation.inv()
-            
-            # X-component is pitch around X
-            rotvec = relative_rotation.as_rotvec()
-            return np.degrees(rotvec[0])
-        except Exception as e:
-            logger.warning(f"Error extracting pitch: {e}")
+            logger.warning(f"Error extracting rotation: {e}")
             return 0.0

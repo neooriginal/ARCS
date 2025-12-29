@@ -169,7 +169,7 @@ class VRKinematics:
         if self.client is not None:
             try:
                 p.disconnect(self.client)
-            except:
+            except Exception:
                 pass
             self.client = None
             self.is_initialized = False

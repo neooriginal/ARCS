@@ -10,29 +10,24 @@ from config import (
 
 ARM_ELBOW_STEP = 2.0
 
+HOME_POSITIONS = {
+    'shoulder_pan': 0,
+    'shoulder_lift': 0,
+    'elbow_flex': 0,
+    'wrist_flex': 0,
+    'wrist_roll': 0,
+    'gripper': 90
+}
+
 
 class ArmController:
     """Direct joint control for robot arm."""
     
     def __init__(self):
-        self.targets = {
-            'shoulder_pan': 0,
-            'shoulder_lift': 0,
-            'elbow_flex': 0,
-            'wrist_flex': 0,
-            'wrist_roll': 0,
-            'gripper': 90
-        }
+        self.targets = HOME_POSITIONS.copy()
     
     def reset_to_home(self):
-        self.targets = {
-            'shoulder_pan': 0,
-            'shoulder_lift': 0,
-            'elbow_flex': 0,
-            'wrist_flex': 0,
-            'wrist_roll': 0,
-            'gripper': 90
-        }
+        self.targets = HOME_POSITIONS.copy()
         return self.targets.copy()
     
     def handle_mouse_move(self, delta_x, delta_y):

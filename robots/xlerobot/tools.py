@@ -3,10 +3,6 @@ import cv2
 from pathlib import Path
 from typing import Optional
 from langchain_core.tools import tool  # type: ignore[import]
-from lerobot.async_inference.robot_client import RobotClient 
-from lerobot.async_inference.configs import RobotClientConfig
-from lerobot.robots.so101_follower.config_so101_follower import SO101FollowerConfig
-from lerobot.cameras.opencv.configuration_opencv import OpenCVCameraConfig
 from core.utils import capture_image
 import time
 import threading
@@ -28,8 +24,8 @@ def create_end_task():
         
         # Ensure Approach Mode is disabled
         robot_state.approach_mode = False
-        if robot_state.robot_system and robot_state.robot_system.servo_controller:
-             robot_state.robot_system.servo_controller.set_speed(10000)
+        if robot_state.controller:
+             robot_state.controller.set_speed(10000)
         
         # TTS Announcement
         tts.speak("Task complete")
@@ -93,8 +89,8 @@ def create_disable_approach_mode():
         robot_state.approach_mode = False
         
         # Restore Speed (100%)
-        if robot_state.robot_system and robot_state.robot_system.servo_controller:
-             robot_state.robot_system.servo_controller.set_speed(10000)
+        if robot_state.controller:
+             robot_state.controller.set_speed(10000)
              
         return "Approach Mode DISABLED. Safety systems active. Speed restored."
     return disable_approach_mode
@@ -186,8 +182,8 @@ def create_move_forward(servo_controller):
                          # If extremely close (> 380), auto-disable
                          if c_fwd > 380:
                              robot_state.approach_mode = False
-                             if robot_state.robot_system.servo_controller:
-                                 robot_state.robot_system.servo_controller.set_speed(10000)
+                             if robot_state.controller:
+                                 robot_state.controller.set_speed(10000)
                              return f"Moved forward {distance:.2f} meters. ✓ TARGET REACHED (c_fwd={c_fwd}). Approach Mode Auto-Disabled. You are now touching/very close to the object."
                          
                          # If getting close (> 300), warn
@@ -381,6 +377,11 @@ def create_vla_single_arm_manipulation(
         camera_config (dict, optional): Lerobot-type camera configuration. (E.g., "{ main: {type: opencv, index_or_path: /dev/video2, width: 640, height: 480, fps: 30}, left_arm: {type: opencv, index_or_path: /dev/video0, width: 640, height: 480, fps: 30}}")
         policy_device (str, optional): The device to run the policy on. Defaults to "cuda".
     """
+    from lerobot.async_inference.robot_client import RobotClient 
+    from lerobot.async_inference.configs import RobotClientConfig
+    from lerobot.robots.so101_follower.config_so101_follower import SO101FollowerConfig
+    from lerobot.cameras.opencv.configuration_opencv import OpenCVCameraConfig
+
     configured_cameras = {}
     for cam_name, cam_settings in camera_config.items():
         # Unpack the dictionary settings directly into the Config class

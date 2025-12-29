@@ -46,7 +46,7 @@ class TTSEngine:
                              stderr=subprocess.DEVNULL,
                              timeout=1)
                 return player
-            except:
+            except Exception:
                 continue
         return None
     
@@ -71,7 +71,7 @@ class TTSEngine:
         try:
             lang = detect(text)
             return lang if lang else 'en'
-        except:
+        except Exception:
             return 'en'
     
     def _speak_blocking(self, text):

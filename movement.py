@@ -4,8 +4,11 @@ Handles wheel movement commands and the continuous movement loop.
 """
 
 import time
+import logging
 from config import MOVEMENT_LOOP_INTERVAL, REMOTE_TIMEOUT, STALL_CHECK_INTERVAL, STALL_LOAD_THRESHOLD
 from state import state
+
+logger = logging.getLogger(__name__)
 
 
 def execute_movement(movement):
@@ -75,7 +78,7 @@ def movement_loop():
                      state.stop_all_movement()
                      print(f"!!! {msg} !!!")
             except Exception as e:
-                pass # Don't crash loop on read error
+                logger.warning(f"Stall check error: {e}")
             last_stall_check = time.time()
         
         try:

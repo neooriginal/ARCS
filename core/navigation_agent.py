@@ -14,6 +14,8 @@ from config import AI_MIN_BRIGHTNESS
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 from core.utils import capture_image
 # Try relative import as fallback or test
 try:
@@ -25,8 +27,6 @@ except ImportError:
 from state import state
 from qr_scanner import QRScanner
 from core.robot_system import RobotSystem
-
-logger = logging.getLogger(__name__)
 
 class NavigationAgent:
     def __init__(
@@ -163,7 +163,7 @@ PERSISTENT NOTES:
         self.message_history.append(HumanMessage(content=f"New Task: {task}"))
         logger.info(f"Agent task set: {task}")
 
-    def _check_safety(self, image: np.ndarray) -> tuple[list, np.ndarray]:
+    def _check_safety(self, image: np.ndarray) -> tuple[list, np.ndarray, str, dict]:
         """
         Safety check using ObstacleDetector.
         Returns:

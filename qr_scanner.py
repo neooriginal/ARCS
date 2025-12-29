@@ -8,8 +8,6 @@ class QRScanner:
     def __init__(self):
         self.detector = cv2.QRCodeDetector()
         self.seen_codes = set()
-        self.last_seen_time = {}
-        # Cooldown in seconds before reporting the same code again (if we want to allow re-reporting)
         # Setting strictly once per session for now.
         
     def scan(self, frame, pose=None):

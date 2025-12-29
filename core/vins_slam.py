@@ -232,9 +232,6 @@ class VinsSlam:
             return None
         return points.astype(np.float32).reshape(-1, 1, 2)
     
-    def _generate_imu_reading(self, dt):
-        pass
-    
     def _fuse_visual_inertial(self, R_vo, t_vo, imu_data, dt, R_global):
         scale_vo = np.linalg.norm(t_vo)
         
