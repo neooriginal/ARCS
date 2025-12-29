@@ -211,6 +211,20 @@ body {
     overflow: hidden;
 }
 
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 25px;
+    padding-bottom: 40px;
+}
+
+@media (max-width: 480px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        /* Stack on very small screens */
+    }
+}
+
 .top-bar {
     height: 70px;
     border-bottom: 1px solid var(--border-color);
@@ -821,6 +835,175 @@ body {
     50% {
         opacity: 0.7;
         transform: scale(1.1);
+    }
+}
+
+/* --- Mobile Responsiveness --- */
+@media (max-width: 768px) {
+
+    /* Layout Reset */
+    .dashboard-container {
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    /* Transform Sidebar to Bottom Nav */
+    .sidebar {
+        order: 2;
+        /* Move to bottom */
+        width: 100%;
+        height: 70px;
+        /* Fixed height for bottom nav */
+        flex-direction: row;
+        padding: 0 20px;
+        border-right: none;
+        border-top: 1px solid var(--border-color);
+        background: rgba(10, 10, 15, 0.95);
+        backdrop-filter: blur(20px);
+        justify-content: space-between;
+        align-items: center;
+        z-index: 1000;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+    }
+
+    /* Hide Desktop Sidebar Elements */
+    .sidebar-header,
+    .robot-selector,
+    .sidebar-footer {
+        display: none !important;
+    }
+
+    /* Reflow Navigation Items */
+    .sidebar-nav {
+        flex-direction: row;
+        justify-content: space-around;
+        width: 100%;
+        gap: 0;
+    }
+
+    .nav-item {
+        flex-direction: column;
+        gap: 4px;
+        padding: 8px;
+        font-size: 0.7rem;
+        border-radius: 8px;
+        border-left: none;
+        /* Remove desktop active border */
+        color: var(--text-secondary);
+    }
+
+    .nav-item.active {
+        border-left: none;
+        background: transparent;
+        color: var(--primary);
+    }
+
+    .nav-item.active .nav-icon {
+        transform: translateY(-2px);
+        text-shadow: 0 0 10px var(--primary);
+    }
+
+    .nav-icon {
+        font-size: 1.4rem;
+        margin-bottom: 2px;
+    }
+
+    .nav-text {
+        font-size: 0.65rem;
+        font-weight: 500;
+    }
+
+    /* Main Content Adjustments */
+    .main-content {
+        order: 1;
+        height: calc(100vh - 70px);
+        /* Subtract bottom nav height */
+        width: 100%;
+    }
+
+    .content-wrapper {
+        padding: 15px;
+        padding-bottom: 30px;
+        /* Extra padding for scrolling */
+    }
+
+    .top-bar {
+        padding: 0 15px;
+        height: 60px;
+    }
+
+    .page-title {
+        font-size: 1.1rem;
+    }
+
+    /* Dashboard Grid Mobile Tune */
+    .dashboard-grid {
+        gap: 15px;
+    }
+
+    .control-card {
+        padding: 15px;
+    }
+
+    /* Hide complex elements on mobile dash if needed */
+    .hide-on-mobile {
+        display: none;
+    }
+}
+
+/* Mobile Restricted Overlay (Hidden by default) */
+.mobile-restricted-overlay {
+    display: none;
+    /* Hidden on desktop */
+}
+
+@media (max-width: 768px) {
+    .mobile-restricted {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .mobile-restricted-overlay {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(5, 5, 8, 0.95);
+        backdrop-filter: blur(10px);
+        z-index: 9999;
+        text-align: center;
+        padding: 40px;
+    }
+
+    .mobile-restricted-icon {
+        font-size: 4rem;
+        margin-bottom: 20px;
+        opacity: 0.5;
+        animation: pulse 2s infinite;
+    }
+
+    .mobile-restricted-title {
+        font-size: 1.2rem;
+        color: var(--error);
+        margin-bottom: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+    }
+
+    .mobile-restricted-msg {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        line-height: 1.5;
+        max-width: 300px;
     }
 }
 

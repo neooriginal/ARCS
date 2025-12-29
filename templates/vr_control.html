@@ -10,12 +10,28 @@
 {% endblock %}
 
 {% block content %}
-<div style="position: relative; height: 100%; border-radius: 12px; overflow: hidden; background: #000;">
+<div style="position: relative; height: 100%; border-radius: 12px; overflow: hidden; background: #000;"
+    class="mobile-restricted">
+
+    <!-- Mobile Restriction Overlay -->
+    <div class="mobile-restricted-overlay">
+        <div class="mobile-restricted-icon">🥽</div>
+        <div class="mobile-restricted-title">VR Mode</div>
+        <p class="mobile-restricted-msg">
+            This mode is designed for <strong>Standalone VR Headsets</strong> (e.g., Meta Quest) via the onboard
+            browser, or Desktop WebXR.
+            <br><br>
+            <span style="font-size: 0.8em; opacity: 0.7;">Mobile phone control is not currently supported.</span>
+        </p>
+    </div>
 
     <!-- Status Overlay adapted for Dashboard -->
     <div id="statusPanel" class="status-panel"
         style="position: absolute; top: 20px; left: 280px; z-index: 1000; background: rgba(0,0,0,0.8); border: 1px solid var(--border-color); padding: 20px; border-radius: 12px;">
-        <h2 style="margin: 0 0 15px 0; color: var(--primary);">🤖 RoboCrew VR</h2>
+        <h2 style="margin: 0 0 5px 0; color: var(--primary);">🤖 RoboCrew VR</h2>
+        <div style="font-size: 0.75rem; color: var(--warning); margin-bottom: 15px; letter-spacing: 0.5px;">
+            <span style="font-size: 1.2em; vertical-align: middle;">⚠️</span> USE STANDALONE VR BROWSER
+        </div>
         <div class="status-grid" style="display: grid; gap: 10px; margin-bottom: 20px;">
             <div class="status-item" style="display: flex; align-items: center; gap: 10px;">
                 <div class="status-indicator" id="wsStatus"

@@ -24,7 +24,17 @@
 {% endblock %}
 
 {% block content %}
-<div class="panels">
+<div class="panels mobile-restricted">
+    <!-- Mobile Restriction Overlay -->
+    <div class="mobile-restricted-overlay">
+        <div class="mobile-restricted-icon">📱</div>
+        <div class="mobile-restricted-title">Desktop Required</div>
+        <p class="mobile-restricted-msg">
+            Remote teleoperation requires precise controls and keyboard inputs effectively supported only on desktop
+            devices.
+        </p>
+    </div>
+
     <!-- Drive Mode Panel (Left) -->
     <div class="panel drive-panel" id="drive-panel">
         <div class="panel-header">
