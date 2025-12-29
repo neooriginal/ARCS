@@ -5,7 +5,11 @@ import threading
 from collections import deque
 import time
 from state import state
-from config import CAMERA_WIDTH, CAMERA_HEIGHT
+from config import (
+    CAMERA_WIDTH, CAMERA_HEIGHT, 
+    OBSTACLE_CANNY_LOW, OBSTACLE_CANNY_HIGH, 
+    OBSTACLE_THRESHOLD_RATIO
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +29,8 @@ class ObstacleDetector:
         self.height = height or CAMERA_HEIGHT
         
         # Detection Thresholds
-        # Calculated based on resolution (ratios derived from original 640x480 tuning)
-        self.obstacle_threshold_y = int(self.height * 0.875)    # ~420 @ 480
+        # Calculated based on resolution and config
+        self.obstacle_threshold_y = int(self.height * OBSTACLE_THRESHOLD_RATIO)
         self.approach_threshold_y = int(self.height * 0.98)     # ~470 @ 480
         
         # Precision Mode Thresholds
@@ -142,7 +146,7 @@ class ObstacleDetector:
     def _detect_edges(self, frame):
         """Apply filters and Canny edge detection."""
         filtered = cv2.bilateralFilter(frame, 9, 75, 75)
-        edges = cv2.Canny(filtered, 50, 150)
+        edges = cv2.Canny(filtered, OBSTACLE_CANNY_LOW, OBSTACLE_CANNY_HIGH)
         total_pixels = np.count_nonzero(edges)
         return edges, total_pixels
 
