@@ -930,6 +930,11 @@ body {
         /* Extra padding for scrolling */
     }
 
+    /* Override padding for remote control page to be edge-to-edge */
+    body:has(.touch-controls-layer) .content-wrapper {
+        padding: 0 !important;
+    }
+
     .top-bar {
         padding: 0 15px;
         height: 60px;
@@ -993,18 +998,29 @@ body {
     .drive-panel {
         width: 100% !important;
         flex: 1;
-        height: auto;
+        height: 100%;
+        border-radius: 0 !important;
+        border: none !important;
+    }
+
+    /* Hide redundant header on mobile to save space */
+    .drive-panel .panel-header {
+        display: none !important;
+    }
+
+    /* Hide "Click to Drive" box on mobile */
+    .drive-panel .click-prompt {
+        display: none !important;
     }
 
     /* Ensure video container fills space and clips overflow */
     .video-container {
         height: 100%;
-        min-height: 60vh;
+        min-height: 70vh;
         overflow: hidden;
         border-radius: 0;
-        margin: -15px;
-        /* Pull to edges of content-wrapper */
-        width: calc(100% + 30px);
+        margin: 0;
+        width: 100%;
     }
 
     #video-feed {
