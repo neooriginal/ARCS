@@ -978,6 +978,29 @@ body {
         width: 100%;
         -webkit-overflow-scrolling: touch;
     }
+
+    /* Remote Control "Wheels Only" Layout for Mobile */
+    .touch-controls-layer+.panels {
+        flex-direction: column;
+    }
+
+    /* Hide Arm Panel entirely on mobile */
+    .arm-panel {
+        display: none !important;
+    }
+
+    /* Maximize Drive Panel */
+    .drive-panel {
+        width: 100% !important;
+        flex: 1;
+        height: auto;
+    }
+
+    /* Ensure video container fills space */
+    .video-container {
+        height: 100%;
+        min-height: 50vh;
+    }
 }
 
 /* VR Specific Restriction (Hidden by default) */
