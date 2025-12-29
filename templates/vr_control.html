@@ -5,7 +5,6 @@
 {% block head %}
 <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
-<!-- We keep specific VR styles but override body background handled by base -->
 <link rel="stylesheet" href="/static/css/vr_styles.css">
 {% endblock %}
 
@@ -13,7 +12,6 @@
 <div style="position: relative; height: 100%; border-radius: 12px; overflow: hidden; background: #000;"
     class="vr-restricted">
 
-    <!-- Mobile Restriction Overlay -->
     <div class="vr-only-overlay">
         <div class="mobile-restricted-icon">🥽</div>
         <div class="vr-restricted-title">VR Mode</div>
@@ -25,7 +23,6 @@
         </p>
     </div>
 
-    <!-- Status Overlay adapted for Dashboard -->
     <div id="statusPanel" class="status-panel"
         style="position: absolute; top: 20px; left: 280px; z-index: 1000; background: rgba(0,0,0,0.8); border: 1px solid var(--border-color); padding: 20px; border-radius: 12px;">
         <h2 style="margin: 0 0 5px 0; color: var(--primary);">🤖 RoboCrew VR</h2>
@@ -59,7 +56,6 @@
         <a-entity webxr-passthrough="referenceSpaceType: local-floor"></a-entity>
 
         <a-entity id="cameraPanel" position="0 1.2 -1.5">
-            <!-- Tilted slightly up for better viewing from seated/standing -->
             <a-entity rotation="-15 0 0">
                 <a-plane id="cameraPlane" width="1.6" height="0.9"
                     material="shader: flat; src: #cameraTexture; transparent: true; opacity: 0.95"></a-plane>
@@ -72,19 +68,13 @@
             <a-text id="rightHandInfo" value="Ready" position="0 0.04 -0.05" scale="0.05 0.05 0.05" color="white"
                 align="center"></a-text>
 
-            <!-- Gripper Visual Overlay -->
             <a-entity id="gripperVisual" position="0 0 0" rotation="0 0 0">
-                <!-- Wrist base -->
                 <a-box width="0.04" height="0.04" depth="0.06" color="#333" position="0 0 -0.05"></a-box>
 
-                <!-- Fixed Finger (Straight) -->
                 <a-box width="0.008" height="0.08" depth="0.02" color="#666" position="-0.02 0 -0.10"></a-box>
 
-                <!-- Moving Finger (Inverted L-Shape) -->
                 <a-entity id="fingerMoving" position="0.02 0 -0.10">
-                    <!-- Vertical part -->
                     <a-box width="0.008" height="0.08" depth="0.02" color="#666" position="0 0 0"></a-box>
-                    <!-- Horizontal tip (forming the L closing in) -->
                     <a-box width="0.02" height="0.008" depth="0.02" color="#666" position="-0.01 0.036 0"></a-box>
                 </a-entity>
             </a-entity>
@@ -112,8 +102,6 @@
     document.addEventListener('DOMContentLoaded', () => {
         const cameraImg = document.getElementById('cameraTexture');
         const cameraPlane = document.getElementById('cameraPlane');
-        // We use /video_feed on the dashboard generally, but VR needs it as a texture
-        // The texture loader in A-Frame handles it.
         cameraImg.src = '/video_feed';
 
         setInterval(() => {
@@ -129,12 +117,7 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        // Since we embedded the scene, we might need to adjust some startup logic
         const scene = document.querySelector('a-scene');
-
-        // Re-style the user provided VR button (created by our script) if needed,
-        // or just use our own button.
-        // The original logic created a button on the body. We should probably create it inside the block.
 
         if (!navigator.xr) return;
 
@@ -167,13 +150,11 @@
                 }
             };
 
-            // Append to the content wrapper relative container for better positioning
             document.querySelector('.content-wrapper > div').appendChild(btn);
 
             scene.addEventListener('enter-vr', () => {
                 btn.style.display = 'none';
                 document.getElementById('statusPanel').style.display = 'none';
-                // Hide dashboard sidebar/header via CSS if needed, but A-Frame fullscreen usually handles it.
             });
             scene.addEventListener('exit-vr', () => {
                 btn.style.display = 'block';

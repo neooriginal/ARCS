@@ -3,7 +3,6 @@
 {% block title %}Remote Control{% endblock %}
 
 {% block actions %}
-<!-- TTS & Speed Controls -->
 <div class="remote-actions" style="display: flex; align-items: center; gap: 10px;">
     <div
         style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; white-space: nowrap;">
@@ -25,14 +24,11 @@
 
 {% block content %}
 <div class="panels">
-    <!-- Touch Controls Layer (Mobile Only) -->
     <div class="touch-controls-layer">
         <div id="joystick-left" class="joystick-zone"></div>
         <div id="joystick-right" class="joystick-zone"></div>
 
-        <!-- Mobile Action Buttons -->
         <div class="mobile-actions">
-            <!-- Arm controls removed per user request (Wheels only) -->
         </div>
     </div>
 
@@ -156,14 +152,9 @@
 {% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
 <script>
-    // Mobile Touch Control Logic
     document.addEventListener('DOMContentLoaded', () => {
-        // Only initialize on touch devices or small screens
         if (window.innerWidth > 768 && !('ontouchstart' in window)) return;
 
-        console.log('Initializing Mobile Controls');
-
-        // Left Joystick - Drive (WASD)
         const driveManager = nipplejs.create({
             zone: document.getElementById('joystick-left'),
             mode: 'static',
@@ -172,7 +163,6 @@
             size: 100
         });
 
-        // Right Joystick - Head (Mouse Look)
         const headManager = nipplejs.create({
             zone: document.getElementById('joystick-right'),
             mode: 'static',
@@ -181,24 +171,18 @@
             size: 100
         });
 
-        // Drive Logic
         driveManager.on('move', (evt, data) => {
             if (!data.vector) return;
 
-            // Map vector to WASD keys globally defined in app.js
-            // Thresholds for directional activation
-            const threshold = 0.3;
             const x = data.vector.x;
             const y = data.vector.y;
 
-            // Update global keysPressed object from app.js
             if (typeof keysPressed !== 'undefined') {
                 keysPressed.w = y > threshold;
                 keysPressed.s = y < -threshold;
                 keysPressed.a = x < -threshold;
-                keysPressed.d = x > threshold; // Fixed: d is positive x
+                keysPressed.d = x > threshold;
 
-                // Trigger movement update
                 if (typeof sendMovement === 'function') sendMovement();
             }
         });
@@ -213,19 +197,16 @@
             }
         });
 
-        // Head Logic
         let headInterval;
         headManager.on('move', (evt, data) => {
             if (!data.vector) return;
 
-            // Continuous update while holding
             clearInterval(headInterval);
             headInterval = setInterval(() => {
                 if (typeof currentYaw !== 'undefined' && typeof currentPitch !== 'undefined') {
-                    // Adjust sensitivity here
                     const sensitivity = 2.0;
                     const deltaYaw = data.vector.x * sensitivity;
-                    const deltaPitch = -data.vector.y * sensitivity; // Invert Y for natural look
+                    const deltaPitch = -data.vector.y * sensitivity;
 
                     currentYaw = Math.max(YAW_MIN, Math.min(YAW_MAX, currentYaw + deltaYaw));
                     currentPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, currentPitch + deltaPitch));
@@ -240,7 +221,6 @@
             clearInterval(headInterval);
         });
 
-        // Mobile Buttons
         const gripBtn = document.getElementById('btn-mobile-gripper');
         if (gripBtn) {
             gripBtn.addEventListener('touchstart', (e) => {
@@ -258,8 +238,6 @@
         const modeBtn = document.getElementById('btn-toggle-arm');
         if (modeBtn) {
             modeBtn.addEventListener('click', () => {
-                // Toggle between drive/arm modes if needed, currently sets focus
-                // For now, mobile assumes 'drive' mode mostly, but we can toggle view
                 if (typeof setMode === 'function') {
                     const newMode = (currentMode === 'drive') ? 'arm' : 'drive';
                     setMode(newMode);
@@ -267,7 +245,6 @@
             });
         }
 
-        // Force Drive Mode on touch interaction start if not set
         document.getElementById('joystick-left').addEventListener('touchstart', () => {
             if (currentMode !== 'drive' && typeof setMode === 'function') setMode('drive');
         });

@@ -838,7 +838,7 @@ body {
     }
 }
 
-/* --- Mobile Responsiveness --- */
+/* Mobile */
 @media (max-width: 768px) {
 
     /* Layout Reset */
@@ -869,7 +869,6 @@ body {
         left: 0;
     }
 
-    /* Hide Desktop Sidebar Elements */
     .sidebar-header,
     .robot-selector,
     .sidebar-footer {
@@ -976,7 +975,6 @@ body {
         gap: 15px;
     }
 
-    /* Remote Control Mobile Header */
     .remote-actions {
         overflow-x: auto;
         padding-bottom: 5px;
@@ -984,17 +982,14 @@ body {
         -webkit-overflow-scrolling: touch;
     }
 
-    /* Remote Control "Wheels Only" Layout for Mobile */
     .touch-controls-layer+.panels {
         flex-direction: column;
     }
 
-    /* Hide Arm Panel entirely on mobile */
     .arm-panel {
         display: none !important;
     }
 
-    /* Maximize Drive Panel */
     .drive-panel {
         width: 100% !important;
         flex: 1;
@@ -1003,17 +998,14 @@ body {
         border: none !important;
     }
 
-    /* Hide redundant header on mobile to save space */
     .drive-panel .panel-header {
         display: none !important;
     }
 
-    /* Hide "Click to Drive" box on mobile */
     .drive-panel .click-prompt {
         display: none !important;
     }
 
-    /* Ensure video container fills space and clips overflow */
     .video-container {
         height: 100%;
         min-height: 70vh;
@@ -1027,7 +1019,6 @@ body {
         width: 100%;
         height: 100%;
         object-fit: cover;
-        /* Cut out black bars */
     }
 }
 
@@ -1055,7 +1046,6 @@ body {
         background: rgba(5, 5, 8, 0.95);
         backdrop-filter: blur(10px);
         z-index: 900;
-        /* Below sidebar (1000) */
         text-align: center;
         padding: 40px;
     }
@@ -1076,12 +1066,10 @@ body {
         max-width: 300px;
     }
 
-    /* Hide VR Status Panel on mobile since it's restricted anyway */
     #statusPanel {
         display: none !important;
     }
 
-    /* Stack Top Bar for better spacing on mobile */
     .top-bar {
         height: auto !important;
         padding: 10px 15px !important;
@@ -1114,7 +1102,6 @@ body {
         height: 160px;
         pointer-events: auto;
         bottom: 160px;
-        /* High enough to clear nav and centered on video */
     }
 
     #joystick-left {
