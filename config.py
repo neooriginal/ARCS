@@ -13,9 +13,9 @@ CAMERA_WIDTH = 1280
 CAMERA_HEIGHT = 720
 CAMERA_BUFFER_SIZE = 1
 
-# Video Stream (Web/VR - Optimized for Latency)
-STREAM_WIDTH = 320
-STREAM_HEIGHT = 180
+# Video Stream (Web/VR)
+STREAM_WIDTH = 640
+STREAM_HEIGHT = 360
 STREAM_JPEG_QUALITY = 20
 
 # Control intervals (ms)
