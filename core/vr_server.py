@@ -94,15 +94,12 @@ class VRSocketHandler:
                     self._handle_grip_release()
                 
                 if 'thumbstick' in right:
-                    self._handle_joystick(right['thumbstick'], right_grip=self.right_controller.grip_active)
+                    self._handle_head_control(right['thumbstick'])
                 
                 left = data.get('leftController', {})
                 left_grip = left.get('gripActive', False)
                 if 'thumbstick' in left:
                     self._handle_joystick(left['thumbstick'], right_grip=self.right_controller.grip_active, left_grip=left_grip)
-                
-                if 'thumbstick' in right:
-                    self._handle_head_control(right['thumbstick'])
                 return
             
             if data.get('gripReleased'):

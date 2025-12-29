@@ -161,9 +161,6 @@ class VRArmController:
             new_yaw = current_yaw + goal.head_yaw_delta
             new_pitch = current_pitch + goal.head_pitch_delta
             
-            new_yaw = max(-60, min(60, new_yaw))
-            new_pitch = max(-30, min(60, new_pitch))
-            
             self.servo_controller.turn_head_yaw(new_yaw)
             self.servo_controller.turn_head_pitch(new_pitch)
             
