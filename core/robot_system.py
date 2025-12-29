@@ -28,7 +28,6 @@ class RobotSystem:
         state.robot_system = self
         
     def _init_camera(self):
-    def _init_camera(self):
         try:
             from camera import init_camera
             if init_camera():
@@ -37,6 +36,9 @@ class RobotSystem:
             else:
                 logger.error("Failed to initialize camera module")
                 self.camera = None
+        except ImportError:
+            logger.error("Camera module not found or dependencies missing")
+            self.camera = None
         except Exception as e:
             logger.error(f"Camera init error: {e}")
             self.camera = None
