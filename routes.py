@@ -44,6 +44,12 @@ def video_feed():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
+@bp.route('/video_feed_right')
+def video_feed_right():
+    from camera import generate_frames_right
+    return Response(generate_frames_right(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
 @bp.route('/head_position')
 def get_head_position():
     if state.controller is None:

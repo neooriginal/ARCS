@@ -59,6 +59,11 @@
             <a-entity rotation="-15 0 0">
                 <a-plane id="cameraPlane" width="1.6" height="0.9"
                     material="shader: flat; src: #cameraTexture; transparent: true; opacity: 0.95"></a-plane>
+
+                <!-- Right Camera Feed -->
+                <a-plane id="cameraPlaneRight" width="0.53" height="0.3" position="1.1 -0.3 0.1" rotation="0 -15 0"
+                    material="shader: flat; src: #cameraTextureRight; transparent: true; opacity: 0.95; side: double"></a-plane>
+
                 <a-text value="Camera" position="0 0.5 0" align="center" scale="0.1 0.1 0.1" color="#00d2ff"></a-text>
             </a-entity>
 
@@ -91,6 +96,7 @@
 
         <a-assets>
             <img id="cameraTexture" crossorigin="anonymous">
+            <img id="cameraTextureRight" crossorigin="anonymous">
         </a-assets>
     </a-scene>
 
@@ -104,9 +110,17 @@
         const cameraPlane = document.getElementById('cameraPlane');
         cameraImg.src = '/video_feed';
 
+        const cameraImgRight = document.getElementById('cameraTextureRight');
+        const cameraPlaneRight = document.getElementById('cameraPlaneRight');
+        if (cameraImgRight) cameraImgRight.src = '/video_feed_right';
+
         setInterval(() => {
             if (cameraPlane && cameraPlane.getObject3D('mesh')) {
                 const mat = cameraPlane.getObject3D('mesh').material;
+                if (mat.map) mat.map.needsUpdate = true;
+            }
+            if (cameraPlaneRight && cameraPlaneRight.getObject3D('mesh')) {
+                const mat = cameraPlaneRight.getObject3D('mesh').material;
                 if (mat.map) mat.map.needsUpdate = true;
             }
         }, 33);

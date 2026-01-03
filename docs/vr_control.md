@@ -32,5 +32,5 @@ VR_TO_ROBOT_SCALE = 1.0   # Movement sensitivity
 ## Notes
 
 - Uses PyBullet for inverse kinematics
-- Camera feed visible in VR at eye level
+- Camera feeds (Main & Arm) visible in VR at eye level
 - Works with Quest 3 passthrough mode

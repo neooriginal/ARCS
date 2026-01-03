@@ -11,9 +11,12 @@ class RobotState:
     
     def __init__(self):
         self.camera = None
+        self.camera_right = None
         self.controller = None
         self.latest_frame = None       # Threaded capture frame buffer
+        self.latest_frame_right = None # Right camera buffer
         self.frame_id = 0              # Synchronization counter
+        self.frame_id_right = 0        # Right camera counter
         self.running = True
         self.movement = {
             'forward': False,

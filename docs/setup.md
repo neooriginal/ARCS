@@ -51,7 +51,7 @@
     You can adjust core settings in `config.py`:
     - **TTS**: Set `TTS_ENABLED = True` and configure `TTS_AUDIO_DEVICE` (default `plughw:1,0` for HDMI).
     - **Safety**: Adjust `STALL_LOAD_THRESHOLD` (default 600) or `AI_MIN_BRIGHTNESS`.
-    - **Camera**: Change `CAMERA_PORT` if not using `/dev/video0`.
+    - **Camera**: Change `CAMERA_PORT` or `CAMERA_RIGHT_PORT` to configure video inputs.
 
 ## 🔧 Calibration
 
