@@ -16,57 +16,34 @@ from config import (
 from state import state
 
 
-def _open_camera(port):
-    """Helper to open camera with retries on path/index."""
-    # Try opening as string path first (let OpenCV choose backend)
-    cap = cv2.VideoCapture(port)
-    if cap.isOpened():
-        return cap
-        
-    # If path looks like /dev/videoN, try as integer index
-    import re
-    if isinstance(port, str):
-        match = re.search(r'video(\d+)$', port)
-        if match:
-            idx = int(match.group(1))
-            print(f"(trying index {idx})...", end=" ", flush=True)
-            cap = cv2.VideoCapture(idx)
-            if cap.isOpened():
-                return cap
-
-    return cap
-
-
 def init_camera():
     print(f"📷 Connecting camera ({CAMERA_PORT})...", end=" ", flush=True)
     try:
         if state.camera is not None and state.camera.isOpened():
             print("✓ (Already open)")
-        else:
-            # Use V4L2 backend for better buffer control on Linux
-            camera = _open_camera(CAMERA_PORT)
+            return True
+
+        # Use V4L2 backend for better buffer control on Linux
+        camera = cv2.VideoCapture(CAMERA_PORT, cv2.CAP_V4L2)
+        
+        # Request MJPEG format (hardware-encoded, faster)
+        camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+        camera.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
+        camera.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+        camera.set(cv2.CAP_PROP_FPS, 30)
+        camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        
+        if camera.isOpened():
+            # Drain stale frames from buffer
+            for _ in range(5):
+                camera.grab()
             
-            # Request MJPEG format (hardware-encoded, faster)
-            camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
-            camera.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
-            camera.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
-            camera.set(cv2.CAP_PROP_FPS, 30)
-            camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            print("✓")
+            state.camera = camera
             
-            if camera.isOpened():
-                # Drain stale frames from buffer
-                for _ in range(5):
-                    camera.grab()
-                
-                print("✓")
-                state.camera = camera
-                
-                # Start background capture thread
-                capture_thread = threading.Thread(target=_capture_loop, daemon=True)
-                capture_thread.start()
-            else:
-                print("⚠ Warning: Camera not available")
-                state.camera = None
+            # Start background capture thread
+            capture_thread = threading.Thread(target=_capture_loop, daemon=True)
+            capture_thread.start()
 
         # Initialize Right Camera
         if CAMERA_RIGHT_ENABLED:
@@ -76,7 +53,7 @@ def init_camera():
                     print("✓ (Already open)")
                 else:
                     # Use V4L2 backend
-                    camera_right = _open_camera(CAMERA_RIGHT_PORT)
+                    camera_right = cv2.VideoCapture(CAMERA_RIGHT_PORT, cv2.CAP_V4L2)
                     
                     # Request MJPEG format
                     camera_right.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))

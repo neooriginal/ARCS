@@ -1,7 +1,7 @@
 """ARCS Configuration"""
 
 # Hardware ports
-CAMERA_PORT = "/dev/video1"
+CAMERA_PORT = "/dev/video2"
 CAMERA_RIGHT_PORT = "/dev/video0"
 CAMERA_RIGHT_ENABLED = True
 WHEEL_USB = "/dev/robot_acm0"
