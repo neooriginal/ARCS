@@ -81,11 +81,7 @@ def init_camera():
                 state.camera_right = None
             
         return True
-        else:
-            print("⚠ Warning: Camera may not be available")
-            state.last_error = "Camera not available"
-            state.camera = None
-            return False
+
     except Exception as e:
         print(f"✗ Failed: {e}")
         state.camera = None
