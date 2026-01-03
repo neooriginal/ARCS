@@ -11,7 +11,7 @@ import threading
 from config import (
     CAMERA_PORT, CAMERA_WIDTH, CAMERA_HEIGHT, CAMERA_BUFFER_SIZE,
     STREAM_WIDTH, STREAM_HEIGHT, STREAM_JPEG_QUALITY,
-    CAMERA_RIGHT_PORT, CAMERA_RIGHT_ENABLED
+    CAMERA_RIGHT_PORT
 )
 from state import state
 
@@ -45,40 +45,39 @@ def init_camera():
             capture_thread = threading.Thread(target=_capture_loop, daemon=True)
             capture_thread.start()
 
-        # Initialize Right Camera
-        if CAMERA_RIGHT_ENABLED:
-            print(f"📷 Connecting right camera ({CAMERA_RIGHT_PORT})...", end=" ", flush=True)
-            try:
-                if state.camera_right is not None and state.camera_right.isOpened():
-                    print("✓ (Already open)")
+        # Initialize Right Camera (Optional)
+        print(f"📷 Connecting right camera ({CAMERA_RIGHT_PORT})...", end=" ", flush=True)
+        try:
+            if state.camera_right is not None and state.camera_right.isOpened():
+                print("✓ (Already open)")
+            else:
+                # Use V4L2 backend
+                camera_right = cv2.VideoCapture(CAMERA_RIGHT_PORT, cv2.CAP_V4L2)
+                
+                # Request MJPEG format
+                camera_right.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+                camera_right.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
+                camera_right.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+                camera_right.set(cv2.CAP_PROP_FPS, 30)
+                camera_right.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                
+                if camera_right.isOpened():
+                    # Drain stale frames
+                    for _ in range(5):
+                        camera_right.grab()
+                    
+                    print("✓")
+                    state.camera_right = camera_right
+                    
+                    # Start background capture thread for right camera
+                    capture_thread_right = threading.Thread(target=_capture_loop_right, daemon=True)
+                    capture_thread_right.start()
                 else:
-                    # Use V4L2 backend
-                    camera_right = cv2.VideoCapture(CAMERA_RIGHT_PORT, cv2.CAP_V4L2)
-                    
-                    # Request MJPEG format
-                    camera_right.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
-                    camera_right.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
-                    camera_right.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
-                    camera_right.set(cv2.CAP_PROP_FPS, 30)
-                    camera_right.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-                    
-                    if camera_right.isOpened():
-                        # Drain stale frames
-                        for _ in range(5):
-                            camera_right.grab()
-                        
-                        print("✓")
-                        state.camera_right = camera_right
-                        
-                        # Start background capture thread for right camera
-                        capture_thread_right = threading.Thread(target=_capture_loop_right, daemon=True)
-                        capture_thread_right.start()
-                    else:
-                        print("⚠ Warning: Right camera not available")
-                        state.camera_right = None
-            except Exception as e:
-                print(f"✗ Failed (Right): {e}")
-                state.camera_right = None
+                    print(f"⚠ (Not found on {CAMERA_RIGHT_PORT})")
+                    state.camera_right = None
+        except Exception as e:
+            print(f"⚠ (Failed: {e})")
+            state.camera_right = None
             
         return True
 
