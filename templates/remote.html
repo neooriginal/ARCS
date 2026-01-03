@@ -84,13 +84,12 @@
             <div class="mode-indicator" id="arm-indicator"></div>
         </div>
         <div class="arm-container" id="arm-container">
-            <!-- Arm Camera Preview -->
-            <div class="arm-camera-preview">
-                <img src="/video_feed_right" alt="Arm Camera">
-            </div>
+            <!-- Arm Camera Feed (Background) -->
+            <img id="arm-video-feed" src="/video_feed_right" alt="Arm Camera">
+            <div class="video-overlay"></div>
 
             <!-- Arm visualization -->
-            <div class="arm-visual">
+            <div class="arm-visual" style="position: relative; z-index: 2;">
                 <svg viewBox="0 0 200 200" class="arm-svg">
                     <!-- Base -->
                     <circle cx="100" cy="180" r="20" class="arm-base" />

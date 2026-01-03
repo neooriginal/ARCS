@@ -637,27 +637,22 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-}
-
-.arm-camera-preview {
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    width: 35%;
-    max-width: 140px;
-    aspect-ratio: 16/9;
-    background: #000;
-    border: 1px solid rgba(255, 170, 0, 0.4);
-    border-radius: 6px;
     overflow: hidden;
-    z-index: 10;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
-.arm-camera-preview img {
+#arm-video-feed {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
+    z-index: 0;
+    opacity: 0.8;
+}
+
+.arm-container .video-overlay {
+    z-index: 1;
 }
 
 .arm-container.locked {
@@ -666,6 +661,8 @@ body {
 
 .arm-panel .click-prompt {
     border-color: rgba(255, 170, 0, 0.3);
+    position: relative;
+    z-index: 5;
 }
 
 .arm-panel .click-prompt h2 {
@@ -678,8 +675,11 @@ body {
     flex-direction: column;
     align-items: center;
     gap: 15px;
-    opacity: 0.3;
+    opacity: 0.8;
     transition: opacity 0.3s;
+    position: relative;
+    z-index: 2;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 .arm-container.locked .arm-visual {
@@ -762,6 +762,8 @@ body {
     gap: 6px;
     opacity: 0.5;
     transition: opacity 0.3s;
+    z-index: 5;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
 .arm-container.locked .arm-controls-hint {
