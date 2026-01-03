@@ -94,7 +94,6 @@ frame_condition = threading.Condition()
 encoded_frame = None
 current_frame_id = 0
 
-# Right Camera synchronization
 frame_condition_right = threading.Condition()
 encoded_frame_right = None
 current_frame_id_right = 0
@@ -272,42 +271,7 @@ def generate_frames_right():
             time.sleep(0.01)
 
 
-def generate_frames_right():
-    global encoded_frame_right, current_frame_id_right
-    
-    current_frame = encoded_frame_right
-    last_sent_frame_id = 0
-    
-    # Fallback
-    if current_frame is None:
-        try:
-            blank_frame = np.zeros((STREAM_HEIGHT, STREAM_WIDTH, 3), np.uint8)
-            cv2.putText(blank_frame, "STARTING...", (20, STREAM_HEIGHT//2), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-            _, buffer = cv2.imencode('.jpg', blank_frame, [cv2.IMWRITE_JPEG_QUALITY, STREAM_JPEG_QUALITY])
-            current_frame = buffer.tobytes()
-        except Exception:
-            pass
 
-    if current_frame:
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + current_frame + b'\r\n')
-    
-    while state.running:
-        with frame_condition_right:
-            frame_condition_right.wait(timeout=0.05)
-            
-            if current_frame_id_right == last_sent_frame_id:
-                continue
-            
-            current_frame = encoded_frame_right
-            last_sent_frame_id = current_frame_id_right
-
-        if current_frame:
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + current_frame + b'\r\n')
-        else:
-            time.sleep(0.01)
 
 
 def release_camera():

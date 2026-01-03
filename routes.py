@@ -7,7 +7,7 @@ import numpy as np
 from flask import Blueprint, Response, jsonify, request, render_template
 
 from state import state
-from camera import generate_frames
+from camera import generate_frames, generate_frames_right
 from movement import execute_movement
 from arm import arm_controller
 import tts
@@ -46,7 +46,6 @@ def video_feed():
 
 @bp.route('/video_feed_right')
 def video_feed_right():
-    from camera import generate_frames_right
     return Response(generate_frames_right(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
