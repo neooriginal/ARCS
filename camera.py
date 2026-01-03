@@ -128,7 +128,7 @@ def _capture_loop():
                 state.frame_id += 1
                 
                 # Resize and encode for streaming
-                stream_frame = cv2.resize(frame, (STREAM_WIDTH, STREAM_HEIGHT), interpolation=cv2.INTER_NEAREST)
+                stream_frame = cv2.resize(frame, (STREAM_WIDTH, STREAM_HEIGHT), interpolation=cv2.INTER_LINEAR)
                 _, buffer = cv2.imencode('.jpg', stream_frame, [
                     cv2.IMWRITE_JPEG_QUALITY, STREAM_JPEG_QUALITY,
                     cv2.IMWRITE_JPEG_OPTIMIZE, 0
@@ -176,7 +176,7 @@ def _capture_loop_right():
                 state.frame_id_right += 1
                 
                 # Resize and encode
-                stream_frame = cv2.resize(frame, (STREAM_WIDTH, STREAM_HEIGHT), interpolation=cv2.INTER_NEAREST)
+                stream_frame = cv2.resize(frame, (STREAM_WIDTH, STREAM_HEIGHT), interpolation=cv2.INTER_LINEAR)
                 _, buffer = cv2.imencode('.jpg', stream_frame, [
                     cv2.IMWRITE_JPEG_QUALITY, STREAM_JPEG_QUALITY,
                     cv2.IMWRITE_JPEG_OPTIMIZE, 0

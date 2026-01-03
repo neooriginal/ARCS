@@ -21,7 +21,7 @@ OBSTACLE_THRESHOLD_RATIO = 0.875 # Forward safety line (0.0=top, 1.0=bottom)
 # Video Stream (Web/VR)
 STREAM_WIDTH = 640
 STREAM_HEIGHT = 360
-STREAM_JPEG_QUALITY = 20
+STREAM_JPEG_QUALITY = 50
 
 # Control intervals (ms)
 MOVEMENT_LOOP_INTERVAL = 0.05
