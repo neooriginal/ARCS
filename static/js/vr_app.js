@@ -16,6 +16,86 @@ AFRAME.registerComponent('vr-controller-updater', {
 
         this.connectSocket();
         this.setupEvents();
+        this.setupRecording();
+    },
+
+    setupRecording: function () {
+        this.recordBtn = document.getElementById('recordBtn');
+        this.datasetNameInput = document.getElementById('datasetName');
+        this.recordingStatus = document.getElementById('recordingStatus');
+        this.recFrameCount = document.getElementById('recFrameCount');
+        this.vrRecIndicator = document.getElementById('vrRecIndicator');
+        this.isRecording = false;
+
+        const savedName = localStorage.getItem('vr_dataset_name');
+        if (savedName) this.datasetNameInput.value = savedName;
+
+        if (this.recordBtn) {
+            this.recordBtn.addEventListener('click', () => this.toggleRecording());
+        }
+
+        setInterval(() => this.checkRecordingStatus(), 1000);
+    },
+
+    toggleRecording: async function () {
+        const name = this.datasetNameInput.value.trim();
+        if (!name) return;
+
+        localStorage.setItem('vr_dataset_name', name);
+
+        if (!this.isRecording) {
+            try {
+                const res = await fetch('/api/recording/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dataset_name: name })
+                });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    this.isRecording = true;
+                    this.updateRecordUI(true);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        } else {
+            try {
+                const res = await fetch('/api/recording/stop', { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    this.isRecording = false;
+                    this.updateRecordUI(false);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+    },
+
+    checkRecordingStatus: async function () {
+        try {
+            const res = await fetch('/api/recording/status');
+            const data = await res.json();
+            this.isRecording = data.is_recording;
+            if (this.isRecording) {
+                this.updateRecordUI(true);
+                if (this.recFrameCount) this.recFrameCount.innerText = data.frame_count;
+            } else {
+                this.updateRecordUI(false);
+            }
+        } catch (e) { }
+    },
+
+    updateRecordUI: function (recording) {
+        if (recording) {
+            this.recordingStatus.style.display = 'block';
+            this.datasetNameInput.disabled = true;
+            if (this.vrRecIndicator) this.vrRecIndicator.setAttribute('visible', true);
+        } else {
+            this.recordingStatus.style.display = 'none';
+            this.datasetNameInput.disabled = false;
+            if (this.vrRecIndicator) this.vrRecIndicator.setAttribute('visible', false);
+        }
     },
 
     connectSocket: function () {
@@ -40,6 +120,10 @@ AFRAME.registerComponent('vr-controller-updater', {
 
     setupEvents: function () {
         if (!this.rightHand || !this.leftHand) return;
+
+        this.rightHand.addEventListener('abuttondown', () => {
+            this.toggleRecording();
+        });
 
         this.rightHand.addEventListener('gripdown', () => {
             this.rightGripDown = true;

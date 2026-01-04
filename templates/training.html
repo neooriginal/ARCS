@@ -1,0 +1,449 @@
+{% extends "base.html" %}
+
+{% block title %}Training Dashboard (BETA){% endblock %}
+
+{% block head %}
+<style>
+    .split-view {
+        display: flex;
+        gap: 20px;
+        height: calc(100vh - 80px);
+        /* Fill remaining */
+    }
+
+    .panel {
+        background: #1e1e1e;
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 20px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .panel h2 {
+        margin-top: 0;
+        color: #ddd;
+        border-bottom: 1px solid #333;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
+
+    .list-container {
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    .item-row {
+        background: #2a2a2a;
+        padding: 10px;
+        margin-bottom: 8px;
+        border-radius: 4px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .item-row:hover {
+        background: #333;
+    }
+
+    .status-badge {
+        font-size: 0.8em;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: #444;
+        color: #aaa;
+    }
+
+    .logs-panel {
+        background: #000;
+        color: #0f0;
+        font-family: monospace;
+        padding: 10px;
+        overflow-y: auto;
+        flex: 1;
+        font-size: 0.9em;
+        border: 1px solid #333;
+    }
+
+    .train-controls {
+        background: #252525;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+
+    label {
+        display: block;
+        margin-bottom: 5px;
+        color: #aaa;
+        font-size: 0.9em;
+    }
+
+    input,
+    select {
+        width: 100%;
+        background: #333;
+        border: 1px solid #444;
+        color: #fff;
+        padding: 8px;
+        border-radius: 4px;
+        margin-bottom: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="padding: 20px;">
+
+    <!-- Active Training Monitor (Top) -->
+    <div id="activeJobPanel"
+        style="display: none; background: #222; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #444;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="margin: 0; color: #fff;">🏃 Active Training Job: <span id="jobName"
+                    style="color: #00d2ff;">...</span></h3>
+            <button class="btn btn-danger" onclick="stopTraining()">Stop Training</button>
+        </div>
+        <div class="logs-panel" id="trainingLogs" style="height: 200px;">
+            <div>> Waiting for logs...</div>
+        </div>
+    </div>
+
+    <div class="split-view">
+        <!-- Datasets Panel -->
+        <div class="panel">
+            <h2>HuggingFace Hub</h2>
+            <div id="hfAuthPanel" style="background:#252525; padding:10px; border-radius:4px; margin-bottom:15px;">
+                Checking login status...
+            </div>
+
+            <h2>Reference Datasets (Local)</h2>
+            <div class="train-controls">
+                <label>Job Name (Required)</label>
+                <input type="text" id="newJobName" placeholder="e.g. policy_test_1">
+                <small style="color:#666; display:block; margin-top:-5px; margin-bottom:10px;">Device will be
+                    auto-detected.</small>
+            </div>
+            <div class="list-container" id="datasetList">
+                <div style="color: #666; padding: 10px; text-align: center;">Loading datasets...</div>
+            </div>
+        </div>
+
+        <!-- Trained Policies Panel -->
+        <div class="panel">
+            <h2>Trained Policies</h2>
+            <div class="list-container" id="policyList">
+                <div style="color: #666; padding: 10px; text-align: center;">Loading policies...</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let isTraining = false;
+    let logInterval = null;
+
+    async function loadData() {
+        checkAuthStatus(); // Check login
+
+        // Load Datasets
+        try {
+            const res = await fetch('/api/training/datasets');
+            const data = await res.json();
+            const container = document.getElementById('datasetList');
+            container.innerHTML = '';
+
+            if (data.datasets.length === 0) {
+                container.innerHTML = '<div style="color:#666; padding:10px;">No datasets found in logs/datasets/</div>';
+            }
+
+            data.datasets.forEach(name => {
+                const row = document.createElement('div');
+                row.className = 'item-row';
+                row.innerHTML = `
+                    <span style="font-weight: bold; color: #fff;">📄 ${name}</span>
+                    <div>
+                        <button class="btn btn-sm btn-primary" onclick="requestTrain('${name}')" style="margin-right:8px;">Train ACT</button>
+                        <button class="btn btn-sm" onclick="renameDataset('${name}')" style="margin-right:8px; background: #666;">Rename</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteDataset('${name}')" style="padding: 2px 8px;">🗑️</button>
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+        } catch (e) { console.error(e); }
+
+        // Load Policies
+        try {
+            const res = await fetch('/api/training/policies');
+            const data = await res.json();
+            const container = document.getElementById('policyList');
+            container.innerHTML = '';
+
+            if (data.policies.length === 0) {
+                container.innerHTML = '<div style="color:#666; padding:10px;">No policies found in logs/policies/</div>';
+            }
+
+            data.policies.forEach(name => {
+                const row = document.createElement('div');
+                row.className = 'item-row';
+                row.innerHTML = `
+                    <span style="font-weight: bold; color: #0f0;">🧠 ${name}</span>
+                    <button class="btn btn-sm" onclick="runPolicy('${name}')" style="background:#444;">Run (TODO)</button>
+                `;
+                container.appendChild(row);
+            });
+        } catch (e) { console.error(e); }
+    }
+
+    async function renameDataset(oldName) {
+        const newName = prompt("Enter new name for dataset '" + oldName + "':", oldName);
+        if (!newName || newName === oldName) return;
+
+        try {
+            const res = await fetch('/api/training/datasets/rename', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ old_name: oldName, new_name: newName })
+            });
+            const data = await res.json();
+            if (data.status === 'ok') {
+                alert("Renamed: " + data.message);
+                loadData(); // Refresh list
+            } else {
+                alert("Error: " + data.message);
+            }
+        } catch (e) {
+            alert("Req error: " + e);
+        }
+    }
+
+    async function deleteDataset(name) {
+        if (!confirm(`⚠️ PERMANENTLY DELETE '${name}'?\n\nThis will delete:\n1. Local copy in /logs/datasets/\n2. Remote repo on HuggingFace Hub\n\nAre you sure?`)) return;
+
+        try {
+            const res = await fetch('/api/training/datasets/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dataset_name: name })
+            });
+            const data = await res.json();
+            if (data.status === 'ok') {
+                alert("Deleted: " + data.message);
+                loadData(); // Refresh list
+            } else {
+                alert("Error: " + data.message);
+            }
+        } catch (e) {
+            alert("Req error: " + e);
+        }
+    }
+
+    async function requestTrain(datasetName) {
+        const jobName = document.getElementById('newJobName').value.trim();
+
+        if (isTraining) {
+            alert("A training job is already active.");
+            return;
+        }
+
+        if (!jobName) {
+            alert("Please provide a Job Name for the new policy.");
+            document.getElementById('newJobName').focus();
+            return;
+        }
+
+        if (!confirm(`Start ACT training on dataset '${datasetName}'?\nJob: ${jobName}`)) return;
+
+        try {
+            const res = await fetch('/api/training/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    dataset: datasetName,
+                    job_name: jobName,
+                    device: 'auto'
+                })
+            });
+            const data = await res.json();
+
+            if (data.status === 'ok') {
+                startMonitoring();
+            } else {
+                alert("Error: " + data.error);
+            }
+        } catch (e) {
+            alert("Req error: " + e);
+        }
+    }
+
+    async function stopTraining() {
+        if (!confirm("Are you sure you want to kill the training process?")) return;
+        await fetch('/api/training/stop', { method: 'POST' });
+    }
+
+    async function startMonitoring() {
+        document.getElementById('activeJobPanel').style.display = 'block';
+        document.getElementById('trainingLogs').innerHTML = '';
+        isTraining = true;
+
+        if (logInterval) clearInterval(logInterval);
+        logInterval = setInterval(pollStatus, 1000);
+    }
+
+    async function pollStatus() {
+        try {
+            const res = await fetch('/api/training/status');
+            const data = await res.json();
+
+            isTraining = data.status.is_training;
+
+            // Update Logs
+            const logPanel = document.getElementById('trainingLogs');
+            if (data.logs && data.logs.length > 0) {
+                data.logs.forEach(line => {
+                    const div = document.createElement('div');
+                    div.innerText = line;
+                    logPanel.appendChild(div);
+                });
+                logPanel.scrollTop = logPanel.scrollHeight;
+            }
+
+            // Update Job Info
+            if (data.status.current_job) {
+                document.getElementById('jobName').innerText = data.status.current_job.name;
+            }
+
+            // Check completion
+            if (!isTraining) {
+                clearInterval(logInterval);
+                logInterval = null;
+                document.getElementById('activeJobPanel').style.display = 'none';
+                loadData(); // Refresh lists
+                if (data.status.current_job && data.status.current_job.status === 'completed') {
+                    alert("Training Completed Successfully!");
+                }
+            }
+
+        } catch (e) {
+            console.error("Poll fail", e);
+        }
+    }
+
+    // Determine default device
+    document.addEventListener('DOMContentLoaded', () => {
+        // Simple heuristic: if mac, assume mps default? 
+        // JS can't know for sure, but user can change it.
+        // Let's default to cpu if unknown, or keep cuda.
+        // Actually, let's keep cuda default as code assumes nvidia mostly, but users can switch.
+        loadData();
+        // Check if already running on load
+        pollStatus();
+    });
+
+    async function runPolicy(name) {
+        // Simple toggle for now, or open modal
+        // For v1, let's just load and run
+        const device = document.getElementById('deviceSelect').value;
+        if (!confirm(`Load and RUN policy '${name}' on ${device}?`)) return;
+
+        // Load
+        try {
+            document.getElementById('jobName').innerText = "Loading Policy...";
+            document.getElementById('activeJobPanel').style.display = 'block';
+
+            let res = await fetch('/api/policies/load', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ policy_name: name, device: device })
+            });
+            let data = await res.json();
+
+            if (data.status !== 'ok') {
+                alert("Load Failed: " + data.error);
+                document.getElementById('activeJobPanel').style.display = 'none';
+                return;
+            }
+
+            // Run
+            res = await fetch('/api/policies/run', { method: 'POST' });
+            data = await res.json();
+
+            if (data.status === 'ok') {
+                document.getElementById('jobName').innerText = `Running Policy: ${name}`;
+                alert("Policy is RUNNING! Check VR/Video stream. Click Stop Training/Policy to abort.");
+                // Reuse stop button but make sure it calls policy stop if not training?
+                // Currently 'stopTraining' calls /api/training/stop. We need a stopPolicy or shared stop.
+                // For now, let's update the stop button action dynamically or separate UI.
+                // Hack for v1:
+                document.querySelector('#activeJobPanel button').onclick = stopPolicy;
+            } else {
+                alert("Run Failed: " + data.error);
+                document.getElementById('activeJobPanel').style.display = 'none';
+            }
+
+        } catch (e) { console.error(e); }
+    }
+
+    async function stopPolicy() {
+        await fetch('/api/policies/stop', { method: 'POST' });
+        document.getElementById('activeJobPanel').style.display = 'none';
+        alert("Policy Stopped");
+    }
+
+    async function checkAuthStatus() {
+        try {
+            const res = await fetch('/api/training/auth');
+            const data = await res.json();
+            const panel = document.getElementById('hfAuthPanel');
+
+            if (data.username) {
+                panel.innerHTML = `
+                    <div style="margin-bottom:5px; color:#aaa;">Logged in as: <strong style="color:#0f0;">${data.username}</strong></div>
+                    <button class="btn btn-sm btn-danger" onclick="hfLogout()">Logout</button>
+                `;
+            } else {
+                panel.innerHTML = `
+                    <div style="margin-bottom:5px; font-size:0.9em; color:#aaa;">Enter HF Write Token:</div>
+                    <input type="password" id="hfToken" placeholder="hf_..." style="width:100%; margin-bottom:5px;">
+                    <button class="btn btn-sm btn-primary" onclick="hfLogin()" style="width:100%;">Login to HuggingFace</button>
+                `;
+            }
+        } catch (e) {
+            console.error("Auth check failed", e);
+            document.getElementById('hfAuthPanel').innerHTML = "Auth check failed.";
+        }
+    }
+
+    async function hfLogin() {
+        const token = document.getElementById('hfToken').value.trim();
+        if (!token) return alert("Please enter a token");
+
+        document.getElementById('hfAuthPanel').innerHTML = "Logging in...";
+
+        try {
+            const res = await fetch('/api/training/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: token })
+            });
+            const data = await res.json();
+            if (data.status === 'ok') {
+                alert(data.message);
+                checkAuthStatus();
+            } else {
+                alert("Login Failed: " + data.message);
+                checkAuthStatus(); // Reset UI
+            }
+        } catch (e) { alert("Error: " + e); checkAuthStatus(); }
+    }
+
+    async function hfLogout() {
+        if (!confirm("Logout from HuggingFace?")) return;
+        await fetch('/api/training/auth/logout', { method: 'POST' });
+        checkAuthStatus();
+    }
+</script>
+{% endblock %}

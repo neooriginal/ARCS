@@ -444,3 +444,51 @@ def create_vla_single_arm_manipulation(
     tool_name_to_override.description = tool_description
 
     return tool_name_to_override
+
+
+def create_run_robot_policy():
+    @tool
+    def run_robot_policy(policy_name: str, duration_seconds: int = 45) -> str:
+        """Executes a trained robot policy to perform a physical task using the arms. 
+        Use this when the user asks to perform a specific learned skill (e.g. 'pickup_cup', 'wipe_table').
+        The policy will take control of the arms and base for the specified duration.
+        """
+        from state import state
+        from core.policy_executor import policy_executor
+        import time
+        
+        print(f"[TOOL] run_robot_policy({policy_name}, duration={duration_seconds})")
+        
+        # 1. Load Policy
+        # Auto-detect device is handled in policy_executor.load_policy
+        if not policy_executor.load_policy(policy_name):
+            return f"Error: Failed to load policy '{policy_name}'. Check if it exists."
+            
+        # 2. Start Execution
+        if not policy_executor.start_execution():
+            return "Error: Failed to start policy execution (maybe already running?)."
+            
+        # 3. Wait for duration (Blocking the agent step is intended here)
+        # We monitor for early stop or errors
+        step = 0.5
+        elapsed = 0
+        try:
+            while elapsed < duration_seconds:
+                if not policy_executor.is_running:
+                    return "Policy execution stopped unexpectedly."
+                if not state.ai_enabled:
+                    policy_executor.stop_execution()
+                    return "Policy execution interrupted by stop command."
+                    
+                time.sleep(step)
+                elapsed += step
+                
+        except Exception as e:
+            policy_executor.stop_execution()
+            return f"Error during policy execution: {e}"
+            
+        # 4. Stop
+        policy_executor.stop_execution()
+        return f"Policy '{policy_name}' executed for {duration_seconds} seconds. Task should be complete."
+
+    return run_robot_policy

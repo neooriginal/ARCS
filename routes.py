@@ -4,6 +4,7 @@
 import cv2
 import time
 import numpy as np
+
 from flask import Blueprint, Response, jsonify, request, render_template
 
 from state import state
@@ -12,6 +13,14 @@ from movement import execute_movement
 from arm import arm_controller
 import tts
 from core.memory_store import memory_store
+from core.dataset_recorder import DatasetRecorder
+from core.training_manager import training_manager
+from core.policy_executor import policy_executor
+
+# Initialize Recorder (will attach cameras later when accessed/available)
+# We need access to the camera objects. In this architecture, they are likely in `state` or global `camera` module.
+# `state.camera` holds the main camera object (cv2.VideoCapture)
+recorder = None 
 
 bp = Blueprint('robot', __name__)
 
@@ -527,5 +536,174 @@ def vr_status():
         'server_running': connected,
         'arm_mode': arm_mode,
         'arm_connected': state.arm_connected
+    })
+
+# Recording Routes
+
+@bp.route('/api/recording/start', methods=['POST'])
+def start_recording():
+    global recorder
+    data = request.json
+    dataset_name = data.get('dataset_name')
+    
+    if not dataset_name:
+        return jsonify({'status': 'error', 'error': 'Dataset name required'}), 400
+
+    # Lazy init recorder with current state cameras
+    if recorder is None:
+        recorder = DatasetRecorder(main_camera=state.camera)
+        import camera
+        if hasattr(camera, 'camera_right'):
+             recorder.right_camera = camera.camera_right
+
+    if recorder.start_recording(dataset_name):
+        return jsonify({'status': 'ok', 'dataset_name': dataset_name})
+    else:
+        return jsonify({'status': 'error', 'error': 'Recording already in progress or failed'}), 409
+
+@bp.route('/api/recording/stop', methods=['POST'])
+def stop_recording():
+    global recorder
+    if recorder and recorder.stop_recording():
+        return jsonify({'status': 'ok'})
+    return jsonify({'status': 'error', 'error': 'Not recording'}), 400
+
+@bp.route('/api/recording/status')
+def recording_status():
+    global recorder
+    is_recording = recorder.is_recording if recorder else False
+    return jsonify({
+        'is_recording': is_recording,
+        'dataset_name': recorder.dataset_name if recorder else None,
+        'episode_idx': recorder.episode_idx if recorder else 0,
+        'frame_count': len(recorder.episode_data['timestamp']) if recorder and is_recording else 0
+    })
+
+
+# Training Routes
+
+@bp.route('/training')
+def training_page():
+    return render_template('training.html')
+
+@bp.route('/api/training/datasets')
+def list_datasets():
+    datasets = training_manager.list_datasets()
+    return jsonify({'datasets': datasets})
+
+@bp.route('/api/training/policies')
+def list_training_policies():
+    policies = training_manager.list_policies()
+    return jsonify({'policies': policies})
+
+@bp.route('/api/training/start', methods=['POST'])
+def start_training():
+    data = request.json
+    dataset = data.get('dataset')
+    job_name = data.get('job_name')
+    device = data.get('device', 'auto') 
+    
+    if not dataset:
+        return jsonify({'status': 'error', 'error': 'Dataset required'}), 400
+        
+    if not job_name:
+        return jsonify({'status': 'error', 'error': 'Job Name required'}), 400
+
+    success, msg = training_manager.start_training(dataset, job_name, device)
+    if success:
+        return jsonify({'status': 'ok', 'job_name': msg})
+    else:
+        return jsonify({'status': 'error', 'error': msg}), 400
+
+@bp.route('/api/training/stop', methods=['POST'])
+def stop_training_job():
+    if training_manager.stop_training():
+        return jsonify({'status': 'ok'})
+    return jsonify({'status': 'error', 'error': 'No active training'}), 400
+
+@bp.route('/api/training/status')
+def training_status():
+    status = training_manager.get_status()
+    logs = training_manager.get_logs()
+    return jsonify({
+        'status': status,
+        'logs': logs
+    })
+
+@bp.route('/api/training/datasets/delete', methods=['POST'])
+def delete_dataset_route():
+    data = request.json
+    dataset_name = data.get('dataset_name')
+    if not dataset_name:
+        return jsonify({'status': 'error', 'error': 'Dataset Name required'}), 400
+    
+    success, msg = training_manager.delete_dataset(dataset_name)
+    return jsonify({'status': 'ok' if success else 'error', 'message': msg})
+
+@bp.route('/api/training/datasets/rename', methods=['POST'])
+def rename_dataset_route():
+    data = request.json
+    old_name = data.get('old_name')
+    new_name = data.get('new_name')
+    
+    if not old_name or not new_name:
+        return jsonify({'status': 'error', 'error': 'Old and New names required'}), 400
+        
+    success, msg = training_manager.rename_dataset(old_name, new_name)
+    return jsonify({'status': 'ok' if success else 'error', 'message': msg})
+
+@bp.route('/api/training/auth', methods=['GET'])
+def get_hf_auth_status():
+    user = training_manager.get_hf_user()
+    return jsonify({'username': user})
+
+@bp.route('/api/training/auth/login', methods=['POST'])
+def hf_login():
+    data = request.json
+    token = data.get('token')
+    if not token:
+        return jsonify({'status': 'error', 'error': 'Token required'}), 400
+    
+    success, msg = training_manager.hf_login(token)
+    return jsonify({'status': 'ok' if success else 'error', 'message': msg})
+
+@bp.route('/api/training/auth/logout', methods=['POST'])
+def hf_logout():
+    success, msg = training_manager.hf_logout()
+    return jsonify({'status': 'ok' if success else 'error', 'message': msg})
+
+
+# Policy Execution Routes
+
+@bp.route('/api/policies/load', methods=['POST'])
+def load_policy():
+    data = request.json
+    policy_name = data.get('policy_name')
+    device = data.get('device', 'cuda')
+    
+    if not policy_name:
+        return jsonify({'status': 'error', 'error': 'Policy Name required'}), 400
+        
+    if policy_executor.load_policy(policy_name, device):
+        return jsonify({'status': 'ok'})
+    return jsonify({'status': 'error', 'error': 'Failed to load policy'}), 500
+
+@bp.route('/api/policies/run', methods=['POST'])
+def run_policy():
+    if policy_executor.start_execution():
+        return jsonify({'status': 'ok'})
+    return jsonify({'status': 'error', 'error': 'Failed to start or already running'}), 500
+
+@bp.route('/api/policies/stop', methods=['POST'])
+def stop_policy():
+    if policy_executor.stop_execution():
+        return jsonify({'status': 'ok'})
+    return jsonify({'status': 'error', 'error': 'Not running'}), 400
+
+@bp.route('/api/policies/status')
+def policy_status():
+    return jsonify({
+        'is_running': policy_executor.is_running,
+        'current_policy': policy_executor.current_policy_name
     })
 

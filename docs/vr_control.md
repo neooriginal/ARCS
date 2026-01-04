@@ -33,4 +33,8 @@ VR_TO_ROBOT_SCALE = 1.0   # Movement sensitivity
 
 - Uses PyBullet for inverse kinematics
 - Camera feeds (Main & Arm) visible in VR at eye level
+
 - Works with Quest 3 passthrough mode
+
+## VLA Recording
+To use VR for collecting LeRobot training data, see the [VLA Guide](vla_guide.md).

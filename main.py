@@ -42,7 +42,8 @@ from robots.xlerobot.tools import (
     create_save_note,
     create_enable_approach_mode,
     create_disable_approach_mode,
-    create_speak
+    create_speak,
+    create_run_robot_policy
 )
 
 # Configure logging
@@ -126,7 +127,8 @@ def main():
             create_save_note(),
             create_enable_approach_mode(),
             create_disable_approach_mode(),
-            create_speak()
+            create_speak(),
+            create_run_robot_policy()
         ]
 
         model_name = os.getenv("AI_MODEL", "openai/gpt-5.2") 

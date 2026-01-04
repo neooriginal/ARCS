@@ -24,6 +24,7 @@ Full guides available in [`docs/`](docs/):
 - **[🧭 Navigation](docs/navigation.md)**: Obstacle Detection, Precision Mode, & Holonomic Control.
 - **[📱 Mobile Control](docs/mobile_control.md)**: Virtual Joysticks & Touch-optimized FPV.
 - **[🥽 VR Control](docs/vr_control.md)**: Arm manipulation via Standalone VR Headsets (e.g., Quest 3 Browser).
+- **[🤖 VLA Guide](docs/vla_guide.md)**: Learn how to use Imitation Learning to train policies.
 - **[🛡️ Safety Architecture](docs/safety.md)**: Active perception & reflex systems.
 - **[👁️ Visual Intelligence](docs/visual_intelligence.md)**: Computer Vision & Semantic Memory.
 - **[🔐 Security](docs/security.md)**: Network & Privacy.

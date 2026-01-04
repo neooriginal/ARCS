@@ -193,7 +193,21 @@ PERSISTENT NOTES:
 
     def reset(self):
         """Reset the agent state and memory."""
-        self.message_history = [SystemMessage(content=self.system_prompt)]
+        # Update system prompt with latest policies
+        try:
+             # Lazy import to avoid circular dependency
+             from core.training_manager import training_manager
+             policies = training_manager.list_policies()
+             if policies:
+                 policy_list = ", ".join(policies)
+                 full_prompt = self.system_prompt + f"\n\nAVAILABLE ROBOT POLICIES (Use `run_robot_policy` tool): [{policy_list}]\nUse these tools when the task involves manipulating objects with the arms (e.g. pickup, wipe, cook)."
+             else:
+                 full_prompt = self.system_prompt
+        except Exception as e:
+             logger.warning(f"Failed to list policies for prompt: {e}")
+             full_prompt = self.system_prompt
+
+        self.message_history = [SystemMessage(content=full_prompt)]
         self.stuck_counter = 0
         self.last_action = None
         self.current_task = "Idle"

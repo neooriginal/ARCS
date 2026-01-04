@@ -40,12 +40,32 @@
                     style="width: 10px; height: 10px; border-radius: 50%; background: #555;"></div>
                 <span style="color: var(--text-secondary);">Arm Control</span>
             </div>
+
+            <!-- Recording Controls -->
+            <div class="recording-controls" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #333;">
+                <input type="text" id="datasetName" placeholder="Dataset Name"
+                    style="background: #222; border: 1px solid #444; color: #fff; padding: 5px; border-radius: 4px; width: 100%; margin-bottom: 8px;">
+
+                <div
+                    style="font-size: 0.8em; color: #aaa; text-align: center; border: 1px solid #444; padding: 8px; border-radius: 4px; background: #222;">
+                    Press <strong>(A)</strong> to Record
+                </div>
+
+                <!-- Hidden button for logic compatibility or unforeseen debug needs -->
+                <button id="recordBtn" style="display: none;"></button>
+
+                <div id="recordingStatus"
+                    style="font-size: 0.7em; color: #ff4444; margin-top: 5px; display: none; text-align: center; font-weight: bold;">
+                    ● Recording: <span id="recFrameCount">0</span> frames
+                </div>
+            </div>
         </div>
         <div class="instructions">
             <h3 style="color: #fff; font-size: 0.9rem; margin-bottom: 10px;">🎮 Controls</h3>
             <div style="color: #aaa; font-size: 0.8rem; line-height: 1.5;">
                 <div><strong>Grip:</strong> Hold to move arm</div>
                 <div><strong>Trigger:</strong> Close gripper</div>
+                <div><strong>Button A:</strong> Record/Stop</div>
                 <div><strong>Thumbstick:</strong> Move robot</div>
             </div>
         </div>
@@ -65,13 +85,19 @@
                     material="shader: flat; src: #cameraTextureRight; transparent: true; opacity: 0.95; side: double"></a-plane>
 
                 <a-text value="Camera" position="0 0.5 0" align="center" scale="0.1 0.1 0.1" color="#00d2ff"></a-text>
+
+                <!-- VR Recording Indicator (Hidden by default) -->
+                <a-entity id="vrRecIndicator" visible="false" position="0.7 0.4 0.02">
+                    <a-circle color="#ff0000" radius="0.03"></a-circle>
+                    <a-text value="REC" position="0.05 0 0" align="left" scale="0.2 0.2 0.2" color="#ff0000"></a-text>
+                </a-entity>
             </a-entity>
 
         </a-entity>
 
         <a-entity id="rightHand" oculus-touch-controls="hand: right">
-            <a-text id="rightHandInfo" value="Ready" position="0 0.04 -0.05" scale="0.05 0.05 0.05" color="white"
-                align="center"></a-text>
+            <a-text id="rightHandInfo" value="Ready\nA: Record" position="0 0.04 -0.05" scale="0.05 0.05 0.05"
+                color="white" align="center"></a-text>
 
             <a-entity id="gripperVisual" position="0 0 0" rotation="0 0 0">
                 <a-box width="0.04" height="0.04" depth="0.06" color="#333" position="0 0 -0.05"></a-box>
