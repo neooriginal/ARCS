@@ -28,16 +28,16 @@ def get_hf_username() -> Optional[str]:
 class TrainingManager:
     def __init__(self):
         self.process = None
-        self.logs_queue = queue.Queue()
+        self.logs = [] # Persistent Log History
         self.is_training = False
         self.current_job = None
         self.job_history = []
         self._monitor_thread = None
         
         # Remote Worker State
-        self.workers = {} # {id: {last_seen: float, gpu: str, status: str, ...}}
+        self.workers = {} 
         self.pending_jobs = queue.Queue()
-        self.worker_logs = {} # {job_name: [logs]}
+        self.worker_logs = {}
 
     def register_worker_heartbeat(self, data: dict) -> dict:
         """Process heartbeat, return pending job if any."""
@@ -122,7 +122,10 @@ class TrainingManager:
             self.workers[wid]['status'] = 'working'
             
         if self.current_job and self.current_job['name'] == job_name:
-            self.logs_queue.put(line)
+            self.logs.append(line)
+            # Update Device Info if not present
+            if 'worker_info' not in self.current_job and wid in self.workers:
+                 self.current_job['worker_info'] = self.workers[wid]['gpu']
             logger.info(f"[REMOTE] {line}")
         else:
              logger.debug(f"[REMOTE IGNORED] {job_name}: {line}")
@@ -178,6 +181,7 @@ class TrainingManager:
         # Set training state immediately so UI doesn't flicker
         self.is_training = True
         self.current_job = job
+        self.logs = [] # Clear logs for new job
         return True, "Job Queued. Waiting for Worker..."
 
     def list_datasets(self) -> List[str]:
@@ -365,6 +369,7 @@ class TrainingManager:
             "cmd": " ".join(cmd)
         }
         self.is_training = True
+        self.logs = [] # Clear logs
         
         # Start subprocess
         try:
@@ -398,6 +403,8 @@ class TrainingManager:
             return True
         return False
 
+    # Monitor Training (Remote & Local)
+
     def _monitor_training(self):
         if not self.process:
             return
@@ -410,7 +417,7 @@ class TrainingManager:
             for line in iter(self.process.stdout.readline, ''):
                 if line:
                     stripped = line.strip()
-                    self.logs_queue.put(stripped)
+                    self.logs.append(stripped)
                     logger.info(f"[TRAIN] {stripped}")
             
             self.process.stdout.close()
@@ -439,17 +446,12 @@ class TrainingManager:
              "history": self.job_history[-5:] # Last 5
          }
 
-
-    def get_logs(self):
-        # Flush queue
-        logs = []
-        try:
-            while True:
-                line = self.logs_queue.get_nowait()
-                logs.append(line)
-        except queue.Empty:
-            pass
-        return logs
+    def get_logs(self, since: int = 0):
+        """Get logs starting from index `since`."""
+        if since < 0: since = 0
+        if since >= len(self.logs):
+            return []
+        return self.logs[since:]
     
     def hf_login(self, token: str) -> tuple:
         """Login to HuggingFace cli."""

@@ -18,6 +18,8 @@
         flex: 1;
         display: flex;
         flex-direction: column;
+        overflow-y: auto;
+        /* Allow scrolling if content overflows */
     }
 
     .panel h2 {
@@ -361,6 +363,7 @@
         document.getElementById('progressText').innerText = "Starting...";
         window.maxSteps = 0;
         window.currentStep = 0;
+        window.logIndex = 0; // Reset Log Index
 
         if (logInterval) clearInterval(logInterval);
         logInterval = setInterval(pollTrainingStatus, 1000);
@@ -368,13 +371,14 @@
 
     async function pollTrainingStatus() {
         try {
-            const res = await fetch('/api/training/status');
+            const res = await fetch(`/api/training/status?since=${window.logIndex || 0}`);
             const data = await res.json();
             isTraining = data.status.is_training;
 
             // Logs
             const logPanel = document.getElementById('trainingLogs');
             if (data.logs && data.logs.length > 0) {
+                window.logIndex = (window.logIndex || 0) + data.logs.length;
                 data.logs.forEach(line => {
                     const div = document.createElement('div');
                     div.innerText = line;

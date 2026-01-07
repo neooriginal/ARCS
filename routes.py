@@ -656,8 +656,9 @@ def get_worker_status():
 
 @bp.route('/api/training/status')
 def training_status():
+    since = int(request.args.get('since', 0))
     status = training_manager.get_status()
-    logs = training_manager.get_logs()
+    logs = training_manager.get_logs(since=since)
     return jsonify({
         'status': status,
         'logs': logs
