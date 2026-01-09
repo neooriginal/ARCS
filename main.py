@@ -55,6 +55,12 @@ log_handler = CircularLogHandler()
 logging.getLogger().addHandler(log_handler)
 state.log_handler = log_handler
 
+class WerkzeugErrorFilter(logging.Filter):
+    def filter(self, record):
+        return "write() before start_response" not in record.getMessage()
+
+logging.getLogger('werkzeug').addFilter(WerkzeugErrorFilter())
+
 def create_app() -> Flask:
     app = Flask(__name__)
     app.register_blueprint(routes.bp)

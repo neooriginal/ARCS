@@ -569,6 +569,10 @@ def generate_cv_frames():
     _, buffer_error = cv2.imencode('.jpg', error_frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
     error_bytes = buffer_error.tobytes()
 
+    # Yield initial frame immediately to ensure headers are sent
+    yield (b'--frame\r\n'
+           b'Content-Type: image/jpeg\r\n\r\n' + error_bytes + b'\r\n')
+
     while state.running:
         if state.robot_system is None:
             time.sleep(1)
