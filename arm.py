@@ -1,12 +1,12 @@
 """RoboCrew Arm Control Module"""
 
 from state import state
-from config import (
-    ARM_XY_SENSITIVITY,
-    ARM_WRIST_SENSITIVITY,
-    ARM_SHOULDER_PAN_STEP,
-    ARM_WRIST_FLEX_STEP,
-)
+from core.config_manager import get_config
+
+ARM_XY_SENSITIVITY = get_config("ARM_XY_SENSITIVITY")
+ARM_WRIST_SENSITIVITY = get_config("ARM_WRIST_SENSITIVITY")
+ARM_SHOULDER_PAN_STEP = get_config("ARM_SHOULDER_PAN_STEP")
+ARM_WRIST_FLEX_STEP = get_config("ARM_WRIST_FLEX_STEP")
 
 ARM_ELBOW_STEP = 2.0
 

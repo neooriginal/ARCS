@@ -5,8 +5,13 @@ Handles wheel movement commands and the continuous movement loop.
 
 import time
 import logging
-from config import MOVEMENT_LOOP_INTERVAL, REMOTE_TIMEOUT, STALL_CHECK_INTERVAL, STALL_LOAD_THRESHOLD
+from core.config_manager import get_config
 from state import state
+
+MOVEMENT_LOOP_INTERVAL = get_config("MOVEMENT_LOOP_INTERVAL")
+REMOTE_TIMEOUT = get_config("REMOTE_TIMEOUT")
+STALL_CHECK_INTERVAL = get_config("STALL_CHECK_INTERVAL")
+STALL_LOAD_THRESHOLD = get_config("STALL_LOAD_THRESHOLD")
 
 logger = logging.getLogger(__name__)
 

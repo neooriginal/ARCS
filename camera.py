@@ -8,12 +8,17 @@ import cv2
 import numpy as np
 import threading
 
-from config import (
-    CAMERA_PORT, CAMERA_WIDTH, CAMERA_HEIGHT, CAMERA_BUFFER_SIZE,
-    STREAM_WIDTH, STREAM_HEIGHT, STREAM_JPEG_QUALITY,
-    CAMERA_RIGHT_PORT
-)
+from core.config_manager import get_config
 from state import state
+
+CAMERA_PORT = get_config("CAMERA_PORT")
+CAMERA_WIDTH = get_config("CAMERA_WIDTH")
+CAMERA_HEIGHT = get_config("CAMERA_HEIGHT")
+CAMERA_BUFFER_SIZE = get_config("CAMERA_BUFFER_SIZE")
+STREAM_WIDTH = get_config("STREAM_WIDTH")
+STREAM_HEIGHT = get_config("STREAM_HEIGHT")
+STREAM_JPEG_QUALITY = get_config("STREAM_JPEG_QUALITY")
+CAMERA_RIGHT_PORT = get_config("CAMERA_RIGHT_PORT")
 
 
 

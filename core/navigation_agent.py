@@ -10,7 +10,9 @@ from collections import deque
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain.chat_models import init_chat_model
-from config import AI_MIN_BRIGHTNESS
+from core.config_manager import get_config
+
+AI_MIN_BRIGHTNESS = get_config("AI_MIN_BRIGHTNESS")
 
 load_dotenv()
 

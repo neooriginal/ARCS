@@ -6,8 +6,12 @@ import tempfile
 import os
 import subprocess
 import logging
+from core.config_manager import get_config
 from gtts import gTTS
-from config import TTS_ENABLED, TTS_AUDIO_DEVICE, TTS_TLD
+
+TTS_ENABLED = get_config("TTS_ENABLED")
+TTS_AUDIO_DEVICE = get_config("TTS_AUDIO_DEVICE")
+TTS_TLD = get_config("TTS_TLD")
 
 logger = logging.getLogger(__name__)
 

@@ -167,9 +167,12 @@ body {
 .connection-status {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
+    padding: 12px 16px;
     font-size: 0.85rem;
     color: var(--text-secondary);
+    border-radius: 8px;
+    margin-top: 5px;
 }
 
 .connection-dot {

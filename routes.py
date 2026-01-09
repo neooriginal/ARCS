@@ -16,6 +16,7 @@ from core.memory_store import memory_store
 from core.dataset_recorder import DatasetRecorder
 from core.training_manager import training_manager
 from core.policy_executor import policy_executor
+from core.config_manager import config_manager
 
 # Initialize Recorder (will attach cameras later when accessed/available)
 # We need access to the camera objects. In this architecture, they are likely in `state` or global `camera` module.
@@ -764,3 +765,97 @@ def policy_status():
         'current_policy': policy_executor.current_policy_name
     })
 
+
+# ============ Configuration API ============
+
+@bp.route('/api/config', methods=['GET'])
+def get_config():
+    """Return all configuration values."""
+    return jsonify({
+        'config': config_manager.get_all(),
+        'defaults': config_manager.get_defaults()
+    })
+
+@bp.route('/api/config', methods=['POST'])
+def save_config():
+    """Save configuration values."""
+    data = request.json
+    if not data:
+        return jsonify({'status': 'error', 'error': 'No data'}), 400
+    
+    if config_manager.update(data):
+        return jsonify({'status': 'ok'})
+    return jsonify({'status': 'error', 'error': 'Failed to save'}), 500
+
+@bp.route('/api/ports', methods=['GET'])
+def list_ports():
+    """List available serial and video ports."""
+    import platform
+    import glob
+    
+    result = {'serial': [], 'video': []}
+    
+    # Serial ports
+    try:
+        import serial.tools.list_ports
+        for port in serial.tools.list_ports.comports():
+            result['serial'].append({
+                'device': port.device,
+                'description': port.description or port.device
+            })
+    except Exception:
+        pass
+    
+    # Video devices
+    if platform.system() == 'Linux':
+        for dev in sorted(glob.glob('/dev/video*')):
+            result['video'].append({'device': dev, 'description': dev})
+    elif platform.system() == 'Windows':
+        # Probe first 5 indices
+        for i in range(5):
+            cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)
+            if cap.isOpened():
+                result['video'].append({'device': str(i), 'description': f'Camera {i}'})
+                cap.release()
+    else:  # macOS
+        for i in range(5):
+            cap = cv2.VideoCapture(i)
+            if cap.isOpened():
+                result['video'].append({'device': str(i), 'description': f'Camera {i}'})
+                cap.release()
+    
+    return jsonify(result)
+
+@bp.route('/api/camera/preview/<path:port>')
+def camera_preview(port):
+    """Return a single JPEG snapshot from the specified camera."""
+    try:
+        # Handle integer index or path
+        if port.isdigit():
+            cap = cv2.VideoCapture(int(port))
+        else:
+            # Decode URL-safe path
+            cap = cv2.VideoCapture(port)
+        
+        if not cap.isOpened():
+            return jsonify({'error': 'Cannot open camera'}), 500
+        
+        # Grab a few frames to let the camera settle
+        for _ in range(3):
+            cap.grab()
+        
+        ret, frame = cap.read()
+        cap.release()
+        
+        if not ret:
+            return jsonify({'error': 'Cannot read frame'}), 500
+        
+        # Resize for preview
+        frame = cv2.resize(frame, (320, 180))
+        
+        # Encode to JPEG
+        _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+        
+        return Response(buffer.tobytes(), mimetype='image/jpeg')
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

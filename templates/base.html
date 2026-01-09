@@ -63,13 +63,14 @@
             </nav>
 
             <div class="sidebar-footer">
-                <a href="/settings" class="nav-item {{ 'active' if request.path == '/settings' else '' }}"
-                    style="margin-bottom: 10px; color: #666; font-size: 0.85em;">
-                    <span class="nav-icon" style="font-size: 1rem;">⚙️</span>
+                <a href="/settings" class="nav-item {{ 'active' if request.path == '/settings' else '' }}">
+                    <span class="nav-icon">⚙️</span>
                     <span class="nav-text">Settings</span>
                 </a>
                 <div class="connection-status">
-                    <div class="connection-dot" id="connection-dot"></div>
+                    <div style="width: 24px; display: flex; justify-content: center;">
+                        <div class="connection-dot" id="connection-dot"></div>
+                    </div>
                     <span id="global-status-text">Connected</span>
                 </div>
             </div>

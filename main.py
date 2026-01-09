@@ -18,7 +18,6 @@ try:
     SOCKETIO_AVAILABLE = True
 except ImportError:
     SOCKETIO_AVAILABLE = False
-    # Will warn later if VR_ENABLED is True
 
 from state import state
 from movement import movement_loop, stop_movement
@@ -27,7 +26,10 @@ import tts
 from core.robot_system import RobotSystem
 from core.navigation_agent import NavigationAgent
 
-from config import WEB_PORT, VR_ENABLED, CAMERA_PORT
+from core.config_manager import get_config
+
+WEB_PORT = get_config("WEB_PORT")
+CAMERA_PORT = get_config("CAMERA_PORT")
 from robots.xlerobot.tools import (
     create_move_forward, 
     create_move_backward, 
@@ -96,33 +98,34 @@ def init_vr_control():
     """Initialize VR controller (called from deferred_init)."""
     global vr_controller
     
+    if not SOCKETIO_AVAILABLE:
+        logger.warning("VR Control disabled (flask-socketio not installed)")
+        return
+    
     camera_exists = False
     if isinstance(CAMERA_PORT, str) and os.path.exists(CAMERA_PORT):
         camera_exists = True
     elif isinstance(CAMERA_PORT, int):
         camera_exists = os.path.exists(f"/dev/video{CAMERA_PORT}")
     
-    if VR_ENABLED and SOCKETIO_AVAILABLE:
-        if not camera_exists:
-            logger.warning(f"VR Control disabled: Camera {CAMERA_PORT} not found")
-            return
+    if not camera_exists:
+        logger.warning(f"VR Control disabled: Camera {CAMERA_PORT} not found")
+        return
+    
+    logger.info("Initializing VR Control...")
+    try:
+        from vr_arm_controller import VRArmController
+        import vr_arm_controller as vr_module
         
-        logger.info("Initializing VR Control...")
-        try:
-            from vr_arm_controller import VRArmController
-            import vr_arm_controller as vr_module
-            
-            def vr_movement_callback(forward, lateral, rotation):
-                if state.robot_system and state.robot_system.controller:
-                    state.robot_system.controller.set_velocity_vector(forward, lateral, rotation)
-            
-            vr_controller = VRArmController(None, vr_movement_callback)
-            vr_module.vr_arm_controller = vr_controller
-            logger.info("VR Control initialized")
-        except Exception as e:
-            logger.warning(f"VR Control init failed: {e}")
-    elif VR_ENABLED and not SOCKETIO_AVAILABLE:
-        logger.warning("VR Control disabled (flask-socketio not installed)")
+        def vr_movement_callback(forward, lateral, rotation):
+            if state.robot_system and state.robot_system.controller:
+                state.robot_system.controller.set_velocity_vector(forward, lateral, rotation)
+        
+        vr_controller = VRArmController(None, vr_movement_callback)
+        vr_module.vr_arm_controller = vr_controller
+        logger.info("VR Control initialized")
+    except Exception as e:
+        logger.warning(f"VR Control init failed: {e}")
 
 
 def cleanup(signum=None, frame=None):

@@ -4,9 +4,26 @@
 
 {% block head %}
 <style>
+    .settings-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    .settings-section {
+        margin-bottom: 30px;
+    }
+
+    .settings-section h2 {
+        margin-bottom: 15px;
+        font-size: 1.1rem;
+        color: #888;
+        border-bottom: 1px solid #333;
+        padding-bottom: 8px;
+    }
+
     .settings-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
         gap: 20px;
     }
 
@@ -15,79 +32,686 @@
         border: 1px solid #333;
         border-radius: 8px;
         padding: 20px;
-        display: flex;
-        flex-direction: column;
     }
 
     .settings-card h3 {
-        margin-top: 0;
+        margin: 0 0 15px;
+        font-size: 1rem;
         color: #ddd;
-        border-bottom: 1px solid #333;
-        padding-bottom: 10px;
-        margin-bottom: 15px;
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
     }
 
-    label {
+    .form-group {
+        margin-bottom: 15px;
+    }
+
+    .form-group label {
         display: block;
         margin-bottom: 5px;
         color: #aaa;
-        font-size: 0.9em;
+        font-size: 0.85em;
+    }
+
+    .form-group .hint {
+        font-size: 0.75em;
+        color: #666;
+        margin-top: 3px;
     }
 
     input,
     select {
         width: 100%;
+        background: #111;
+        border: 1px solid #333;
+        color: #fff;
+        padding: 10px;
+        border-radius: 4px;
+        font-family: inherit;
+    }
+
+    input:focus,
+    select:focus {
+        border-color: var(--primary);
+        outline: none;
+    }
+
+    .toggle-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .toggle {
+        position: relative;
+        width: 50px;
+        height: 26px;
+    }
+
+    .toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .toggle .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #333;
+        border-radius: 26px;
+        transition: 0.3s;
+    }
+
+    .toggle .slider:before {
+        position: absolute;
+        content: "";
+        height: 20px;
+        width: 20px;
+        left: 3px;
+        bottom: 3px;
+        background: #888;
+        border-radius: 50%;
+        transition: 0.3s;
+    }
+
+    .toggle input:checked+.slider {
+        background: var(--primary);
+    }
+
+    .toggle input:checked+.slider:before {
+        transform: translateX(24px);
+        background: #fff;
+    }
+
+    .camera-preview {
+        width: 100%;
+        height: 120px;
+        background: #000;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #444;
+        margin-top: 8px;
+        overflow: hidden;
+    }
+
+    .camera-preview img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+
+    .port-row {
+        display: flex;
+        gap: 10px;
+    }
+
+    .port-row select {
+        flex: 1;
+    }
+
+    .port-row .manual-btn {
         background: #333;
         border: 1px solid #444;
-        color: #fff;
-        padding: 8px;
+        color: #888;
+        padding: 10px 12px;
         border-radius: 4px;
-        margin-bottom: 10px;
+        cursor: pointer;
+        white-space: nowrap;
     }
 
-    .status-active {
-        color: #00ff9d;
+    .port-row .manual-btn:hover {
+        color: #fff;
     }
 
-    .status-inactive {
-        color: #ff2a2a;
+    .manual-input {
+        display: none;
+        margin-top: 8px;
+    }
+
+    .manual-input.visible {
+        display: block;
+    }
+
+    .advanced-toggle {
+        background: none;
+        border: none;
+        color: #666;
+        cursor: pointer;
+        font-size: 0.9em;
+        padding: 10px 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .advanced-toggle:hover {
+        color: #aaa;
+    }
+
+    .advanced-content {
+        display: none;
+    }
+
+    .advanced-content.visible {
+        display: block;
+    }
+
+    .save-bar {
+        position: fixed;
+        bottom: 30px;
+        right: 40px;
+        left: auto;
+        transform: none;
+        background: none;
+        border: none;
+        border-radius: 0;
+        padding: 0;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 15px;
+        box-shadow: none;
+        backdrop-filter: none;
+        z-index: 1000;
+        width: auto;
+        max-width: none;
+    }
+
+    .save-bar .restart-warning {
+        background: rgba(20, 20, 20, 0.95);
+        border: 1px solid #ffaa00;
+        color: #ffaa00;
+        padding: 10px 16px;
+        border-radius: 8px;
+        font-size: 0.9em;
+        display: none;
+        white-space: nowrap;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .save-bar .restart-warning.visible {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    .toast {
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #00ff9d;
+        color: #000;
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-weight: 500;
+        opacity: 0;
+        transition: opacity 0.3s;
+        pointer-events: none;
+    }
+
+    .toast.visible {
+        opacity: 1;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="settings-grid">
+<div class="settings-container">
 
-    <!-- HuggingFace Authentication -->
-    <div class="settings-card">
-        <h3>🤗 HuggingFace Hub</h3>
-        <p style="color:#888; font-size:0.9em; margin-bottom:15px;">
-            Connect your HuggingFace account to upload datasets and sync trained policies.
-        </p>
+    <!-- Essential Settings -->
+    <div class="settings-section">
+        <h2>Essential Settings</h2>
+        <div class="settings-grid">
 
-        <div id="hfAuthPanel">
-            <div style="padding:10px; text-align:center; color:#666;">Checking status...</div>
+            <!-- HuggingFace -->
+            <div class="settings-card">
+                <h3>🤗 HuggingFace Hub</h3>
+                <p style="color:#888; font-size:0.85em; margin-bottom:15px;">Connect your HuggingFace account for
+                    dataset/policy sync.</p>
+                <div id="hfAuthPanel">
+                    <div style="color:#666; text-align:center;">Checking...</div>
+                </div>
+            </div>
+
+            <!-- Hardware Ports -->
+            <div class="settings-card">
+                <h3>🔌 Hardware</h3>
+
+                <div class="form-group">
+                    <label>Main Camera</label>
+                    <div class="port-row">
+                        <select id="cfg_CAMERA_PORT" onchange="onCameraChange('CAMERA_PORT', this.value)"></select>
+                        <button type="button" class="manual-btn" onclick="toggleManual('CAMERA_PORT')">✏️</button>
+                    </div>
+                    <input type="text" id="cfg_CAMERA_PORT_manual" class="manual-input"
+                        placeholder="/dev/video0 or index">
+                    <div class="camera-preview" id="preview_CAMERA_PORT"><span>Select to preview</span></div>
+                </div>
+
+                <div class="form-group">
+                    <label>Right Hand Camera</label>
+                    <div class="port-row">
+                        <select id="cfg_CAMERA_RIGHT_PORT"
+                            onchange="onCameraChange('CAMERA_RIGHT_PORT', this.value)"></select>
+                        <button type="button" class="manual-btn" onclick="toggleManual('CAMERA_RIGHT_PORT')">✏️</button>
+                    </div>
+                    <input type="text" id="cfg_CAMERA_RIGHT_PORT_manual" class="manual-input"
+                        placeholder="/dev/video0 or index">
+                    <div class="camera-preview" id="preview_CAMERA_RIGHT_PORT"><span>Select to preview</span></div>
+                </div>
+
+                <div class="form-group">
+                    <label>Wheel Controller USB</label>
+                    <div class="port-row">
+                        <select id="cfg_WHEEL_USB"></select>
+                        <button type="button" class="manual-btn" onclick="toggleManual('WHEEL_USB')">✏️</button>
+                    </div>
+                    <input type="text" id="cfg_WHEEL_USB_manual" class="manual-input" placeholder="/dev/ttyACM0">
+                </div>
+
+                <div class="form-group">
+                    <label>Head Controller USB</label>
+                    <div class="port-row">
+                        <select id="cfg_HEAD_USB"></select>
+                        <button type="button" class="manual-btn" onclick="toggleManual('HEAD_USB')">✏️</button>
+                    </div>
+                    <input type="text" id="cfg_HEAD_USB_manual" class="manual-input" placeholder="/dev/ttyACM1">
+                </div>
+            </div>
+
+            <!-- Web Server -->
+            <div class="settings-card">
+                <h3>🌐 Web Server</h3>
+                <div class="form-group">
+                    <label>Port</label>
+                    <input type="number" id="cfg_WEB_PORT" min="1024" max="65535" onchange="onWebPortChange()">
+                    <div class="hint">Default: 5000. Requires restart.</div>
+                </div>
+            </div>
+
+            <!-- TTS -->
+            <div class="settings-card">
+                <h3>🗣️ Text-to-Speech</h3>
+                <div class="form-group">
+                    <div class="toggle-container">
+                        <label class="toggle">
+                            <input type="checkbox" id="cfg_TTS_ENABLED">
+                            <span class="slider"></span>
+                        </label>
+                        <span>Enable TTS</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Audio Device (ALSA)</label>
+                    <input type="text" id="cfg_TTS_AUDIO_DEVICE" placeholder="plughw:1,0">
+                </div>
+                <div class="form-group">
+                    <label>Google TLD (Voice Accent)</label>
+                    <select id="cfg_TTS_TLD">
+                        <option value="com">com (US)</option>
+                        <option value="co.uk">co.uk (UK)</option>
+                        <option value="com.au">com.au (Australia)</option>
+                        <option value="co.in">co.in (India)</option>
+                        <option value="ca">ca (Canada)</option>
+                    </select>
+                </div>
+            </div>
+
         </div>
     </div>
 
-    <!-- General Configuration (Future) -->
-    <div class="settings-card">
-        <h3>⚙️ General Configuration</h3>
-        <div style="padding:20px; text-align:center; color:#666; border: 1px dashed #444; border-radius:4px;">
-            More settings coming soon...
+    <!-- Advanced Settings -->
+    <button class="advanced-toggle" onclick="toggleAdvanced()">
+        <span id="adv-arrow">▶</span> Advanced Settings
+    </button>
+
+    <div id="advanced-content" class="advanced-content">
+        <div class="settings-grid">
+
+            <!-- Camera Capture -->
+            <div class="settings-card">
+                <h3>📷 Camera Capture</h3>
+                <div class="form-group">
+                    <label>Width</label>
+                    <input type="number" id="cfg_CAMERA_WIDTH" min="320" max="4096">
+                </div>
+                <div class="form-group">
+                    <label>Height</label>
+                    <input type="number" id="cfg_CAMERA_HEIGHT" min="240" max="2160">
+                </div>
+                <div class="form-group">
+                    <label>Buffer Size</label>
+                    <input type="number" id="cfg_CAMERA_BUFFER_SIZE" min="1" max="10">
+                </div>
+            </div>
+
+            <!-- Video Stream -->
+            <div class="settings-card">
+                <h3>📺 Video Stream</h3>
+                <div class="form-group">
+                    <label>Width</label>
+                    <input type="number" id="cfg_STREAM_WIDTH" min="160" max="1920">
+                </div>
+                <div class="form-group">
+                    <label>Height</label>
+                    <input type="number" id="cfg_STREAM_HEIGHT" min="120" max="1080">
+                </div>
+                <div class="form-group">
+                    <label>JPEG Quality: <span id="quality_val">50</span></label>
+                    <input type="range" id="cfg_STREAM_JPEG_QUALITY" min="10" max="100"
+                        oninput="document.getElementById('quality_val').innerText=this.value">
+                </div>
+            </div>
+
+            <!-- Obstacle Detection -->
+            <div class="settings-card">
+                <h3>🚧 Obstacle Detection</h3>
+                <div class="form-group">
+                    <label>Sobel Threshold</label>
+                    <input type="number" id="cfg_OBSTACLE_SOBEL_THRESHOLD" min="1" max="255">
+                    <div class="hint">Lower = more sensitive. Default: 45</div>
+                </div>
+                <div class="form-group">
+                    <label>Threshold Ratio</label>
+                    <input type="number" id="cfg_OBSTACLE_THRESHOLD_RATIO" step="0.01" min="0" max="1">
+                    <div class="hint">0.0=top, 1.0=bottom. Default: 0.875</div>
+                </div>
+            </div>
+
+            <!-- Control Timings -->
+            <div class="settings-card">
+                <h3>⏱️ Control Timings</h3>
+                <div class="form-group">
+                    <label>Movement Loop Interval (s)</label>
+                    <input type="number" id="cfg_MOVEMENT_LOOP_INTERVAL" step="0.01" min="0.01" max="1">
+                </div>
+                <div class="form-group">
+                    <label>Head Update Interval (ms)</label>
+                    <input type="number" id="cfg_HEAD_UPDATE_INTERVAL" min="10" max="500">
+                </div>
+                <div class="form-group">
+                    <label>Arm Update Interval (ms)</label>
+                    <input type="number" id="cfg_ARM_UPDATE_INTERVAL" min="10" max="500">
+                </div>
+            </div>
+
+            <!-- Arm Sensitivity -->
+            <div class="settings-card">
+                <h3>🦾 Arm Sensitivity</h3>
+                <div class="form-group">
+                    <label>XY Sensitivity</label>
+                    <input type="number" id="cfg_ARM_XY_SENSITIVITY" step="0.01" min="0.01" max="1">
+                </div>
+                <div class="form-group">
+                    <label>Wrist Sensitivity</label>
+                    <input type="number" id="cfg_ARM_WRIST_SENSITIVITY" step="0.1" min="0.1" max="5">
+                </div>
+                <div class="form-group">
+                    <label>Shoulder Pan Step</label>
+                    <input type="number" id="cfg_ARM_SHOULDER_PAN_STEP" step="0.1" min="0.1" max="10">
+                </div>
+                <div class="form-group">
+                    <label>Wrist Flex Step</label>
+                    <input type="number" id="cfg_ARM_WRIST_FLEX_STEP" step="0.1" min="0.1" max="10">
+                </div>
+            </div>
+
+            <!-- Safety -->
+            <div class="settings-card">
+                <h3>🛡️ Safety</h3>
+                <div class="form-group">
+                    <label>Remote Timeout (s)</label>
+                    <input type="number" id="cfg_REMOTE_TIMEOUT" step="0.1" min="0.1" max="5">
+                </div>
+                <div class="form-group">
+                    <label>AI Min Brightness</label>
+                    <input type="number" id="cfg_AI_MIN_BRIGHTNESS" min="0" max="255">
+                </div>
+                <div class="form-group">
+                    <label>Stall Load Threshold</label>
+                    <input type="number" id="cfg_STALL_LOAD_THRESHOLD" min="100" max="2000">
+                </div>
+                <div class="form-group">
+                    <label>Stall Check Interval (s)</label>
+                    <input type="number" id="cfg_STALL_CHECK_INTERVAL" step="0.1" min="0.1" max="5">
+                </div>
+            </div>
+
+            <!-- VR -->
+            <div class="settings-card">
+                <h3>🥽 VR Control</h3>
+                <div class="form-group">
+                    <label>WebSocket Port</label>
+                    <input type="number" id="cfg_VR_WEBSOCKET_PORT" min="1024" max="65535">
+                </div>
+                <div class="form-group">
+                    <label>Robot Scale</label>
+                    <input type="number" id="cfg_VR_TO_ROBOT_SCALE" step="0.1" min="0.1" max="5">
+                </div>
+                <div class="form-group">
+                    <label>Send Interval (s)</label>
+                    <input type="number" id="cfg_VR_SEND_INTERVAL" step="0.01" min="0.01" max="1">
+                </div>
+            </div>
+
         </div>
+    </div>
+
+    <!-- Save Bar -->
+    <div class="save-bar">
+        <div class="restart-warning" id="restart-warning">
+            ⚠️ Restart required. New URL: <strong id="new-url"></strong>
+        </div>
+        <button class="btn btn-primary" onclick="saveConfig()"
+            style="box-shadow: 0 4px 20px rgba(0, 242, 255, 0.4); padding: 12px 24px; font-size: 1rem;">💾 Save
+            Settings</button>
     </div>
 
 </div>
+
+<div class="toast" id="toast">Settings saved!</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // ---- Auth Logic (Ported from training.html) ----
+    let config = {};
+    let defaults = {};
+    let ports = { serial: [], video: [] };
+    let originalWebPort = null;
 
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadPorts();
+        await loadConfig();
+        checkAuthStatus();
+    });
+
+    async function loadConfig() {
+        const res = await fetch('/api/config');
+        const data = await res.json();
+        config = data.config;
+        defaults = data.defaults;
+        originalWebPort = config.WEB_PORT;
+
+        // Populate all fields
+        for (const [key, value] of Object.entries(config)) {
+            const el = document.getElementById(`cfg_${key}`);
+            if (!el) continue;
+
+            if (el.type === 'checkbox') {
+                el.checked = value;
+            } else if (el.tagName === 'SELECT') {
+                populateSelect(el, key, value);
+            } else {
+                el.value = value;
+            }
+        }
+
+        // Update quality display
+        document.getElementById('quality_val').innerText = config.STREAM_JPEG_QUALITY || 50;
+    }
+
+    async function loadPorts() {
+        try {
+            const res = await fetch('/api/ports');
+            ports = await res.json();
+        } catch (e) {
+            console.error('Failed to load ports', e);
+        }
+    }
+
+    function populateSelect(el, key, currentValue) {
+        el.innerHTML = '';
+
+        const isVideo = key.includes('CAMERA');
+        const isSerial = key.includes('USB');
+
+        const list = isVideo ? ports.video : (isSerial ? ports.serial : []);
+
+        // Add discovered options
+        list.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.device;
+            opt.textContent = p.description;
+            if (p.device === currentValue) opt.selected = true;
+            el.appendChild(opt);
+        });
+
+        // Add current value if not in list
+        if (currentValue && !list.find(p => p.device === currentValue)) {
+            const opt = document.createElement('option');
+            opt.value = currentValue;
+            opt.textContent = `${currentValue} (current)`;
+            opt.selected = true;
+            el.prepend(opt);
+        }
+
+        // Add empty option if nothing selected
+        if (!currentValue && list.length === 0) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'No devices found';
+            el.appendChild(opt);
+        }
+    }
+
+    function toggleManual(key) {
+        const manualInput = document.getElementById(`cfg_${key}_manual`);
+        manualInput.classList.toggle('visible');
+        if (manualInput.classList.contains('visible')) {
+            manualInput.value = document.getElementById(`cfg_${key}`).value;
+            manualInput.focus();
+        }
+    }
+
+    function onCameraChange(key, value) {
+        if (!value) return;
+
+        const previewEl = document.getElementById(`preview_${key}`);
+        previewEl.innerHTML = '<span>Loading...</span>';
+
+        // URL encode the path
+        const encodedPort = encodeURIComponent(value);
+        const img = new Image();
+        img.onload = () => { previewEl.innerHTML = ''; previewEl.appendChild(img); };
+        img.onerror = () => { previewEl.innerHTML = '<span style="color:#ff5555">Failed</span>'; };
+        img.src = `/api/camera/preview/${encodedPort}?t=${Date.now()}`;
+    }
+
+    function onWebPortChange() {
+        const newPort = parseInt(document.getElementById('cfg_WEB_PORT').value);
+        const warning = document.getElementById('restart-warning');
+        const urlEl = document.getElementById('new-url');
+
+        if (newPort !== originalWebPort) {
+            const newUrl = `${window.location.protocol}//${window.location.hostname}:${newPort}/`;
+            urlEl.textContent = newUrl;
+            warning.classList.add('visible');
+        } else {
+            warning.classList.remove('visible');
+        }
+    }
+
+    function toggleAdvanced() {
+        const content = document.getElementById('advanced-content');
+        const arrow = document.getElementById('adv-arrow');
+        content.classList.toggle('visible');
+        arrow.textContent = content.classList.contains('visible') ? '▼' : '▶';
+    }
+
+    async function saveConfig() {
+        // Gather all values
+        const data = {};
+
+        for (const key of Object.keys(defaults)) {
+            const el = document.getElementById(`cfg_${key}`);
+            const manualEl = document.getElementById(`cfg_${key}_manual`);
+
+            if (!el) continue;
+
+            let value;
+
+            // Check manual input first
+            if (manualEl && manualEl.classList.contains('visible') && manualEl.value.trim()) {
+                value = manualEl.value.trim();
+            } else if (el.type === 'checkbox') {
+                value = el.checked;
+            } else if (el.type === 'number' || el.type === 'range') {
+                value = parseFloat(el.value);
+            } else {
+                value = el.value;
+            }
+
+            data[key] = value;
+        }
+
+        try {
+            const res = await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                showToast('Settings saved!');
+                originalWebPort = data.WEB_PORT;
+                onWebPortChange();
+            } else {
+                showToast('Save failed!');
+            }
+        } catch (e) {
+            showToast('Error: ' + e);
+        }
+    }
+
+    function showToast(msg) {
+        const toast = document.getElementById('toast');
+        toast.textContent = msg;
+        toast.classList.add('visible');
+        setTimeout(() => toast.classList.remove('visible'), 2500);
+    }
+
+    // HuggingFace Auth (from original)
     async function checkAuthStatus() {
         try {
             const res = await fetch('/api/training/auth');
@@ -96,64 +720,42 @@
 
             if (data.username) {
                 panel.innerHTML = `
-                    <div style="background:#252525; padding:15px; border-radius:4px; border-left: 3px solid #00ff9d; margin-bottom:15px;">
-                        <div style="font-size:0.85em; color:#aaa; margin-bottom:4px;">Logged in as</div>
-                        <div style="font-size:1.1em; font-weight:bold; color:#fff;">${data.username}</div>
-                    </div>
-                    <button class="btn btn-danger" onclick="hfLogout()" style="width:100%">Disconnect Account</button>
-                `;
+                <div style="background:#252525; padding:12px; border-radius:4px; border-left: 3px solid #00ff9d; margin-bottom:12px;">
+                    <div style="font-size:0.8em; color:#aaa;">Logged in as</div>
+                    <div style="font-weight:bold; color:#fff;">${data.username}</div>
+                </div>
+                <button class="btn btn-danger" onclick="hfLogout()" style="width:100%; font-size:0.85em;">Disconnect</button>
+            `;
             } else {
                 panel.innerHTML = `
-                    <label>HF Write Token</label>
-                    <input type="password" id="hfToken" placeholder="hf_..." style="margin-bottom:15px;">
-                    <button class="btn btn-primary" onclick="hfLogin()" style="width:100%">Login to HuggingFace</button>
-                    <div style="margin-top:10px; font-size:0.8em; color:#666; text-align:center;">
-                        Token must have "Write" permissions.
-                    </div>
-                `;
+                <input type="password" id="hfToken" placeholder="hf_..." style="margin-bottom:10px;">
+                <button class="btn btn-primary" onclick="hfLogin()" style="width:100%; font-size:0.85em;">Login</button>
+                <div style="margin-top:8px; font-size:0.75em; color:#666; text-align:center;">Token needs "Write" access.</div>
+            `;
             }
         } catch (e) {
-            console.error("Auth check failed", e);
-            document.getElementById('hfAuthPanel').innerHTML = "<div style='color:red'>Failed to connect to server.</div>";
+            document.getElementById('hfAuthPanel').innerHTML = "<div style='color:red'>Failed to check auth.</div>";
         }
     }
 
     async function hfLogin() {
         const token = document.getElementById('hfToken').value.trim();
-        if (!token) return alert("Please enter a token");
+        if (!token) return alert("Enter token");
 
-        const btn = document.querySelector('#hfAuthPanel button');
-        const originalText = btn.innerText;
-        btn.innerText = "Verifying...";
-        btn.disabled = true;
-
-        try {
-            const res = await fetch('/api/training/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: token })
-            });
-            const data = await res.json();
-            if (data.status === 'ok') {
-                checkAuthStatus();
-            } else {
-                alert("Login Failed: " + data.message);
-                btn.innerText = originalText;
-                btn.disabled = false;
-            }
-        } catch (e) {
-            alert("Error: " + e);
-            btn.innerText = originalText;
-            btn.disabled = false;
-        }
+        const res = await fetch('/api/training/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token })
+        });
+        const data = await res.json();
+        if (data.status === 'ok') checkAuthStatus();
+        else alert("Failed: " + data.message);
     }
 
     async function hfLogout() {
-        if (!confirm("Disconnect from HuggingFace? This will stop auto-sync options.")) return;
+        if (!confirm("Disconnect from HuggingFace?")) return;
         await fetch('/api/training/auth/logout', { method: 'POST' });
         checkAuthStatus();
     }
-
-    document.addEventListener('DOMContentLoaded', checkAuthStatus);
 </script>
 {% endblock %}

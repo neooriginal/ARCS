@@ -5,11 +5,12 @@ import threading
 from collections import deque
 import time
 from state import state
-from config import (
-    CAMERA_WIDTH, CAMERA_HEIGHT, 
-    OBSTACLE_SOBEL_THRESHOLD, 
-    OBSTACLE_THRESHOLD_RATIO
-)
+from core.config_manager import get_config
+
+CAMERA_WIDTH = get_config("CAMERA_WIDTH")
+CAMERA_HEIGHT = get_config("CAMERA_HEIGHT")
+OBSTACLE_SOBEL_THRESHOLD = get_config("OBSTACLE_SOBEL_THRESHOLD")
+OBSTACLE_THRESHOLD_RATIO = get_config("OBSTACLE_THRESHOLD_RATIO")
 
 logger = logging.getLogger(__name__)
 

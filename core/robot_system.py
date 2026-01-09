@@ -4,7 +4,10 @@ from typing import Optional
 
 from state import state
 from robots.xlerobot.servo_controls import ServoControler
-from config import WHEEL_USB, HEAD_USB
+from core.config_manager import get_config
+
+WHEEL_USB = get_config("WHEEL_USB")
+HEAD_USB = get_config("HEAD_USB")
 
 logger = logging.getLogger(__name__)
 
