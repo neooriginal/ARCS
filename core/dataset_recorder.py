@@ -12,22 +12,12 @@ from huggingface_hub import HfApi
 
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 from state import state
+from core.training_manager import get_hf_username
 
 logger = logging.getLogger(__name__)
 
-# Constants
 DATASET_ROOT = Path("logs/datasets")
 FPS = 30
-
-def get_hf_username() -> Optional[str]:
-    """Get the current HuggingFace username from the logged-in account."""
-    try:
-        api = HfApi()
-        user_info = api.whoami()
-        return user_info.get("name")
-    except Exception as e:
-        logger.warning(f"Could not get HuggingFace username: {e}")
-        return None
 
 class DatasetRecorder:
     def __init__(self, main_camera, right_camera=None):

@@ -398,9 +398,6 @@ PERSISTENT NOTES:
         if state.precision_mode:
             reflex_msg += f"\nVISUAL GUIDANCE: {guidance}"
             reflex_msg += "\nPRECISION MODE: ON. Use the guidance to align with the gap."
-            
-            # Note: Auto-disable logic removed to prevent premature disabling while in doorway.
-            # AI must judge "space opening up" visually.
         else:
             reflex_msg += "\nPRECISION MODE: OFF."
             if "FORWARD" not in safe_actions:
@@ -517,10 +514,6 @@ PERSISTENT NOTES:
                             logger.error(result)
                             
                     self.message_history.append(ToolMessage(content=str(result), tool_call_id=tool_call["id"]))
-                    
-                if not any_blocked and len(response.tool_calls) > 0:
-                     # If we executed tools and none were blocked, we aren't stuck right now.
-                     pass
 
                 return f"Executed {len(response.tool_calls)} actions"
             else:

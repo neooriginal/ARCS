@@ -30,8 +30,6 @@ def get_gpu_info():
 import atexit
 import signal
 
-# ...
-
 SERVER_URL = None
 WORKER_ID = None
 
@@ -79,11 +77,7 @@ def run_job(server_url, job, worker_id):
     # Quick parse to get flags
     if "--" in original_cmd_str:
         flags_str = original_cmd_str[original_cmd_str.index("--"):]
-        if platform.system() == "Windows":
-             # Windows needs careful splitting if quotes are involved, but shlex usually works for flags
-             flags = shlex.split(flags_str)
-        else:
-             flags = shlex.split(flags_str)
+        flags = shlex.split(flags_str)
     else:
         flags = []
 

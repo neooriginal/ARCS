@@ -98,14 +98,14 @@ class VRArmController:
         fwd = goal.move_forward
         rot = goal.move_rotation
 
-        state.movement = {
+        state.update_movement({
             'forward': fwd if fwd > 0 else 0.0,
             'backward': -fwd if fwd < 0 else 0.0,
             'left': rot if rot > 0 else 0.0,
             'right': -rot if rot < 0 else 0.0,
             'slide_left': 0.0,
             'slide_right': 0.0
-        }
+        })
         state.last_movement_activity = now
         state.last_remote_activity = now
     

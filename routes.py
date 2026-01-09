@@ -408,8 +408,6 @@ def display_state():
 
 def generate_cv_frames():
     """Generate CV-processed frames showing what the AI sees with Obstacle Detection."""
-    import time
-    # Initialize detector (Shared)
     detector = state.get_detector()
     
     # Pre-generate fallback frames
@@ -576,9 +574,8 @@ def start_recording():
     # Lazy init recorder with current state cameras
     if recorder is None:
         recorder = DatasetRecorder(main_camera=state.camera)
-        import camera
-        if hasattr(camera, 'camera_right'):
-             recorder.right_camera = camera.camera_right
+        if state.camera_right is not None:
+            recorder.right_camera = state.camera_right
 
     if recorder.start_recording(dataset_name):
         return jsonify({'status': 'ok', 'dataset_name': dataset_name})
@@ -630,9 +627,6 @@ def start_training():
     if not dataset:
         return jsonify({'status': 'error', 'error': 'Dataset required'}), 400
         
-    if not job_name:
-        return jsonify({'status': 'error', 'error': 'Job Name required'}), 400
-
     if not job_name:
         return jsonify({'status': 'error', 'error': 'Job Name required'}), 400
 

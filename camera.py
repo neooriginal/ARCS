@@ -310,3 +310,11 @@ def release_camera():
         except Exception as e:
             print(f"✗ Camera cleanup error: {e}")
     state.camera = None
+    
+    if state.camera_right:
+        try:
+            state.camera_right.release()
+            print("✓ Right camera released")
+        except Exception as e:
+            print(f"✗ Right camera cleanup error: {e}")
+    state.camera_right = None

@@ -371,9 +371,6 @@ class RoboDisplay {
             toggle(this.warnLeft, data.blockage.left);
             toggle(this.warnCenter, data.blockage.forward);
             toggle(this.warnRight, data.blockage.right);
-
-            // Note: Expression change removed per user request. 
-            // The red warning zones are sufficient feedback.
         }
     }
 

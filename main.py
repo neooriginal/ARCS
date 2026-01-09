@@ -98,7 +98,13 @@ def cleanup(signum=None, frame=None):
     if state.robot_system:
         state.robot_system.cleanup()
     
-    # Lazy import to avoid circular dependency
+    # Clean up VR Kinematics (PyBullet)
+    try:
+        from core.vr_kinematics import vr_kinematics
+        vr_kinematics.cleanup()
+    except Exception:
+        pass
+    
     import tts
     tts.shutdown()
     
@@ -118,7 +124,7 @@ def main():
     tts.init()
     
     # Initialize AI Agent
-    if robot.controller or True: # Allow agent init even if controller is lazy loading
+    if robot.controller:
         logger.info("Initializing AI Agent...")
         # Minimal tools - no individual camera controls to avoid confusion
         tools = [

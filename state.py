@@ -19,12 +19,12 @@ class RobotState:
         self.frame_id_right = 0        # Right camera counter
         self.running = True
         self.movement = {
-            'forward': False,
-            'backward': False,
-            'left': False,
-            'right': False,
-            'slide_left': False,
-            'slide_right': False
+            'forward': 0.0,
+            'backward': 0.0,
+            'left': 0.0,
+            'right': 0.0,
+            'slide_left': 0.0,
+            'slide_right': 0.0
         }
         self.lock = threading.Lock()
         self.last_error = None
@@ -74,20 +74,20 @@ class RobotState:
         # Shared Obstacle Detector
         self.detector = None
         
-        # VINS-SLAM
-        # Removed per user request
+        # Position tracking (for QR code location logging)
+        self.pose = None
 
     
     def update_movement(self, data):
         """Update movement state from request data."""
         with self.lock:
             self.movement = {
-                'forward': bool(data.get('forward')),
-                'backward': bool(data.get('backward')),
-                'left': bool(data.get('left')),
-                'right': bool(data.get('right')),
-                'slide_left': bool(data.get('slide_left')),
-                'slide_right': bool(data.get('slide_right'))
+                'forward': float(data.get('forward', 0.0)),
+                'backward': float(data.get('backward', 0.0)),
+                'left': float(data.get('left', 0.0)),
+                'right': float(data.get('right', 0.0)),
+                'slide_left': float(data.get('slide_left', 0.0)),
+                'slide_right': float(data.get('slide_right', 0.0))
             }
     
     def get_movement(self):
@@ -99,12 +99,12 @@ class RobotState:
         """Stop all movement."""
         with self.lock:
             self.movement = {
-                'forward': False,
-                'backward': False,
-                'left': False,
-                'right': False,
-                'slide_left': False,
-                'slide_right': False
+                'forward': 0.0,
+                'backward': 0.0,
+                'left': 0.0,
+                'right': 0.0,
+                'slide_left': 0.0,
+                'slide_right': 0.0
             }
     
     def set_control_mode(self, mode):
