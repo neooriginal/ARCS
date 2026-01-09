@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ARCS Control Dashboard</title>
+    <title>{% block title %}ARCS{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo-nobackground.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap"
@@ -18,7 +19,8 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
-                    <span class="logo-icon">🤖</span>
+                    <img src="{{ url_for('static', filename='logo-nobackground.png') }}" alt="ARCS" class="logo-icon"
+                        style="width: 32px; height: 32px; object-fit: contain;">
                     <span class="logo-text">ARCS</span>
                 </div>
             </div>

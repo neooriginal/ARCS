@@ -1,4 +1,8 @@
-# 🤖 ARCS (Autonomous Robot Control System)
+<p align="center">
+  <img src="static/logo-nobackground.png" alt="ARCS Logo" width="200">
+</p>
+
+# ARCS (Autonomous Robot Control System)
 
 > [!IMPORTANT]
 > **Experimental Work in Progress**
