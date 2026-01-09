@@ -5,7 +5,7 @@ import cv2
 import time
 import numpy as np
 
-from flask import Blueprint, Response, jsonify, request, render_template
+from flask import Blueprint, Response, jsonify, request, render_template, redirect, make_response
 
 from state import state
 from camera import generate_frames, generate_frames_right
@@ -17,6 +17,10 @@ from core.dataset_recorder import DatasetRecorder
 from core.training_manager import training_manager
 from core.policy_executor import policy_executor
 from core.config_manager import config_manager
+from core.auth import (
+    hash_password, verify_password, generate_token, verify_token,
+    is_auth_configured, require_auth
+)
 
 # Initialize Recorder (will attach cameras later when accessed/available)
 # We need access to the camera objects. In this architecture, they are likely in `state` or global `camera` module.
@@ -26,11 +30,148 @@ recorder = None
 bp = Blueprint('robot', __name__)
 
 
+PUBLIC_PATHS = [
+    '/login',
+    '/api/auth/',
+    '/video_feed',
+    '/static/',
+]
+
+
+@bp.before_request
+def check_auth():
+    path = request.path
+    
+    for public in PUBLIC_PATHS:
+        if path.startswith(public) or path == public.rstrip('/'):
+            return None
+    
+    if not is_auth_configured():
+        if path.startswith('/api/'):
+            return jsonify({'error': 'Auth not configured'}), 401
+        return redirect('/login')
+    
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        token = request.cookies.get('auth_token', '')
+    
+    if not verify_token(token):
+        if path.startswith('/api/'):
+            return jsonify({'error': 'Unauthorized'}), 401
+        return redirect('/login')
+    
+    return None
+
+
+
+@bp.route('/login')
+def login_page():
+    return render_template('login.html')
+
+
+@bp.route('/api/auth/status')
+def auth_status():
+    configured = is_auth_configured()
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        token = request.cookies.get('auth_token', '')
+    
+    valid = verify_token(token) is not None if token else False
+    return jsonify({
+        'configured': configured,
+        'authenticated': valid,
+        'username': config_manager.get('AUTH_USERNAME', '')
+    })
+
+
+@bp.route('/api/auth/setup', methods=['POST'])
+def auth_setup():
+    if is_auth_configured():
+        return jsonify({'error': 'Already configured'}), 400
+    
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    
+    if not username or len(password) < 4:
+        return jsonify({'error': 'Username required, password min 4 chars'}), 400
+    
+    config_manager.set('AUTH_USERNAME', username)
+    config_manager.set('AUTH_PASSWORD_HASH', hash_password(password))
+    config_manager._save()
+    
+    token = generate_token(username)
+    response = make_response(jsonify({'token': token, 'username': username}))
+    response.set_cookie('auth_token', token, max_age=30*24*3600, httponly=True, samesite='Lax')
+    return response
+
+
+@bp.route('/api/auth/login', methods=['POST'])
+def auth_login():
+    if not is_auth_configured():
+        return jsonify({'error': 'Not configured'}), 400
+    
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    
+    stored_username = config_manager.get('AUTH_USERNAME', '')
+    stored_hash = config_manager.get('AUTH_PASSWORD_HASH', '')
+    
+    if username != stored_username or not verify_password(password, stored_hash):
+        return jsonify({'error': 'Invalid credentials'}), 401
+    
+    token = generate_token(username)
+    response = make_response(jsonify({'token': token, 'username': username}))
+    response.set_cookie('auth_token', token, max_age=30*24*3600, httponly=True, samesite='Lax')
+    return response
+
+
+@bp.route('/api/auth/password', methods=['POST'])
+def auth_change_password():
+    if not is_auth_configured():
+        return jsonify({'error': 'Not configured'}), 400
+    
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        token = request.cookies.get('auth_token', '')
+    
+    username = verify_token(token)
+    if not username:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.json or {}
+    current_password = data.get('current_password', '')
+    new_password = data.get('new_password', '')
+    
+    stored_hash = config_manager.get('AUTH_PASSWORD_HASH', '')
+    
+    if not verify_password(current_password, stored_hash):
+        return jsonify({'error': 'Current password incorrect'}), 401
+    
+    if len(new_password) < 4:
+        return jsonify({'error': 'New password too short (min 4 chars)'}), 400
+    
+    config_manager.set('AUTH_PASSWORD_HASH', hash_password(new_password))
+    config_manager._save()
+    
+    return jsonify({'success': True, 'message': 'Password changed'})
+
+
+@bp.route('/api/auth/logout', methods=['POST'])
+def auth_logout():
+    response = make_response(jsonify({'success': True}))
+    response.delete_cookie('auth_token')
+    return response
+
+
 @bp.route('/')
+
 def index():
     return render_template('dashboard.html')
 
 @bp.route('/remote')
+
 def remote():
     return render_template('remote.html')
 

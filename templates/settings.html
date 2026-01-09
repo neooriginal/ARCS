@@ -407,172 +407,191 @@
                 </div>
             </div>
 
+            <!-- AI Configuration -->
+            <div class="settings-card">
+                <h3>🧠 AI Configuration</h3>
+                <div class="form-group">
+                    <label>OpenAI API Key</label>
+                    <div class="input-with-icon">
+                        <input type="password" id="cfg_OPENAI_API_KEY" placeholder="sk-..." onchange="markDirty()">
+                        <button class="btn-icon" onclick="togglePassword('cfg_OPENAI_API_KEY')" title="Show/Hide">
+                            👁️
+                        </button>
+                    </div>
+                    <div class="hint">Required for AI Agent navigation and reasoning.</div>
+                </div>
+            </div>
+
+            <!-- Account Settings -->
+            <div class="settings-card">
+                <h3>🔐 Account</h3>
+                <div class="form-group">
+                    <label>Current Password</label>
+                    <input type="password" id="current_password" placeholder="Enter current password">
+                </div>
+                <div class="form-group">
+                    <label>New Password</label>
+                    <input type="password" id="new_password" placeholder="Enter new password">
+                </div>
+                <div class="form-group">
+                    <label>Confirm New Password</label>
+                    <input type="password" id="confirm_new_password" placeholder="Confirm new password">
+                </div>
+                <button class="btn btn-secondary" onclick="changePassword()" style="margin-top: 10px;">
+                    🔑 Change Password
+                </button>
+                <div id="password-result" style="margin-top: 10px; font-size: 0.9em;"></div>
+            </div>
         </div>
     </div>
+</div>
 
-    <!-- AI Configuration -->
+<!-- Advanced Settings -->
+<button class="advanced-toggle" onclick="toggleAdvanced()">
+    <span id="adv-arrow">▶</span> Advanced Settings
+</button>
+
+<div id="advanced-content" class="advanced-content">
     <div class="settings-grid">
-        <div class="settings-card" style="width: 100%; max-width: 800px;">
-            <h3>🧠 AI Configuration</h3>
+
+        <!-- Camera Capture -->
+        <div class="settings-card">
+            <h3>📷 Camera Capture</h3>
             <div class="form-group">
-                <label>OpenAI API Key</label>
-                <div class="input-with-icon">
-                    <input type="password" id="cfg_OPENAI_API_KEY" placeholder="sk-..." onchange="markDirty()">
-                    <button class="btn-icon" onclick="togglePassword('cfg_OPENAI_API_KEY')" title="Show/Hide">
-                        👁️
-                    </button>
-                </div>
-                <div class="hint">Required for AI Agent navigation and reasoning.</div>
+                <label>Width</label>
+                <input type="number" id="cfg_CAMERA_WIDTH" min="320" max="4096">
+            </div>
+            <div class="form-group">
+                <label>Height</label>
+                <input type="number" id="cfg_CAMERA_HEIGHT" min="240" max="2160">
+            </div>
+            <div class="form-group">
+                <label>Buffer Size</label>
+                <input type="number" id="cfg_CAMERA_BUFFER_SIZE" min="1" max="10">
             </div>
         </div>
-    </div>
 
-    <!-- Advanced Settings -->
-    <button class="advanced-toggle" onclick="toggleAdvanced()">
-        <span id="adv-arrow">▶</span> Advanced Settings
-    </button>
-
-    <div id="advanced-content" class="advanced-content">
-        <div class="settings-grid">
-
-            <!-- Camera Capture -->
-            <div class="settings-card">
-                <h3>📷 Camera Capture</h3>
-                <div class="form-group">
-                    <label>Width</label>
-                    <input type="number" id="cfg_CAMERA_WIDTH" min="320" max="4096">
-                </div>
-                <div class="form-group">
-                    <label>Height</label>
-                    <input type="number" id="cfg_CAMERA_HEIGHT" min="240" max="2160">
-                </div>
-                <div class="form-group">
-                    <label>Buffer Size</label>
-                    <input type="number" id="cfg_CAMERA_BUFFER_SIZE" min="1" max="10">
-                </div>
+        <!-- Video Stream -->
+        <div class="settings-card">
+            <h3>📺 Video Stream</h3>
+            <div class="form-group">
+                <label>Width</label>
+                <input type="number" id="cfg_STREAM_WIDTH" min="160" max="1920">
             </div>
-
-            <!-- Video Stream -->
-            <div class="settings-card">
-                <h3>📺 Video Stream</h3>
-                <div class="form-group">
-                    <label>Width</label>
-                    <input type="number" id="cfg_STREAM_WIDTH" min="160" max="1920">
-                </div>
-                <div class="form-group">
-                    <label>Height</label>
-                    <input type="number" id="cfg_STREAM_HEIGHT" min="120" max="1080">
-                </div>
-                <div class="form-group">
-                    <label>JPEG Quality: <span id="quality_val">50</span></label>
-                    <input type="range" id="cfg_STREAM_JPEG_QUALITY" min="10" max="100"
-                        oninput="document.getElementById('quality_val').innerText=this.value">
-                </div>
+            <div class="form-group">
+                <label>Height</label>
+                <input type="number" id="cfg_STREAM_HEIGHT" min="120" max="1080">
             </div>
-
-            <!-- Obstacle Detection -->
-            <div class="settings-card">
-                <h3>🚧 Obstacle Detection</h3>
-                <div class="form-group">
-                    <label>Sobel Threshold</label>
-                    <input type="number" id="cfg_OBSTACLE_SOBEL_THRESHOLD" min="1" max="255">
-                    <div class="hint">Lower = more sensitive. Default: 45</div>
-                </div>
-                <div class="form-group">
-                    <label>Threshold Ratio</label>
-                    <input type="number" id="cfg_OBSTACLE_THRESHOLD_RATIO" step="0.01" min="0" max="1">
-                    <div class="hint">0.0=top, 1.0=bottom. Default: 0.875</div>
-                </div>
+            <div class="form-group">
+                <label>JPEG Quality: <span id="quality_val">50</span></label>
+                <input type="range" id="cfg_STREAM_JPEG_QUALITY" min="10" max="100"
+                    oninput="document.getElementById('quality_val').innerText=this.value">
             </div>
-
-            <!-- Control Timings -->
-            <div class="settings-card">
-                <h3>⏱️ Control Timings</h3>
-                <div class="form-group">
-                    <label>Movement Loop Interval (s)</label>
-                    <input type="number" id="cfg_MOVEMENT_LOOP_INTERVAL" step="0.01" min="0.01" max="1">
-                </div>
-                <div class="form-group">
-                    <label>Head Update Interval (ms)</label>
-                    <input type="number" id="cfg_HEAD_UPDATE_INTERVAL" min="10" max="500">
-                </div>
-                <div class="form-group">
-                    <label>Arm Update Interval (ms)</label>
-                    <input type="number" id="cfg_ARM_UPDATE_INTERVAL" min="10" max="500">
-                </div>
-            </div>
-
-            <!-- Arm Sensitivity -->
-            <div class="settings-card">
-                <h3>🦾 Arm Sensitivity</h3>
-                <div class="form-group">
-                    <label>XY Sensitivity</label>
-                    <input type="number" id="cfg_ARM_XY_SENSITIVITY" step="0.01" min="0.01" max="1">
-                </div>
-                <div class="form-group">
-                    <label>Wrist Sensitivity</label>
-                    <input type="number" id="cfg_ARM_WRIST_SENSITIVITY" step="0.1" min="0.1" max="5">
-                </div>
-                <div class="form-group">
-                    <label>Shoulder Pan Step</label>
-                    <input type="number" id="cfg_ARM_SHOULDER_PAN_STEP" step="0.1" min="0.1" max="10">
-                </div>
-                <div class="form-group">
-                    <label>Wrist Flex Step</label>
-                    <input type="number" id="cfg_ARM_WRIST_FLEX_STEP" step="0.1" min="0.1" max="10">
-                </div>
-            </div>
-
-            <!-- Safety -->
-            <div class="settings-card">
-                <h3>🛡️ Safety</h3>
-                <div class="form-group">
-                    <label>Remote Timeout (s)</label>
-                    <input type="number" id="cfg_REMOTE_TIMEOUT" step="0.1" min="0.1" max="5">
-                </div>
-                <div class="form-group">
-                    <label>AI Min Brightness</label>
-                    <input type="number" id="cfg_AI_MIN_BRIGHTNESS" min="0" max="255">
-                </div>
-                <div class="form-group">
-                    <label>Stall Load Threshold</label>
-                    <input type="number" id="cfg_STALL_LOAD_THRESHOLD" min="100" max="2000">
-                </div>
-                <div class="form-group">
-                    <label>Stall Check Interval (s)</label>
-                    <input type="number" id="cfg_STALL_CHECK_INTERVAL" step="0.1" min="0.1" max="5">
-                </div>
-            </div>
-
-            <!-- VR -->
-            <div class="settings-card">
-                <h3>🥽 VR Control</h3>
-                <div class="form-group">
-                    <label>WebSocket Port</label>
-                    <input type="number" id="cfg_VR_WEBSOCKET_PORT" min="1024" max="65535">
-                </div>
-                <div class="form-group">
-                    <label>Robot Scale</label>
-                    <input type="number" id="cfg_VR_TO_ROBOT_SCALE" step="0.1" min="0.1" max="5">
-                </div>
-                <div class="form-group">
-                    <label>Send Interval (s)</label>
-                    <input type="number" id="cfg_VR_SEND_INTERVAL" step="0.01" min="0.01" max="1">
-                </div>
-            </div>
-
         </div>
-    </div>
 
-    <!-- Save Bar -->
-    <div class="save-bar">
-        <div class="restart-warning" id="restart-warning">
-            ⚠️ Restart required. New URL: <strong id="new-url"></strong>
+        <!-- Obstacle Detection -->
+        <div class="settings-card">
+            <h3>🚧 Obstacle Detection</h3>
+            <div class="form-group">
+                <label>Sobel Threshold</label>
+                <input type="number" id="cfg_OBSTACLE_SOBEL_THRESHOLD" min="1" max="255">
+                <div class="hint">Lower = more sensitive. Default: 45</div>
+            </div>
+            <div class="form-group">
+                <label>Threshold Ratio</label>
+                <input type="number" id="cfg_OBSTACLE_THRESHOLD_RATIO" step="0.01" min="0" max="1">
+                <div class="hint">0.0=top, 1.0=bottom. Default: 0.875</div>
+            </div>
         </div>
-        <button class="btn btn-primary" onclick="saveConfig()"
-            style="box-shadow: 0 4px 20px rgba(0, 242, 255, 0.4); padding: 12px 24px; font-size: 1rem;">💾 Save
-            Settings</button>
+
+        <!-- Control Timings -->
+        <div class="settings-card">
+            <h3>⏱️ Control Timings</h3>
+            <div class="form-group">
+                <label>Movement Loop Interval (s)</label>
+                <input type="number" id="cfg_MOVEMENT_LOOP_INTERVAL" step="0.01" min="0.01" max="1">
+            </div>
+            <div class="form-group">
+                <label>Head Update Interval (ms)</label>
+                <input type="number" id="cfg_HEAD_UPDATE_INTERVAL" min="10" max="500">
+            </div>
+            <div class="form-group">
+                <label>Arm Update Interval (ms)</label>
+                <input type="number" id="cfg_ARM_UPDATE_INTERVAL" min="10" max="500">
+            </div>
+        </div>
+
+        <!-- Arm Sensitivity -->
+        <div class="settings-card">
+            <h3>🦾 Arm Sensitivity</h3>
+            <div class="form-group">
+                <label>XY Sensitivity</label>
+                <input type="number" id="cfg_ARM_XY_SENSITIVITY" step="0.01" min="0.01" max="1">
+            </div>
+            <div class="form-group">
+                <label>Wrist Sensitivity</label>
+                <input type="number" id="cfg_ARM_WRIST_SENSITIVITY" step="0.1" min="0.1" max="5">
+            </div>
+            <div class="form-group">
+                <label>Shoulder Pan Step</label>
+                <input type="number" id="cfg_ARM_SHOULDER_PAN_STEP" step="0.1" min="0.1" max="10">
+            </div>
+            <div class="form-group">
+                <label>Wrist Flex Step</label>
+                <input type="number" id="cfg_ARM_WRIST_FLEX_STEP" step="0.1" min="0.1" max="10">
+            </div>
+        </div>
+
+        <!-- Safety -->
+        <div class="settings-card">
+            <h3>🛡️ Safety</h3>
+            <div class="form-group">
+                <label>Remote Timeout (s)</label>
+                <input type="number" id="cfg_REMOTE_TIMEOUT" step="0.1" min="0.1" max="5">
+            </div>
+            <div class="form-group">
+                <label>AI Min Brightness</label>
+                <input type="number" id="cfg_AI_MIN_BRIGHTNESS" min="0" max="255">
+            </div>
+            <div class="form-group">
+                <label>Stall Load Threshold</label>
+                <input type="number" id="cfg_STALL_LOAD_THRESHOLD" min="100" max="2000">
+            </div>
+            <div class="form-group">
+                <label>Stall Check Interval (s)</label>
+                <input type="number" id="cfg_STALL_CHECK_INTERVAL" step="0.1" min="0.1" max="5">
+            </div>
+        </div>
+
+        <!-- VR -->
+        <div class="settings-card">
+            <h3>🥽 VR Control</h3>
+            <div class="form-group">
+                <label>WebSocket Port</label>
+                <input type="number" id="cfg_VR_WEBSOCKET_PORT" min="1024" max="65535">
+            </div>
+            <div class="form-group">
+                <label>Robot Scale</label>
+                <input type="number" id="cfg_VR_TO_ROBOT_SCALE" step="0.1" min="0.1" max="5">
+            </div>
+            <div class="form-group">
+                <label>Send Interval (s)</label>
+                <input type="number" id="cfg_VR_SEND_INTERVAL" step="0.01" min="0.01" max="1">
+            </div>
+        </div>
+
     </div>
+</div>
+
+<!-- Save Bar -->
+<div class="save-bar">
+    <div class="restart-warning" id="restart-warning">
+        ⚠️ Restart required. New URL: <strong id="new-url"></strong>
+    </div>
+    <button class="btn btn-primary" onclick="saveConfig()"
+        style="box-shadow: 0 4px 20px rgba(0, 242, 255, 0.4); padding: 12px 24px; font-size: 1rem;">💾 Save
+        Settings</button>
+</div>
 
 </div>
 
@@ -598,6 +617,43 @@
             input.type = "text";
         } else {
             input.type = "password";
+        }
+    }
+
+    async function changePassword() {
+        const current = document.getElementById('current_password').value;
+        const newPw = document.getElementById('new_password').value;
+        const confirm = document.getElementById('confirm_new_password').value;
+        const result = document.getElementById('password-result');
+
+        if (newPw !== confirm) {
+            result.innerHTML = '<span style="color: #ff2a2a;">Passwords do not match</span>';
+            return;
+        }
+
+        if (newPw.length < 4) {
+            result.innerHTML = '<span style="color: #ff2a2a;">New password too short</span>';
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/auth/password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ current_password: current, new_password: newPw })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                result.innerHTML = '<span style="color: #00ff9d;">Password changed successfully!</span>';
+                document.getElementById('current_password').value = '';
+                document.getElementById('new_password').value = '';
+                document.getElementById('confirm_new_password').value = '';
+            } else {
+                result.innerHTML = '<span style="color: #ff2a2a;">' + (data.error || 'Failed') + '</span>';
+            }
+        } catch (e) {
+            result.innerHTML = '<span style="color: #ff2a2a;">Connection error</span>';
         }
     }
 

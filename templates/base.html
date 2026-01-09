@@ -21,7 +21,15 @@
                 <div class="logo">
                     <img src="{{ url_for('static', filename='logo-nobackground.png') }}" alt="ARCS" class="logo-icon"
                         style="width: 32px; height: 32px; object-fit: contain;">
-                    <span class="logo-text">ARCS</span>
+                    <div style="display: flex; flex-direction: column;">
+                        <span class="logo-text">ARCS</span>
+                        <div class="connection-status-header"
+                            style="font-size: 0.6em; margin-top: 2px; display: flex; align-items: center; gap: 4px; color: #555; font-weight: 500;">
+                            <div class="connection-dot" id="connection-dot-header"
+                                style="width: 6px; height: 6px; background: #555; border-radius: 50%;"></div>
+                            <span id="global-status-text-header">Connecting...</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -63,15 +71,15 @@
             </nav>
 
             <div class="sidebar-footer">
-                <a href="/settings" class="nav-item {{ 'active' if request.path == '/settings' else '' }}">
-                    <span class="nav-icon">⚙️</span>
-                    <span class="nav-text">Settings</span>
-                </a>
-                <div class="connection-status">
-                    <div style="width: 24px; display: flex; justify-content: center;">
-                        <div class="connection-dot" id="connection-dot"></div>
-                    </div>
-                    <span id="global-status-text">Connected</span>
+                <div style="display: flex; gap: 12px;">
+                    <a href="/settings" class="nav-item {{ 'active' if request.path == '/settings' else '' }}"
+                        style="flex: 1; justify-content: center; background: rgba(0, 242, 255, 0.1); border: 1px solid rgba(0, 242, 255, 0.2);">
+                        <span class="nav-icon">⚙️</span>
+                    </a>
+                    <a href="#" class="nav-item" onclick="logout(); return false;"
+                        style="flex: 1; justify-content: center; background: rgba(255, 42, 42, 0.1); border: 1px solid rgba(255, 42, 42, 0.2);">
+                        <span class="nav-icon">🚪</span>
+                    </a>
                 </div>
             </div>
         </aside>
@@ -93,6 +101,32 @@
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script src="{{ url_for('static', filename='js/notifications.js') }}"></script>
+    <script>
+        (function () {
+            const token = localStorage.getItem('auth_token');
+            if (token) {
+                const originalFetch = window.fetch;
+                window.fetch = function (url, options = {}) {
+                    options.headers = options.headers || {};
+                    if (!options.headers['Authorization']) {
+                        options.headers['Authorization'] = 'Bearer ' + token;
+                    }
+                    return originalFetch(url, options);
+                };
+            }
+        })();
+
+        async function logout() {
+            try {
+                await fetch('/api/auth/logout', { method: 'POST' });
+            } catch (e) {
+                console.error('Logout failed', e);
+            }
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_username');
+            window.location.replace('/login');
+        }
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 

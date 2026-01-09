@@ -9,8 +9,8 @@ const armContainer = document.getElementById('arm-container');
 const drivePanel = document.getElementById('drive-panel');
 const armPanel = document.getElementById('arm-panel');
 const statusDot = document.getElementById('status-dot');
-const statusText = document.getElementById('global-status-text');
-const connectionDot = document.getElementById('connection-dot');
+const statusText = document.getElementById('global-status-text-header');
+const connectionDot = document.getElementById('connection-dot-header');
 const debugPanel = document.getElementById('debug-panel');
 const compassArrow = document.getElementById('compass-arrow');
 
