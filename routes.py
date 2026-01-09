@@ -840,7 +840,7 @@ def delete_dataset_route():
     return jsonify({'status': 'ok' if success else 'error', 'message': msg})
 
 @bp.route('/api/auth/hf/status', methods=['GET'])
-def get_hf_auth_status():
+def get_hf_status_check():
     user = training_manager.get_hf_user()
     return jsonify({
         'logged_in': bool(user),
