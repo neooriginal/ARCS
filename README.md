@@ -21,7 +21,7 @@
 
 ## ⚡ Quick Start
 
-**View the [Compatibility List](docs/compatibility.md) for supported robots.**
+**View the [compatibility list](docs/compatibility.md) for supported robots.**
 
 **Linux / macOS:**
 ```bash
