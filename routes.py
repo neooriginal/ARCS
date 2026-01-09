@@ -22,9 +22,6 @@ from core.auth import (
     is_auth_configured, require_auth
 )
 
-# Initialize Recorder (will attach cameras later when accessed/available)
-# We need access to the camera objects. In this architecture, they are likely in `state` or global `camera` module.
-# `state.camera` holds the main camera object (cv2.VideoCapture)
 recorder = None 
 
 bp = Blueprint('robot', __name__)
@@ -421,8 +418,7 @@ def arm_home():
 def ai_start():
     if not state.agent:
         return jsonify({'status': 'error', 'error': 'AI Agent not initialized'})
-    
-    # Save current task if set (so we don't wipe it on start)
+
     current_task = None
     if hasattr(state.agent, 'current_task'):
         current_task = state.agent.current_task
@@ -912,8 +908,15 @@ def policy_status():
 @bp.route('/api/config', methods=['GET'])
 def get_config():
     """Return all configuration values."""
+    current_config = config_manager.get_all()
+    
+    # Mask API Key
+    api_key = current_config.get('OPENAI_API_KEY', '')
+    if len(api_key) > 10:
+        current_config['OPENAI_API_KEY'] = 'sk-' + '*' * (len(api_key) - 3)
+        
     return jsonify({
-        'config': config_manager.get_all(),
+        'config': current_config,
         'defaults': config_manager.get_defaults()
     })
 
@@ -923,6 +926,11 @@ def save_config():
     data = request.json
     if not data:
         return jsonify({'status': 'error', 'error': 'No data'}), 400
+    
+    # Don't save if it's the mask
+    new_key = data.get('OPENAI_API_KEY', '')
+    if new_key.startswith('sk-***'):
+        del data['OPENAI_API_KEY']
     
     if config_manager.update(data):
         return jsonify({'status': 'ok'})
