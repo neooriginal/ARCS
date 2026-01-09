@@ -1,0 +1,177 @@
+/* Memory Page Styles */
+
+/* Specific styles for memory page */
+.memory-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.add-section {
+    background: var(--bg-panel);
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.add-section select,
+.add-section input,
+.add-section button {
+    padding: 10px;
+    border: 1px solid #333;
+    border-radius: 6px;
+    background: #222;
+    color: #fff;
+}
+
+.add-section input {
+    flex: 1;
+}
+
+.add-section button {
+    background: var(--success);
+    border: none;
+    cursor: pointer;
+    color: #000;
+    font-weight: 600;
+}
+
+.add-section button:hover {
+    background: #00cc6a;
+}
+
+.memory-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.memory-item {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px 15px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.memory-item:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.category-badge {
+    background: #333;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75em;
+    text-transform: uppercase;
+    min-width: 60px;
+    text-align: center;
+    color: #fff;
+}
+
+.category-badge.layout {
+    background: #2d4a6f;
+}
+
+.category-badge.landmark {
+    background: #4a2d6f;
+}
+
+.category-badge.obstacle {
+    background: #6f2d2d;
+}
+
+.category-badge.path {
+    background: #2d6f4a;
+}
+
+.category-badge.other {
+    background: #4a4a4a;
+}
+
+.memory-content {
+    flex: 1;
+    color: #e0e0e0;
+}
+
+.memory-content.editing {
+    display: flex;
+    gap: 8px;
+}
+
+.memory-content.editing input {
+    flex: 1;
+    padding: 6px 10px;
+    background: #222;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #fff;
+}
+
+.memory-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 1.1em;
+}
+
+.btn-icon:hover {
+    background: #333;
+    color: #fff;
+}
+
+.btn-icon.delete:hover {
+    background: rgba(255, 68, 68, 0.2);
+    color: var(--error);
+}
+
+.btn-icon.save {
+    color: var(--success);
+}
+
+.toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.clear-btn {
+    background: rgba(220, 53, 69, 0.2);
+    color: var(--error);
+    border: 1px solid var(--error);
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.clear-btn:hover {
+    background: var(--error);
+    color: white;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 12px;
+}
+
+.stats {
+    color: #888;
+    font-size: 0.9em;
+}

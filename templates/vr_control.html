@@ -5,7 +5,7 @@
 {% block head %}
 <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
-<link rel="stylesheet" href="/static/css/vr_styles.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/vr_styles.css') }}">
 {% endblock %}
 
 {% block content %}
