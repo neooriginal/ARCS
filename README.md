@@ -21,17 +21,6 @@
   A robust control framework: Feature-rich, safe, and ready for autonomy.
 </p>
 
-## 📚 Documentation
-Full guides available in [`docs/`](docs/):
-
-- **[🚀 Setup Guide](docs/setup.md)**: Install & Calibrate.
-- **[🧭 Navigation](docs/navigation.md)**: Obstacle Detection, Precision Mode, & Holonomic Control.
-- **[🥽 VR Control](docs/vr_control.md)**: Arm manipulation via Standalone VR Headsets (e.g., Quest 3 Browser).
-- **[🤖 VLA Guide](docs/vla_guide.md)**: Learn how to use Imitation Learning to train policies.
-- **[🛡️ Safety Architecture](docs/safety.md)**: Active perception & reflex systems.
-- **[👁️ Visual Intelligence](docs/visual_intelligence.md)**: Computer Vision & Semantic Memory.
-- **[🔐 Security](docs/security.md)**: Network & Privacy.
-
 
 ## ⚡ Quick Start
 
@@ -45,10 +34,16 @@ curl -fsSL https://raw.githubusercontent.com/neooriginal/ARCS/main/install.sh | 
 irm https://raw.githubusercontent.com/neooriginal/ARCS/main/install.ps1 | iex
 ```
 
-> After installation, open `http://localhost:5000/settings` to configure hardware.
+## 📚 Documentation
+Full guides available in [`docs/`](docs/):
 
-## 📋 Requirements
-- Python 3.10+
+- **[🚀 Setup Guide](docs/setup.md)**: Install & Calibrate.
+- **[🧭 Navigation](docs/navigation.md)**: Obstacle Detection, Precision Mode, & Holonomic Control.
+- **[🥽 VR Control](docs/vr_control.md)**: Arm manipulation via Standalone VR Headsets (e.g., Quest 3 Browser).
+- **[🤖 VLA Guide](docs/vla_guide.md)**: Learn how to use Imitation Learning to train policies.
+- **[🛡️ Safety Architecture](docs/safety.md)**: Active perception & reflex systems.
+- **[👁️ Visual Intelligence](docs/visual_intelligence.md)**: Computer Vision & Semantic Memory.
+- **[🔐 Security](docs/security.md)**: Network & Privacy.
 
 ## 🙏 Special Thanks
 Based on the [RoboCrew](https://github.com/Grigorij-Dudnik/RoboCrew) project. 
