@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 import json
 from pathlib import Path
@@ -75,6 +76,7 @@ class ServoControler:
         self._arm_enabled = False
         self.wheel_bus = None
         self.head_bus = None
+        self._bus_lock = threading.RLock()
 
         if right_arm_wheel_usb:
             motors = {
@@ -203,12 +205,14 @@ class ServoControler:
         
         multipliers = self.action_map[action.lower()]
         payload = {wid: int(effective_speed * factor) for wid, factor in multipliers.items()}
-        self.wheel_bus.sync_write("Goal_Velocity", payload)
+        with self._bus_lock:
+            self.wheel_bus.sync_write("Goal_Velocity", payload)
         return payload
 
     def _wheels_stop(self) -> Dict[int, int]:
         payload = {wid: 0 for wid in self._wheel_ids}
-        self.wheel_bus.sync_write("Goal_Velocity", payload)
+        with self._bus_lock:
+            self.wheel_bus.sync_write("Goal_Velocity", payload)
         return payload
 
     def _wheels_run(self, action: str, duration: float) -> Dict[int, int]:
@@ -265,8 +269,9 @@ class ServoControler:
             
             # Scale by effective speed
             payload[wid] = int(effective_speed * combined_factor)
-            
-        self.wheel_bus.sync_write("Goal_Velocity", payload)
+        
+        with self._bus_lock:
+            self.wheel_bus.sync_write("Goal_Velocity", payload)
         return payload
 
     def apply_wheel_modes(self) -> None:
@@ -279,7 +284,8 @@ class ServoControler:
         if not self.wheel_bus:
             return {}
         try:
-            return self.wheel_bus.sync_read("Present_Load", list(self._wheel_ids))
+            with self._bus_lock:
+                return self.wheel_bus.sync_read("Present_Load", list(self._wheel_ids))
         except Exception:
             return {}
 
@@ -296,7 +302,8 @@ class ServoControler:
         if not self.head_bus:
             return {}
         payload = {HEAD_SERVO_MAP["yaw"]: float(degrees)}
-        self.head_bus.sync_write("Goal_Position", payload)
+        with self._bus_lock:
+            self.head_bus.sync_write("Goal_Position", payload)
         self._head_positions.update(payload)
         return payload
 
@@ -304,14 +311,16 @@ class ServoControler:
         if not self.head_bus:
             return {}
         payload = {HEAD_SERVO_MAP["pitch"]: float(degrees)}
-        self.head_bus.sync_write("Goal_Position", payload)
+        with self._bus_lock:
+            self.head_bus.sync_write("Goal_Position", payload)
         self._head_positions.update(payload)
         return payload
 
     def get_head_position(self) -> Dict[int, float]:
         if not self.head_bus:
             return {}
-        return self.head_bus.sync_read("Present_Position", list(self._head_ids))
+        with self._bus_lock:
+            return self.head_bus.sync_read("Present_Position", list(self._head_ids))
     
     def turn_head_to_vla_position(self, pitch_deg=45) -> str:
         self.turn_head_pitch(pitch_deg)
@@ -352,9 +361,9 @@ class ServoControler:
         if not self._arm_enabled:
             return {}
         try:
-            raw = self.wheel_bus.sync_read("Present_Position", list(self._arm_ids))
+            with self._bus_lock:
+                raw = self.wheel_bus.sync_read("Present_Position", list(self._arm_ids))
         except Exception:
-            # Return empty on read failure to avoid crashing loop
             return {}
             
         result = {}
@@ -377,7 +386,8 @@ class ServoControler:
         
         if payload:
             try:
-                self.wheel_bus.sync_write("Goal_Position", payload)
+                with self._bus_lock:
+                    self.wheel_bus.sync_write("Goal_Position", payload)
             except Exception as e:
                 print(f"Failed to write arm positions: {e}")
                 
@@ -400,7 +410,8 @@ class ServoControler:
         if not self.head_bus:
             return {}
         try:
-            return self.head_bus.sync_read("Present_Load", list(self._head_ids))
+            with self._bus_lock:
+                return self.head_bus.sync_read("Present_Load", list(self._head_ids))
         except Exception:
             return {}
 
@@ -409,8 +420,8 @@ class ServoControler:
         if not self._arm_enabled:
             return {}
         try:
-            # Remap from motor_id to joint_name or just return motor_id map
-            return self.wheel_bus.sync_read("Present_Load", list(self._arm_ids))
+            with self._bus_lock:
+                return self.wheel_bus.sync_read("Present_Load", list(self._arm_ids))
         except Exception:
             return {}
 
