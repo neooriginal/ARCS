@@ -273,8 +273,8 @@ def main() -> None:
         def handle_vr_data(data):
             if not vr_controller:
                 return
-            if vr_controller.controller is None and state.robot_system and state.robot_system.controller:
-                vr_controller.controller = state.robot_system.controller
+            if vr_controller.servo_controller is None and state.robot_system and state.robot_system.controller:
+                vr_controller.servo_controller = state.robot_system.controller
 
             vr_controller.vr_handler.on_vr_data(data)
 
