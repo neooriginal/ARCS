@@ -4,89 +4,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ARCS Display</title>
+    <title>ARCS System Diagnostics</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo-nobackground.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/display.css') }}">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Rajdhani:wght@500;600;700&display=swap"
+        rel="stylesheet">
 </head>
 
 <body>
-    <div class="display-container" id="display-container">
-        <!-- Animated Background -->
-        <div class="bg-particles" id="bg-particles"></div>
-        <div class="bg-glow" id="bg-glow"></div>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-left">
+                <span class="brand">ARCS</span>
+                <span class="sub-brand">SYSTEM DIAGNOSTICS</span>
+            </div>
+            <div class="header-right">
+                <div class="mode-badge" id="mode-badge">INITIALIZING</div>
+                <div class="clock" id="system-clock">00:00:00</div>
+            </div>
+        </header>
 
-        <!-- Blockage Warning Zones -->
-        <div class="warning-zone left" id="warn-left"></div>
-        <div class="warning-zone right" id="warn-right"></div>
-        <div class="warning-zone center" id="warn-center"></div>
+        <!-- Main Content Grid -->
+        <main class="dashboard-grid">
 
-        <!-- Control Mode Badge -->
-        <div class="control-mode-badge" id="control-mode-badge">
-            <span class="mode-emoji" id="mode-emoji">😴</span>
-            <span class="mode-text" id="mode-text">Idle</span>
-        </div>
-
-        <!-- Eyes Container -->
-        <div class="eyes-container" id="eyes-container">
-            <div class="eye left-eye" id="left-eye">
-                <div class="eye-white">
-                    <div class="eye-iris" id="left-iris">
-                        <div class="eye-pupil"></div>
-                        <div class="eye-highlight"></div>
-                        <div class="eye-highlight small"></div>
+            <!-- Left Panel: Sensors & Status -->
+            <section class="panel left-panel">
+                <div class="panel-header">SYSTEM STATUS</div>
+                <div class="status-grid">
+                    <div class="status-item" id="status-controller">
+                        <span class="label">CONTROLLER</span>
+                        <div class="indicator"></div>
+                    </div>
+                    <div class="status-item" id="status-arm">
+                        <span class="label">ROBOT ARM</span>
+                        <div class="indicator"></div>
+                    </div>
+                    <div class="status-item" id="status-camera">
+                        <span class="label">MAIN VISION</span>
+                        <div class="indicator"></div>
+                    </div>
+                    <div class="status-item" id="status-lidar">
+                        <span class="label">LIDAR ARRAY</span>
+                        <div class="indicator"></div>
                     </div>
                 </div>
-                <div class="eyelid top-lid" id="left-top-lid"></div>
-                <div class="eyelid bottom-lid" id="left-bottom-lid"></div>
-                <div class="eye-sparkle"></div>
-            </div>
 
-            <div class="eye right-eye" id="right-eye">
-                <div class="eye-white">
-                    <div class="eye-iris" id="right-iris">
-                        <div class="eye-pupil"></div>
-                        <div class="eye-highlight"></div>
-                        <div class="eye-highlight small"></div>
+                <div class="metric-box">
+                    <div class="metric-label">LIDAR PROXIMITY</div>
+                    <div class="metric-bar-container">
+                        <div class="metric-bar-fill" id="lidar-bar" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-value" id="lidar-value">--- cm</div>
+                </div>
+            </section>
+
+            <!-- Center Panel: The Core -->
+            <section class="panel center-panel">
+                <div class="core-container">
+                    <div class="core-ring outer"></div>
+                    <div class="core-ring inner"></div>
+                    <div class="core-heart" id="core-heart">
+                        <div class="icon" id="core-icon">⚡</div>
                     </div>
                 </div>
-                <div class="eyelid top-lid" id="right-top-lid"></div>
-                <div class="eyelid bottom-lid" id="right-bottom-lid"></div>
-                <div class="eye-sparkle"></div>
-            </div>
-        </div>
+                <div class="core-status-text" id="core-status-text">SYSTEM READY</div>
+            </section>
 
-        <!-- Status Bar -->
-        <div class="status-bar">
-            <div class="status-indicator">
-                <div class="status-dot" id="status-dot"></div>
-                <span class="status-label" id="status-label">Initializing...</span>
-            </div>
-            <div class="task-display" id="task-display">Ready to help!</div>
-        </div>
+            <!-- Right Panel: Logs -->
+            <section class="panel right-panel">
+                <div class="panel-header">SYSTEM LOGS</div>
+                <div class="log-terminal" id="log-terminal">
+                    <div class="log-entry"><span class="timestamp">[SYS]</span> System initialized.</div>
+                    <div class="log-entry"><span class="timestamp">[SYS]</span> Waiting for input...</div>
+                </div>
+            </section>
+        </main>
 
-        <!-- System Status Panel -->
-        <div class="branding-watermark">
-            ARCS
-        </div>
-        <div class="system-status-panel" id="system-status-panel">
-            <div class="system-item" id="system-controller">
-                <div class="system-dot"></div>
-                <span class="system-label">Controller</span>
-            </div>
-            <div class="system-item" id="system-camera">
-                <div class="system-dot"></div>
-                <span class="system-label">Camera</span>
-            </div>
-            <div class="system-item" id="system-arm">
-                <div class="system-dot"></div>
-                <span class="system-label">Arm</span>
-            </div>
-            <div class="system-item" id="system-ai">
-                <div class="system-dot"></div>
-                <span class="system-label">AI</span>
-            </div>
-        </div>
+        <!-- Footer: Task -->
+        <footer class="dashboard-footer">
+            <div class="task-label">CURRENT TASK</div>
+            <div class="task-content" id="task-content">Waiting for command...</div>
+        </footer>
     </div>
+
+    <!-- Blockage Overlays -->
+    <div class="warning-overlay left" id="warn-left"></div>
+    <div class="warning-overlay right" id="warn-right"></div>
+    <div class="warning-overlay center" id="warn-center"></div>
 
     <script src="{{ url_for('static', filename='js/display.js') }}"></script>
 </body>
