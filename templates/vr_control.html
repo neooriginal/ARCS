@@ -75,6 +75,11 @@
     <a-scene vr-controller-updater vr-mode-ui="enabled: false;" embedded style="width: 100%; height: 100%;">
         <a-entity webxr-passthrough="referenceSpaceType: local-floor"></a-entity>
 
+        <!-- 3D Arm Model (synced with real robot) -->
+        <a-entity arm-model="scale: 1.5; position: 0.5 0.6 -0.8"></a-entity>
+        <a-light type="ambient" intensity="0.6"></a-light>
+        <a-light type="directional" position="1 2 1" intensity="0.8"></a-light>
+
         <a-entity id="cameraPanel" position="0 1.2 -1.5">
             <a-entity rotation="-15 0 0">
                 <a-plane id="cameraPlane" width="1.6" height="0.9"
@@ -132,5 +137,6 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/vr_control_handlers.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vr_arm_model.js') }}"></script>
 <script src="/static/js/vr_app.js"></script>
 {% endblock %}

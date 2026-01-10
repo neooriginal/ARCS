@@ -718,6 +718,15 @@ def vr_status():
         'arm_connected': state.arm_connected
     })
 
+
+@bp.route('/static/urdf/<path:filename>')
+def serve_urdf(filename: str):
+    """Serve URDF/STL files for 3D arm visualization."""
+    from flask import send_from_directory
+    import os
+    urdf_dir = os.path.join(os.path.dirname(__file__), 'robots', 'urdf')
+    return send_from_directory(urdf_dir, filename)
+
 # Recording Routes
 
 @bp.route('/api/recording/start', methods=['POST'])
