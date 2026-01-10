@@ -17,15 +17,33 @@ POLICY_METADATA_FILE = POLICY_ROOT / "policy_metadata.json"
 
 logger = logging.getLogger(__name__)
 
-def get_hf_username() -> Optional[str]:
-    """Get the current HuggingFace username from the logged-in account."""
+# Caching for HuggingFace data
+_hf_username_cache: Optional[str] = None
+_hf_username_cache_time: float = 0
+_HF_USERNAME_CACHE_TTL: int = 300  # 5 minutes
+
+_hf_policies_cache: List[Dict[str, Any]] = []
+_hf_policies_cache_time: float = 0
+_HF_POLICIES_CACHE_TTL: int = 60  # 1 minute
+
+def get_hf_username(force_refresh: bool = False) -> Optional[str]:
+    """Get the current HuggingFace username from the logged-in account (cached)."""
+    global _hf_username_cache, _hf_username_cache_time
+    
+    now = time.time()
+    if not force_refresh and _hf_username_cache is not None and (now - _hf_username_cache_time < _HF_USERNAME_CACHE_TTL):
+        return _hf_username_cache
+
     try:
         api = HfApi()
         user_info = api.whoami()
-        return user_info.get("name")
+        _hf_username_cache = user_info.get("name")
+        _hf_username_cache_time = now
+        return _hf_username_cache
     except Exception as e:
         logger.warning(f"Could not get HuggingFace username: {e}")
-        return None
+        # Don't cache failure, but also don't immediately clear old cache on network error
+        return _hf_username_cache
 
 class TrainingManager:
     def __init__(self):
@@ -239,13 +257,27 @@ class TrainingManager:
             policy_names.extend([d.name for d in POLICY_ROOT.iterdir() if d.is_dir()])
 
         # Remote (HuggingFace)
+        global _hf_policies_cache, _hf_policies_cache_time
+        now = time.time()
+        
         try:
             hf_user = get_hf_username()
             if hf_user:
-                api = HfApi()
-                models = api.list_models(author=hf_user, sort="lastModified", direction=-1, limit=10)
-                for m in models:
-                    policy_names.append(m.modelId)
+                # Use cache if within TTL
+                if now - _hf_policies_cache_time < _HF_POLICIES_CACHE_TTL and _hf_policies_cache:
+                    remote_policies = _hf_policies_cache
+                else:
+                    api = HfApi()
+                    models = api.list_models(author=hf_user, sort="lastModified", direction=-1, limit=10)
+                    remote_policies = []
+                    for m in models:
+                        remote_policies.append(m.modelId)
+                    
+                    # Update cache
+                    _hf_policies_cache = remote_policies
+                    _hf_policies_cache_time = now
+                
+                policy_names.extend(remote_policies)
         except Exception as e:
             logger.warning(f"Failed to list HF models: {e}")
 
@@ -632,7 +664,7 @@ class TrainingManager:
             # Check OS, windows might need different credential logic, but standard cli works usually.
             res = subprocess.run(cmd, capture_output=True, text=True)
             if res.returncode == 0:
-                user = get_hf_username()
+                user = get_hf_username(force_refresh=True)
                 if user:
                     return True, f"Logged in as {user}"
                 else:
@@ -644,10 +676,14 @@ class TrainingManager:
 
     def hf_logout(self) -> tuple:
         """Logout from HuggingFace."""
+        global _hf_username_cache, _hf_policies_cache
         try:
             cmd = ["huggingface-cli", "logout"]
             res = subprocess.run(cmd, capture_output=True, text=True)
             if res.returncode == 0:
+                # Clear cache on logout
+                _hf_username_cache = None
+                _hf_policies_cache = []
                 return True, "Logged out"
             else:
                 return False, res.stderr

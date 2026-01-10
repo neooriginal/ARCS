@@ -36,7 +36,7 @@ AFRAME.registerComponent('vr-controller-updater', {
         }
 
         setInterval(() => this.checkRecordingStatus(), 1000);
-        setInterval(() => this.checkAuthStatus(), 5000);
+        setInterval(() => this.checkAuthStatus(), 30000);
         this.checkAuthStatus();
     },
 
