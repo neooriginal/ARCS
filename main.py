@@ -230,6 +230,16 @@ def main() -> None:
 
         @socketio.on('connect')
         def handle_connect():
+             # Basic Auth Check
+            from flask import request
+            from flask_socketio import disconnect
+            from core.auth import verify_token
+            
+            token = request.cookies.get('auth_token')
+            if not token or not verify_token(token):
+                disconnect()
+                return
+
             if vr_controller:
                 vr_controller.vr_handler.on_connect()
 

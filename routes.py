@@ -32,7 +32,6 @@ bp = Blueprint('robot', __name__)
 PUBLIC_PATHS = [
     '/login',
     '/api/auth/',
-    '/video_feed',
     '/static/',
 ]
 
@@ -929,6 +928,24 @@ def policy_status():
         'current_policy': policy_executor.current_policy_name
     })
 
+@bp.route('/api/policies/update', methods=['POST'])
+def update_policy_info():
+    data = request.json
+    policy_name = data.get('name')
+    if not policy_name:
+        return jsonify({'status': 'error', 'error': 'Policy Name required'}), 400
+        
+    # extract known metadata fields
+    update_data = {}
+    if 'enabled' in data:
+        update_data['enabled'] = bool(data['enabled'])
+    if 'description' in data:
+        update_data['description'] = str(data['description']).strip()
+        
+    if training_manager.update_policy_metadata(policy_name, update_data):
+        return jsonify({'status': 'ok'})
+    return jsonify({'status': 'error', 'error': 'Failed to update metadata'}), 500
+
 
 # ============ Configuration API ============
 
@@ -1009,9 +1026,11 @@ def camera_preview(port):
         # Handle integer index or path
         if port.isdigit():
             cap = cv2.VideoCapture(int(port))
-        else:
-            # Decode URL-safe path
+        elif port.startswith('/dev/video'):
+             # Allow explicit linux device paths
             cap = cv2.VideoCapture(port)
+        else:
+            return jsonify({'error': 'Invalid camera port'}), 400
         
         if not cap.isOpened():
             return jsonify({'error': 'Cannot open camera'}), 500
