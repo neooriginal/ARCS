@@ -341,6 +341,26 @@
         } catch (e) { alert("Req error: " + e); }
     }
 
+    async function renamePolicy(oldName) {
+        const newName = prompt("Enter new name for policy '" + oldName + "':", oldName);
+        if (!newName || newName === oldName) return;
+
+        try {
+            const res = await fetch('/api/training/policies/rename', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ old_name: oldName, new_name: newName })
+            });
+            const data = await res.json();
+            if (data.status === 'ok') {
+                loadPolicies();
+            } else {
+                alert("Error: " + data.message);
+            }
+        } catch (e) { alert("Req error: " + e); }
+    }
+
+
     async function deleteDataset(name) {
         if (!confirm(`⚠️ PERMANENTLY DELETE '${name}'?`)) return;
 
@@ -423,6 +443,7 @@
                         </div>
                     </div>
                     <div style="display:flex; gap:10px; align-items:center; margin-left:15px;">
+                        <button class="btn btn-sm" onclick="renamePolicy('${escapedName}')" style="background:#333; color:#fff; font-size:0.85em; padding:6px 10px; border:1px solid #555;">Rename</button>
                         <button class="btn btn-sm btn-success" onclick="runPolicy('${escapedName}')" ${p.enabled ? '' : 'disabled'}>▶ Run</button>
                     </div>
                 </div>

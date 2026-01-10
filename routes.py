@@ -873,6 +873,18 @@ def rename_dataset_route():
     success, msg = training_manager.rename_dataset(old_name, new_name)
     return jsonify({'status': 'ok' if success else 'error', 'message': msg})
 
+@bp.route('/api/training/policies/rename', methods=['POST'])
+def rename_policy_route():
+    data = request.json
+    old_name = data.get('old_name')
+    new_name = data.get('new_name')
+    
+    if not old_name or not new_name:
+        return jsonify({'status': 'error', 'error': 'Old and New names required'}), 400
+        
+    success, msg = training_manager.rename_policy(old_name, new_name)
+    return jsonify({'status': 'ok' if success else 'error', 'message': msg})
+
 @bp.route('/api/training/auth', methods=['GET'])
 def get_hf_auth_status():
     user = training_manager.get_hf_user()

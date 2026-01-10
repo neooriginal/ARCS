@@ -379,6 +379,51 @@ class TrainingManager:
 
         return True, " | ".join(msgs)
 
+    def rename_policy(self, old_name: str, new_name: str) -> tuple[bool, str]:
+        """Rename policy locally and on HuggingFace Hub."""
+        hf_username = get_hf_username()
+        msgs = []
+
+        # Rename local folder if it exists
+        old_path = POLICY_ROOT / old_name
+        new_path = POLICY_ROOT / new_name
+        if old_path.exists():
+            if new_path.exists():
+                return False, f"Destination '{new_name}' already exists."
+            try:
+                old_path.rename(new_path)
+                msgs.append(f"Renamed local folder to {new_name}.")
+            except Exception as e:
+                return False, f"Failed to rename local folder: {e}"
+        else:
+            msgs.append("Local folder not found (might be remote only).")
+
+        # Rename on HuggingFace Hub
+        if hf_username:
+            old_repo_id = f"{hf_username}/{old_name}"
+            new_repo_id = f"{hf_username}/{new_name}"
+            try:
+                api = HfApi()
+                api.model_info(old_repo_id)
+                api.move_repo(from_id=old_repo_id, to_id=new_repo_id, repo_type="model")
+                msgs.append(f"Renamed remote model to {new_repo_id}.")
+            except Exception as e:
+                if "404" in str(e):
+                    msgs.append("Remote model not found (skipped).")
+                else:
+                    msgs.append(f"Failed to rename remote model: {e}")
+        else:
+            msgs.append("Hub rename skipped (not logged in).")
+
+        # Update metadata file
+        metadata = self._load_policy_metadata()
+        if old_name in metadata:
+            metadata[new_name] = metadata.pop(old_name)
+            self._save_policy_metadata(metadata)
+            msgs.append("Metadata updated.")
+
+        return True, " | ".join(msgs)
+
     def start_training(self, dataset_name: str, job_name: str, device: str = "auto", steps: int = 2000):
         if self.is_training:
             return False, "Training already in progress"
