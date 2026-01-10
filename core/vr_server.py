@@ -163,8 +163,8 @@ class VRSocketHandler:
                 self._send_goal(ControlGoal(
                     mode=ControlMode.POSITION_CONTROL,
                     target_position=delta,
-                    wrist_roll_deg=-ctrl.z_axis_rotation,
-                    wrist_flex_deg=-ctrl.x_axis_rotation
+                    wrist_roll_deg=ctrl.z_axis_rotation,
+                    wrist_flex_deg=ctrl.x_axis_rotation
                 ))
 
     def _handle_joystick(self, stick: Dict, right_grip=False, left_grip=False) -> None:

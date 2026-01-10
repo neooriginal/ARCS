@@ -11,10 +11,11 @@ from core.vr_server import VRSocketHandler, ControlGoal, ControlMode
 
 logger = logging.getLogger(__name__)
 
-# Motion smoothing parameters
-SMOOTHING_FACTOR = 0.35        # Blend ratio per update (0=no movement, 1=instant)
-MAX_STEP_DEG = 8.0             # Maximum degrees to move per update cycle
-MIN_CHANGE_DEG = 0.3           # Deadband - ignore changes smaller than this
+# Motion smoothing parameters (tuned for responsiveness)
+SMOOTHING_FACTOR = 0.5         # Blend ratio per update (higher = more responsive)
+MAX_STEP_DEG = 12.0            # Maximum degrees to move per update cycle
+MIN_CHANGE_DEG = 0.2           # Deadband - ignore changes smaller than this
+RESYNC_INTERVAL = 10           # Re-sync from actual motors every N updates
 
 
 def _smooth_step(t: float) -> float:
@@ -30,7 +31,6 @@ class VRArmController:
         
         self.mode = ControlMode.IDLE
         self.current_angles = np.zeros(NUM_JOINTS)
-        self.target_angles = np.zeros(NUM_JOINTS)  # Smoothed target
         self.origin_position = None
         self.origin_wrist_roll = 0.0
         self.origin_wrist_flex = 0.0
@@ -45,6 +45,12 @@ class VRArmController:
         # Track motion start for acceleration curve
         self.motion_start_time = 0
         self.is_moving = False
+        
+        # Periodic re-sync counter
+        self.update_count = 0
+        
+        # Store latest goal to avoid dropping inputs
+        self.pending_goal: Optional[ControlGoal] = None
         
         self.config = {'vr_scale': 1.0}
         self.vr_handler = VRSocketHandler(self._handle_goal, self.config)
@@ -81,7 +87,6 @@ class VRArmController:
                     return False
 
                 self.current_angles = new_angles.copy()
-                self.target_angles = new_angles.copy()
                 vr_kinematics.update_current_angles(self.current_angles)
                 return True
             else:
@@ -135,6 +140,8 @@ class VRArmController:
                 self.mode = ControlMode.POSITION_CONTROL
                 self.motion_start_time = time.time()
                 self.is_moving = False
+                self.update_count = 0
+                self.pending_goal = None
             else:
                 logger.error("Failed to sync arm, blocking VR engagement")
                 self.mode = ControlMode.IDLE
@@ -143,27 +150,51 @@ class VRArmController:
             self.mode = ControlMode.IDLE
             self.origin_position = None
             self.is_moving = False
+            self.pending_goal = None
     
     def _handle_position(self, goal: ControlGoal) -> None:
         if self.origin_position is None:
             return
         
         now = time.time()
+        
+        # Store goal for later if rate limited (don't drop it)
         if now - self.last_arm_update_time < self.arm_update_interval:
+            self.pending_goal = goal
             return
+        
+        # Use pending goal if available (latest input)
+        active_goal = self.pending_goal if self.pending_goal else goal
+        self.pending_goal = None
         self.last_arm_update_time = now
+        self.update_count += 1
+        
+        # Periodic re-sync from actual motor positions to prevent drift
+        if self.update_count % RESYNC_INTERVAL == 0:
+            pos = self.servo_controller.get_arm_position() if self.servo_controller else None
+            if pos:
+                actual_angles = np.array([
+                    pos.get('shoulder_pan', self.current_angles[0]),
+                    pos.get('shoulder_lift', self.current_angles[1]),
+                    pos.get('elbow_flex', self.current_angles[2]),
+                    pos.get('wrist_flex', self.current_angles[3]),
+                    pos.get('wrist_roll', self.current_angles[4]),
+                    pos.get('gripper', self.current_angles[5])
+                ])
+                # Blend actual with tracked to avoid jumps
+                self.current_angles = 0.8 * self.current_angles + 0.2 * actual_angles
         
         # Calculate raw target from IK
-        target = self.origin_position + goal.target_position
+        target = self.origin_position + active_goal.target_position
         ik = vr_kinematics.solve_ik(target, self.current_angles)
         
         raw_target = self.current_angles.copy()
         raw_target[:NUM_IK_JOINTS] = ik
         
-        if goal.wrist_roll_deg is not None:
-            raw_target[WRIST_ROLL_INDEX] = self.origin_wrist_roll + goal.wrist_roll_deg
-        if goal.wrist_flex_deg is not None:
-            raw_target[WRIST_FLEX_INDEX] = self.origin_wrist_flex + goal.wrist_flex_deg
+        if active_goal.wrist_roll_deg is not None:
+            raw_target[WRIST_ROLL_INDEX] = self.origin_wrist_roll + active_goal.wrist_roll_deg
+        if active_goal.wrist_flex_deg is not None:
+            raw_target[WRIST_FLEX_INDEX] = self.origin_wrist_flex + active_goal.wrist_flex_deg
         
         raw_target = np.clip(raw_target, -120, 120)
         raw_target[GRIPPER_INDEX] = -60 if self.gripper_closed else 80
@@ -190,10 +221,10 @@ class VRArmController:
             self.is_moving = True
             self.motion_start_time = time.time()
         
-        # Calculate acceleration factor (ramps up over first 0.15s)
+        # Calculate acceleration factor (ramps up over first 0.1s)
         if self.is_moving:
             elapsed = time.time() - self.motion_start_time
-            accel_factor = _smooth_step(min(elapsed / 0.15, 1.0))
+            accel_factor = _smooth_step(min(elapsed / 0.1, 1.0))
         else:
             accel_factor = 1.0
         
