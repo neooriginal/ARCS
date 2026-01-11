@@ -11,6 +11,9 @@ from core.vr_server import VRSocketHandler, ControlGoal, ControlMode
 
 logger = logging.getLogger(__name__)
 
+# Smoothing factor for EMA: lower = smoother but slower response
+SMOOTHING_FACTOR = 0.2
+
 
 class VRArmController:
     def __init__(self, servo_controller, movement_callback: Optional[Callable] = None):
@@ -23,6 +26,10 @@ class VRArmController:
         self.origin_wrist_roll = 0.0
         self.origin_wrist_flex = 0.0
         self.gripper_closed = False
+        
+        # Smoothed angles for interpolation
+        self.smoothed_angles = np.zeros(NUM_JOINTS)
+        self.is_vr_active = False
         
         self.last_movement_time = 0
         self.movement_interval = 0.05
@@ -115,13 +122,17 @@ class VRArmController:
                 self.origin_position = vr_kinematics.get_end_effector_position(self.current_angles)
                 self.origin_wrist_roll = self.current_angles[WRIST_ROLL_INDEX]
                 self.origin_wrist_flex = self.current_angles[WRIST_FLEX_INDEX]
+                self.smoothed_angles = self.current_angles.copy()
+                self.is_vr_active = True
                 self.mode = ControlMode.POSITION_CONTROL
             else:
                 logger.error("Failed to sync arm, blocking VR engagement")
                 self.mode = ControlMode.IDLE
+                self.is_vr_active = False
                 
         elif goal.mode == ControlMode.IDLE:
             self.mode = ControlMode.IDLE
+            self.is_vr_active = False
             self.origin_position = None
     
     def _handle_position(self, goal: ControlGoal):
@@ -147,8 +158,12 @@ class VRArmController:
         new = np.clip(new, -120, 120)
         new[GRIPPER_INDEX] = -60 if self.gripper_closed else 80
         
-        self._send_arm(new)
-        self.current_angles = new
+        # Apply exponential smoothing for human-like motion
+        self.smoothed_angles = self.smoothed_angles * (1 - SMOOTHING_FACTOR) + new * SMOOTHING_FACTOR
+        self.smoothed_angles[GRIPPER_INDEX] = new[GRIPPER_INDEX]  # No smoothing on gripper
+        
+        self._send_arm(self.smoothed_angles)
+        self.current_angles = self.smoothed_angles.copy()
         vr_kinematics.update_current_angles(self.current_angles)
     
     def _handle_head(self, goal: ControlGoal):
