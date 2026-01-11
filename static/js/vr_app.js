@@ -12,7 +12,7 @@ AFRAME.registerComponent('vr-controller-updater', {
         this.leftStick = { x: 0, y: 0 };
         this.rightStick = { x: 0, y: 0 };
         this.lastSend = 0;
-        this.sendInterval = 50;
+        this.sendInterval = 33;  // ~30Hz for responsive tracking
         this.hfLoggedIn = false;
 
         this.connectSocket();
@@ -130,9 +130,72 @@ AFRAME.registerComponent('vr-controller-updater', {
             });
             this.socket.on('disconnect', () => this.updateStatus('wsStatus', false));
             this.socket.on('connect_error', () => this.updateStatus('wsStatus', false));
+
+            // Arm position feedback for 3D visualization
+            this.socket.on('arm_position', (pos) => {
+                this.updateArmVisualization(pos);
+            });
         } catch (e) {
             console.error('Socket error:', e);
         }
+    },
+
+    updateArmVisualization: function (pos) {
+        const shoulderPan = document.querySelector('#armShoulderPan');
+        const shoulderLift = document.querySelector('#armShoulderLift');
+        const elbow = document.querySelector('#armElbow');
+        const wristFlex = document.querySelector('#armWristFlex');
+        const wristRoll = document.querySelector('#armWristRoll');
+        const gripperLeft = document.querySelector('#gripperLeft');
+        const gripperRight = document.querySelector('#gripperRight');
+
+        if (!shoulderPan) return;
+
+        // Initialize last position storage for noise filtering
+        if (!this.lastArmPos) this.lastArmPos = {};
+
+        // Noise deadzone - ignore changes smaller than this
+        const deadzone = 0.5;
+        const self = this;
+
+        function filter(key, val) {
+            if (!(key in self.lastArmPos)) {
+                // First update - accept the value as-is
+                self.lastArmPos[key] = val;
+                return val;
+            }
+            const last = self.lastArmPos[key];
+            if (Math.abs(val - last) < deadzone) return last;
+            self.lastArmPos[key] = val;
+            return val;
+        }
+
+        // Filter positions to reduce jitter
+        const sp = filter('sp', pos.shoulder_pan);
+        const sl = filter('sl', pos.shoulder_lift);
+        const ef = filter('ef', pos.elbow_flex);
+        const wf = filter('wf', pos.wrist_flex);
+        const wr = filter('wr', pos.wrist_roll);
+
+        // Apply joint rotations
+        // Shoulder pan rotates around Y (left/right swing)
+        shoulderPan.setAttribute('rotation', `0 ${sp} 0`);
+        // Shoulder lift rotates around X (tip forward/back)
+        shoulderLift.setAttribute('rotation', `${-sl} 0 0`);
+        // Elbow rotates around X - add -90° offset for calibration (neutral = forearm bent forward)
+        elbow.setAttribute('rotation', `${-ef - 90} 0 0`);
+        // Debug: log elbow value to console
+        if (Math.abs(ef) > 1) console.log('Elbow flex:', ef);
+        // Wrist flex rotates around X
+        wristFlex.setAttribute('rotation', `${-wf} 0 0`);
+        // Wrist roll rotates around Y - add 90° offset for calibration
+        wristRoll.setAttribute('rotation', `0 ${wr + 90} 0`);
+
+        // Gripper open/close (gripper angle: -65 closed, +80 open)
+        const gripperOpen = (pos.gripper + 65) / 145;
+        const fingerOffset = 0.012 + gripperOpen * 0.015;
+        if (gripperLeft) gripperLeft.setAttribute('position', `${-fingerOffset} 0.04 0`);
+        if (gripperRight) gripperRight.setAttribute('position', `${fingerOffset} 0.04 0`);
     },
 
     updateStatus: function (id, on) {

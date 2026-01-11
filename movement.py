@@ -66,14 +66,14 @@ def movement_loop():
             state.stop_all_movement()
             movement = state.get_movement()  # Reset local movement to stop immediately
 
-        # Safety: Stall Detection (skip during active VR arm control)
+        # Safety: Stall Detection (skip entirely during active VR arm control)
         if time.time() - last_stall_check > STALL_CHECK_INTERVAL:
+            last_stall_check = time.time()
             try:
-                # Skip stall check during active VR control to avoid false positives
                 from vr_arm_controller import vr_arm_controller
-                skip_stall = vr_arm_controller and vr_arm_controller.is_vr_active
-                
-                if not skip_stall:
+                if vr_arm_controller and vr_arm_controller.is_vr_active:
+                    pass  # Skip when VR active to avoid port conflicts
+                else:
                     msg = state.controller.check_stall(STALL_LOAD_THRESHOLD)
                     if msg:
                          state.last_error = f"SAFETY STOP: {msg}"
@@ -81,7 +81,6 @@ def movement_loop():
                          print(f"!!! {msg} !!!")
             except Exception as e:
                 logger.warning(f"Stall check error: {e}")
-            last_stall_check = time.time()
         
         try:
             execute_movement(movement)

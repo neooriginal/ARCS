@@ -12,7 +12,7 @@ from core.vr_server import VRSocketHandler, ControlGoal, ControlMode
 logger = logging.getLogger(__name__)
 
 # Smoothing factor for EMA: lower = smoother but slower response
-SMOOTHING_FACTOR = 0.2
+SMOOTHING_FACTOR = 0.3
 
 
 class VRArmController:
@@ -35,7 +35,7 @@ class VRArmController:
         self.movement_interval = 0.05
         
         self.last_arm_update_time = 0
-        self.arm_update_interval = 0.05  # 20Hz max for arm updates
+        self.arm_update_interval = 0.033  # ~30Hz for arm updates
         
         self.config = {'vr_scale': 1.0}
         self.vr_handler = VRSocketHandler(self._handle_goal, self.config)
@@ -147,24 +147,27 @@ class VRArmController:
         target = self.origin_position + goal.target_position
         ik = vr_kinematics.solve_ik(target, self.current_angles)
         
-        new = self.current_angles.copy()
-        new[:NUM_IK_JOINTS] = ik
+        # Build target angles (unsmoothed)
+        target_angles = self.current_angles.copy()
+        target_angles[:NUM_IK_JOINTS] = ik
         
         if goal.wrist_roll_deg is not None:
-            new[WRIST_ROLL_INDEX] = self.origin_wrist_roll + goal.wrist_roll_deg
+            target_angles[WRIST_ROLL_INDEX] = self.origin_wrist_roll + goal.wrist_roll_deg
         if goal.wrist_flex_deg is not None:
-            new[WRIST_FLEX_INDEX] = self.origin_wrist_flex + goal.wrist_flex_deg
+            target_angles[WRIST_FLEX_INDEX] = self.origin_wrist_flex + goal.wrist_flex_deg
         
-        new = np.clip(new, -120, 120)
-        new[GRIPPER_INDEX] = -60 if self.gripper_closed else 80
+        target_angles = np.clip(target_angles, -120, 120)
+        target_angles[GRIPPER_INDEX] = -60 if self.gripper_closed else 80
         
-        # Apply exponential smoothing for human-like motion
-        self.smoothed_angles = self.smoothed_angles * (1 - SMOOTHING_FACTOR) + new * SMOOTHING_FACTOR
-        self.smoothed_angles[GRIPPER_INDEX] = new[GRIPPER_INDEX]  # No smoothing on gripper
+        # Update IK reference angles (unsmoothed) for accurate IK calculation
+        self.current_angles = target_angles.copy()
+        vr_kinematics.update_current_angles(self.current_angles)
+        
+        # Apply exponential smoothing for human-like motion (output only)
+        self.smoothed_angles = self.smoothed_angles * (1 - SMOOTHING_FACTOR) + target_angles * SMOOTHING_FACTOR
+        self.smoothed_angles[GRIPPER_INDEX] = target_angles[GRIPPER_INDEX]
         
         self._send_arm(self.smoothed_angles)
-        self.current_angles = self.smoothed_angles.copy()
-        vr_kinematics.update_current_angles(self.current_angles)
     
     def _handle_head(self, goal: ControlGoal):
         if not self.servo_controller:

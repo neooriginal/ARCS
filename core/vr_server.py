@@ -215,9 +215,9 @@ class VRSocketHandler:
             current_rotation = R.from_quat(current_quat)
             relative_rotation = current_rotation * origin_rotation.inv()
 
-            # Extract component
-            rotvec = relative_rotation.as_rotvec()
-            angle = np.degrees(rotvec[axis])
+            # Use Euler angles (intrinsic XYZ) for stable axis extraction
+            euler = relative_rotation.as_euler('xyz', degrees=True)
+            angle = euler[axis]
             return -angle if negate else angle
         except Exception as e:
             logger.warning(f"Error extracting rotation: {e}")

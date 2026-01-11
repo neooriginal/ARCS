@@ -268,6 +268,15 @@ def main() -> None:
         @socketio.on('vr_connect')
         def handle_vr_connect():
             logger.info("VR client connected")
+            # Send initial arm position
+            if state.robot_system and state.robot_system.controller:
+                try:
+                    from flask_socketio import emit
+                    pos = state.robot_system.controller.get_arm_position()
+                    if pos:
+                        emit('arm_position', pos)
+                except Exception:
+                    pass
 
         @socketio.on('vr_data')
         def handle_vr_data(data):
@@ -277,6 +286,19 @@ def main() -> None:
                 vr_controller.servo_controller = state.robot_system.controller
 
             vr_controller.vr_handler.on_vr_data(data)
+            
+            # Send arm position back for visualization during active control only
+            if vr_controller.is_vr_active:
+                from flask_socketio import emit
+                arm_pos = {
+                    'shoulder_pan': float(vr_controller.smoothed_angles[0]),
+                    'shoulder_lift': float(vr_controller.smoothed_angles[1]),
+                    'elbow_flex': float(vr_controller.smoothed_angles[2]),
+                    'wrist_flex': float(vr_controller.smoothed_angles[3]),
+                    'wrist_roll': float(vr_controller.smoothed_angles[4]),
+                    'gripper': float(vr_controller.smoothed_angles[5])
+                }
+                emit('arm_position', arm_pos)
 
     print()
     print(f"🌐 http://localhost:{WEB_PORT}")

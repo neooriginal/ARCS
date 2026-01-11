@@ -96,6 +96,47 @@
 
         </a-entity>
 
+        <!-- Robot Arm Visualization -->
+        <a-entity id="robotArm" position="0.8 0.5 -1.0" rotation="0 -30 0">
+            <!-- Base -->
+            <a-cylinder id="armBase" radius="0.05" height="0.08" color="#444"></a-cylinder>
+
+            <!-- Shoulder Pan (rotates around Y) -->
+            <a-entity id="armShoulderPan" position="0 0.04 0">
+                <!-- Shoulder Lift (rotates around X) -->
+                <a-entity id="armShoulderLift" position="0 0 0">
+                    <!-- Upper Arm -->
+                    <a-cylinder radius="0.02" height="0.15" color="#666" position="0 0.075 0"></a-cylinder>
+
+                    <!-- Elbow (rotates around X for bend) -->
+                    <a-entity id="armElbow" position="0 0.15 0">
+                        <a-sphere radius="0.025" color="#888"></a-sphere>
+                        <!-- Forearm - slightly longer than upper arm -->
+                        <a-cylinder radius="0.018" height="0.16" color="#666" position="0 0.08 0"></a-cylinder>
+
+                        <!-- Wrist Flex - at end of forearm -->
+                        <a-entity id="armWristFlex" position="0 0.16 0">
+                            <a-sphere radius="0.02" color="#888"></a-sphere>
+
+                            <!-- Wrist Roll -->
+                            <a-entity id="armWristRoll" position="0 0 0">
+                                <!-- Gripper Base -->
+                                <a-box width="0.04" height="0.02" depth="0.03" color="#555" position="0 0.02 0"></a-box>
+
+                                <!-- Gripper Fingers -->
+                                <a-entity id="armGripper">
+                                    <a-box id="gripperLeft" width="0.008" height="0.04" depth="0.015" color="#777"
+                                        position="-0.018 0.04 0"></a-box>
+                                    <a-box id="gripperRight" width="0.008" height="0.04" depth="0.015" color="#777"
+                                        position="0.018 0.04 0"></a-box>
+                                </a-entity>
+                            </a-entity>
+                        </a-entity>
+                    </a-entity>
+                </a-entity>
+            </a-entity>
+        </a-entity>
+
         <a-entity id="rightHand" oculus-touch-controls="hand: right">
             <a-text id="rightHandInfo" value="Ready\nA: Record" position="0 0.04 -0.05" scale="0.05 0.05 0.05"
                 color="white" align="center"></a-text>
