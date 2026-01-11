@@ -166,6 +166,8 @@ class VRArmController:
             raw_target[WRIST_FLEX_INDEX] = self.origin_wrist_flex + goal.wrist_flex_deg
         
         raw_target = np.clip(raw_target, -120, 120)
+        raw_target[0] = np.clip(raw_target[0], -90, 90)   # shoulder pan: 180° sideways
+        raw_target[1] = np.clip(raw_target[1], -90, 0)    # shoulder lift: forward/up only
         raw_target[GRIPPER_INDEX] = -60 if self.gripper_closed else 80
         
         # Smooth interpolation toward target
