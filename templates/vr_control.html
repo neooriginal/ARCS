@@ -6,6 +6,7 @@
 <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/vr_styles.css') }}">
+<script src="{{ url_for('static', filename='js/vr_arm_model.js') }}"></script>
 {% endblock %}
 
 {% block content %}
@@ -94,6 +95,12 @@
                 </a-entity>
             </a-entity>
 
+        </a-entity>
+
+        <!-- 3D Arm Model for spatial awareness -->
+        <a-entity id="armModel" vr-arm-model position="-1.2 0.8 -1.3" rotation="0 20 0">
+            <a-text value="ARM STATUS" position="0 0.55 0" align="center" scale="0.08 0.08 0.08"
+                color="#00d2ff"></a-text>
         </a-entity>
 
         <a-entity id="rightHand" oculus-touch-controls="hand: right">

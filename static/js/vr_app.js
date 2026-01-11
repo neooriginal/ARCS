@@ -18,6 +18,7 @@ AFRAME.registerComponent('vr-controller-updater', {
         this.connectSocket();
         this.setupEvents();
         this.setupRecording();
+        this.setupArmModel();
     },
 
     setupRecording: function () {
@@ -130,8 +131,45 @@ AFRAME.registerComponent('vr-controller-updater', {
             });
             this.socket.on('disconnect', () => this.updateStatus('wsStatus', false));
             this.socket.on('connect_error', () => this.updateStatus('wsStatus', false));
+
+            this.socket.on('arm_state', (data) => {
+                if (data && data.angles) {
+                    this.updateArmModel(data.angles);
+                }
+            });
         } catch (e) {
             console.error('Socket error:', e);
+        }
+    },
+
+    setupArmModel: function () {
+        this.armModelEl = document.querySelector('#armModel');
+        this.fetchArmPosition();
+        setInterval(() => this.fetchArmPosition(), 500);
+    },
+
+    fetchArmPosition: async function () {
+        try {
+            const res = await fetch('/arm_position');
+            const data = await res.json();
+            if (data.positions) {
+                const p = data.positions;
+                const angles = [
+                    p.shoulder_pan || 0,
+                    p.shoulder_lift || 0,
+                    p.elbow_flex || 0,
+                    p.wrist_flex || 0,
+                    p.wrist_roll || 0,
+                    p.gripper || 0
+                ];
+                this.updateArmModel(angles);
+            }
+        } catch (e) { }
+    },
+
+    updateArmModel: function (angles) {
+        if (this.armModelEl && this.armModelEl.components['vr-arm-model']) {
+            this.armModelEl.components['vr-arm-model'].setJointAngles(angles);
         }
     },
 
