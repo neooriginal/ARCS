@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 import json
+import threading
 from pathlib import Path
 from typing import Dict, Mapping, Optional
 from lerobot.motors import Motor, MotorCalibration, MotorNormMode
@@ -75,6 +76,7 @@ class ServoControler:
         self._arm_enabled = False
         self.wheel_bus = None
         self.head_bus = None
+        self._bus_lock = threading.Lock()  # Prevent concurrent bus access
 
         if right_arm_wheel_usb:
             motors = {
@@ -351,11 +353,14 @@ class ServoControler:
     def get_arm_position(self) -> Dict[str, float]:
         if not self._arm_enabled:
             return {}
+        if not self._bus_lock.acquire(blocking=False):
+            return {}  # Skip if bus is busy
         try:
             raw = self.wheel_bus.sync_read("Present_Position", list(self._arm_ids))
         except Exception:
-            # Return empty on read failure to avoid crashing loop
             return {}
+        finally:
+            self._bus_lock.release()
             
         result = {}
         for joint_name, motor_id in ARM_SERVO_MAP.items():
@@ -376,10 +381,11 @@ class ServoControler:
                 self._arm_positions[joint_name] = clamped
         
         if payload:
-            try:
-                self.wheel_bus.sync_write("Goal_Position", payload)
-            except Exception as e:
-                print(f"Failed to write arm positions: {e}")
+            with self._bus_lock:
+                try:
+                    self.wheel_bus.sync_write("Goal_Position", payload)
+                except Exception as e:
+                    print(f"Failed to write arm positions: {e}")
                 
         return self._arm_positions.copy()
 
@@ -408,11 +414,14 @@ class ServoControler:
         """Read the current load (0-1000) from arm motors."""
         if not self._arm_enabled:
             return {}
+        if not self._bus_lock.acquire(blocking=False):
+            return {}  # Skip if bus is busy
         try:
-            # Remap from motor_id to joint_name or just return motor_id map
             return self.wheel_bus.sync_read("Present_Load", list(self._arm_ids))
         except Exception:
             return {}
+        finally:
+            self._bus_lock.release()
 
     def check_stall(self, threshold: int = 600) -> Optional[str]:
         """
