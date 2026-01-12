@@ -156,18 +156,7 @@ class VRArmController:
         if goal.wrist_flex_deg is not None:
             target_angles[WRIST_FLEX_INDEX] = self.origin_wrist_flex + goal.wrist_flex_deg
         
-        # Human-like joint limits to prevent overextension
-        # Shoulder pan: ±90° (can't reach behind back)
-        target_angles[0] = np.clip(target_angles[0], -90, 90)
-        # Shoulder lift: -90° to +10° (can't go past straight up backwards)
-        target_angles[1] = np.clip(target_angles[1], -90, 10)
-        # Elbow: -90° to +10° (can only bend forward, can't hyperextend)
-        target_angles[2] = np.clip(target_angles[2], -90, 10)
-        # Wrist flex: ±90°
-        target_angles[3] = np.clip(target_angles[3], -90, 90)
-        # Wrist roll: ±120°
-        target_angles[4] = np.clip(target_angles[4], -120, 120)
-        # Gripper
+        target_angles = np.clip(target_angles, -120, 120)
         target_angles[GRIPPER_INDEX] = -60 if self.gripper_closed else 80
         
         # Update IK reference angles (unsmoothed) for accurate IK calculation
