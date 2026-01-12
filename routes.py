@@ -951,6 +951,19 @@ def policy_status():
         'current_policy': policy_executor.current_policy_name
     })
 
+@bp.route('/api/training/policies/delete', methods=['POST'])
+def delete_policy():
+    data = request.json
+    policy_name = data.get('policy_name')
+    if not policy_name:
+        return jsonify({'status': 'error', 'error': 'Policy name required'}), 400
+        
+    success, message = training_manager.delete_policy(policy_name)
+    if success:
+        return jsonify({'status': 'ok', 'message': message})
+    else:
+        return jsonify({'status': 'error', 'error': message}), 500
+
 @bp.route('/api/policies/update', methods=['POST'])
 def update_policy_info():
     data = request.json
