@@ -401,20 +401,6 @@ def set_gripper():
         return jsonify({'status': 'error', 'error': str(e)})
 
 
-@bp.route('/arm/home', methods=['POST'])
-def arm_home():
-    if not state.arm_connected:
-        return jsonify({'status': 'error', 'error': 'Arm not connected'})
-    
-    try:
-        targets = arm_controller.reset_to_home()
-        result = state.controller.set_arm_position(targets)
-        state.update_arm_positions(result)
-        return jsonify({'status': 'ok', 'positions': result})
-    except Exception as e:
-        return jsonify({'status': 'error', 'error': str(e)})
-
-
 # AI Routes
 
 @bp.route('/ai/start', methods=['POST'])

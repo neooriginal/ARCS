@@ -27,9 +27,7 @@ class ArmController:
     def __init__(self) -> None:
         self.targets: Dict[str, float] = HOME_POSITIONS.copy()
 
-    def reset_to_home(self) -> Dict[str, float]:
-        self.targets = HOME_POSITIONS.copy()
-        return self.targets.copy()
+
 
     def handle_mouse_move(self, delta_x: float, delta_y: float) -> Dict[str, float]:
         self.targets['shoulder_pan'] += delta_x * ARM_XY_SENSITIVITY

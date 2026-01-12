@@ -385,18 +385,7 @@ async function setGripper(closed) {
     }
 }
 
-async function armHome() {
-    try {
-        const res = await fetch('/arm/home', { method: 'POST' });
-        const data = await res.json();
-        if (data.positions) {
-            armPositions = data.positions;
-            updateArmDisplay();
-        }
-    } catch (e) {
-        console.log('Arm home error:', e.message);
-    }
-}
+
 
 // ============== Event Handlers ==============
 
