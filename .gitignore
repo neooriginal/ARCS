@@ -146,3 +146,4 @@ dist
 config.json
 
 arcs_memory.db
+/core/vision/__pycache__
