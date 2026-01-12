@@ -436,6 +436,14 @@ def ai_start():
     # Reset wheel speed to default when AI starts
     state.reset_wheel_speed()
     
+    # Move head to navigation homing position
+    from core.config_manager import get_config
+    if state.controller:
+        homing_yaw = get_config("HEAD_NAV_HOMING_YAW", 0.0)
+        homing_pitch = get_config("HEAD_NAV_HOMING_PITCH", 22.0)
+        state.controller.turn_head_yaw(homing_yaw)
+        state.controller.turn_head_pitch(homing_pitch)
+    
     state.ai_enabled = True
     state.add_ai_log("AI Started")
     return jsonify({'status': 'ok'})

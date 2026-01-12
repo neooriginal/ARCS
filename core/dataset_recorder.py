@@ -80,6 +80,15 @@ class DatasetRecorder:
             # Reset frame_idx for the *current* episode being recorded
             self.frame_idx = 0
 
+            # Move head to homing position for consistent recording
+            from core.config_manager import get_config
+            if state.controller:
+                homing_yaw = get_config("HEAD_HOMING_YAW", 0.0)
+                homing_pitch = get_config("HEAD_HOMING_PITCH", 45.0)
+                state.controller.turn_head_yaw(homing_yaw)
+                state.controller.turn_head_pitch(homing_pitch)
+                time.sleep(0.9)
+
             self.thread = threading.Thread(target=self._recording_loop, daemon=True)
             self.thread.start()
             logger.info(f"Started recording dataset: {self.repo_id} (Episode {self.episode_idx})")

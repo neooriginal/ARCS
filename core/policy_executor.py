@@ -68,6 +68,15 @@ class PolicyExecutor:
             state.ai_enabled = True
             state.ai_status = f"Running Policy: {self.current_policy_name}"
             
+            # Move head to homing position for consistent inference
+            from core.config_manager import get_config
+            if state.controller:
+                homing_yaw = get_config("HEAD_HOMING_YAW", 0.0)
+                homing_pitch = get_config("HEAD_HOMING_PITCH", 45.0)
+                state.controller.turn_head_yaw(homing_yaw)
+                state.controller.turn_head_pitch(homing_pitch)
+                time.sleep(0.9)
+            
             self.thread = threading.Thread(target=self._inference_loop, daemon=True)
             self.thread.start()
             return True

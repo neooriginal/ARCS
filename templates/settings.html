@@ -77,6 +77,51 @@
                 </div>
             </div>
 
+            <!-- Head Homing Position (ACT) -->
+            <div class="settings-card">
+                <h3>🎯 ACT Head Homing</h3>
+                <p style="color:#888; font-size:0.85em; margin-bottom:15px;">Head moves here before ACT recording or
+                    policy execution.</p>
+
+                <div class="form-group">
+                    <label>Yaw (degrees)</label>
+                    <input type="number" id="cfg_HEAD_HOMING_YAW" min="-180" max="180" step="1">
+                </div>
+
+                <div class="form-group">
+                    <label>Pitch (degrees)</label>
+                    <input type="number" id="cfg_HEAD_HOMING_PITCH" min="-90" max="90" step="1">
+
+                </div>
+
+                <button class="btn btn-secondary" onclick="setCurrentHeadPosition('ACT')"
+                    style="width:100%; margin-top:10px;">
+                    📍 Set Current Position
+                </button>
+            </div>
+
+            <!-- Head Homing Position (AI Navigation) -->
+            <div class="settings-card">
+                <h3>🧭 AI Navigation Head Homing</h3>
+                <p style="color:#888; font-size:0.85em; margin-bottom:15px;">Head moves here when AI navigation starts.
+                </p>
+
+                <div class="form-group">
+                    <label>Yaw (degrees)</label>
+                    <input type="number" id="cfg_HEAD_NAV_HOMING_YAW" min="-180" max="180" step="1">
+                </div>
+
+                <div class="form-group">
+                    <label>Pitch (degrees)</label>
+                    <input type="number" id="cfg_HEAD_NAV_HOMING_PITCH" min="-90" max="90" step="1">
+                </div>
+
+                <button class="btn btn-secondary" onclick="setCurrentHeadPosition('NAV')"
+                    style="width:100%; margin-top:10px;">
+                    📍 Set Current Position
+                </button>
+            </div>
+
             <!-- Lidar Sensor -->
             <div class="settings-card">
                 <h3>📡 Lidar Sensor</h3>
@@ -623,6 +668,27 @@
         if (!confirm("Disconnect from HuggingFace?")) return;
         await fetch('/api/training/auth/logout', { method: 'POST' });
         checkAuthStatus();
+    }
+
+    async function setCurrentHeadPosition(mode) {
+        try {
+            const res = await fetch('/head_position');
+            const data = await res.json();
+            if (data.yaw !== undefined && data.pitch !== undefined) {
+                if (mode === 'NAV') {
+                    document.getElementById('cfg_HEAD_NAV_HOMING_YAW').value = Math.round(data.yaw);
+                    document.getElementById('cfg_HEAD_NAV_HOMING_PITCH').value = Math.round(data.pitch);
+                } else {
+                    document.getElementById('cfg_HEAD_HOMING_YAW').value = Math.round(data.yaw);
+                    document.getElementById('cfg_HEAD_HOMING_PITCH').value = Math.round(data.pitch);
+                }
+                showToast('Head position captured!');
+            } else {
+                showToast('Failed to read head position');
+            }
+        } catch (e) {
+            showToast('Error: ' + e);
+        }
     }
 </script>
 {% endblock %}

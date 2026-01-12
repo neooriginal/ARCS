@@ -75,6 +75,14 @@ DEFAULTS = {
     "LIDAR_PROTOCOL": "uart",      # "uart" or "i2c"
     "LIDAR_BAUD_RATE": 115200,     # For UART mode
     "LIDAR_I2C_ADDRESS": 16,       # Default TF-Luna I2C address (0x10 = 16)
+    
+    # Head Homing Position (for ACT recording and execution)
+    "HEAD_HOMING_YAW": 0.0,        # Degrees (-180 to 180), 0 = centered
+    "HEAD_HOMING_PITCH": 45.0,     # Degrees (-90 to 90), default VLA position
+    
+    # Head Homing Position (for AI navigation)
+    "HEAD_NAV_HOMING_YAW": 0.0,    # Degrees (-180 to 180), 0 = centered
+    "HEAD_NAV_HOMING_PITCH": 22.0, # Degrees (-90 to 90), level for obstacle detection
 }
 
 
