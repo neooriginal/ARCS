@@ -54,9 +54,13 @@ class NavigationAgent:
         # System Prompt
         base_prompt = """You are an intelligent mobile robot navigating a real physical environment.
 
-CRITICAL: USE YOUR OWN VISUAL JUDGMENT
-- YOU must look at the actual image and decide if the path is safe.
-- If you see ANY wall or obstacle in front of you, DO NOT MOVE FORWARD.
+CRITICAL: SENSOR TRUST PROTOCOL
+- YOU ARE TERRIBLE AT JUDGING DEPTH FROM IMAGES. Do not guess distances.
+- TRUST YOUR LIDAR and REFLEX SYSTEM 100%.
+- If LIDAR says 20cm, it is 20cm, even if it looks far.
+- If LIDAR says 200cm (or MAX), it means the path AHEAD is clear (e.g., through a door).
+- **DOORWAY LOGIC**: When you align correctly with a door, the distance will typically jump from <1m (wall) to >3m (room inside). THIS IS YOUR SIGNAL TO GO.
+- Rely on `scan_doorway` for measuring gaps. Do not eyeball it.
 
 MISSION OBJECTIVES:
 1. EXECUTE TASK: Your Main Mission is defined by the user (Current Task). Focus on completing it efficiently.
@@ -75,21 +79,16 @@ DOORWAYS AND TIGHT OPENINGS:
 - NEVER attempt to drive through a door without Precision Mode enabled.
 - Only go through openings that are clearly at least 2x your width.
 
-PRECISION MODE PROTOCOL:
-- Use `enable_precision_mode` when approaching a narrow gap.
-- SECURITY NOTICE: In precision mode, obstacle avoidance is minimized. Proceed with extreme caution. You rely SOLELY on the guidance lines.
-- Once enabled, FOLLOW THE VISUAL GUIDANCE STRICTLY, WITH ONE EXCEPTION:
-    - **CLOSE RANGE WARNING**: If you are very close to the door (guidance says "UNSAFE DISTANCE" or you see the door frame filling the view), the Left/Right alignment indicators key become UNRELIABLE. In this specific case, you may ignore the direction if it contradicts your visual judgment, BUT the safest action is usually to **BACK UP** to regain a reliable view.
-    - **BLIND COMMIT**: If guidance says "BLIND COMMIT. GO FORWARD.", it means you are crossing the threshold and sensors are masked. MOVE FORWARD CONFIDENTLY.
-    - **GUIDANCE IS A HINT**: The line helps you align, but it can be wrong (jitter/jump). If the line points into a wall, IGNORE IT and rely on your own judgment of the door frame.
-    - **ROTATION HINTS**: When blocked near a door, guidance may include [ROTATE LEFT/RIGHT to align]. Make a SMALL turn (5-10 degrees) in that direction, then try forward again. Do NOT back up unless you've tried rotating first.
-    - **Backing Up**: If you are STUCK at a door, prefer rotating in place to find the gap. Only back up if rotation fails or you are physically wedged.
-    - Otherwise, if guide says "ACTION: STOP", OBEY IT.
-    - ONLY move forward when guidance says "PERFECT" or if you are confident you are passing through.
-- **EXIT PROTOCOL**: DO NOT disable Precision Mode until you have COMPLETELY PASSED the doorframe.
-    - If you disable it too early, the safety reflex will see the doorframe as a wall and STOP YOU.
-    - Better to leave it on for an extra meter than to disable it early.
-    - Only disable when the space opens up significantly on BOTH sides.
+PRECISION MODE PROTOCOL (DOOR ENTRY):
+- **Use `scan_doorway`** when you need to pass through a narrow door or gap.
+- **Micro-Plan**:
+  1. **APPROACH**: Drive to about 0.8 - 1.0 meter from the door. Face it roughly.
+  2. **SCAN**: Call `scan_doorway`. The robot will 'wiggle' to map the edges and AUTOMATICALLY ALIGN to the center.
+  3. **COMMIT**: If scan says "GAP FOUND", you are now perfectly aligned. Drive FORWARD blindly (0.5m - 1.0m) to cross the threshold.
+     - **TRUST THE ALIGNMENT**. Do not hesitate. The scanner is more precise than your camera.
+  4. **EXIT**: Once clearly through, `disable_precision_mode`.
+
+- **Visual Guidance**: If not using scan, you can still use visual lines, but `scan_doorway` is preferred for tight spaces.
 
 APPROACH MODE (MANIPULATION):
 - Use `enable_approach_mode` ONLY when you need to get within touching distance of a surface (counter, table, button).
@@ -390,6 +389,12 @@ PERSISTENT NOTES:
         
         # Inject Allowed Actions & Warnings
         reflex_msg = f"REFLEX SYSTEM: Allowed actions are {safe_actions}. Green Marked Paths are SAFE. Red Marked Areas are BLOCKED."
+        
+        dist_val = metrics.get('distance')
+        if dist_val is not None:
+             reflex_msg += f"\nLIDAR DISTANCE: {int(dist_val)} cm."
+        else:
+             reflex_msg += f"\nLIDAR STATUS: No Data/Disconnected."
         
         memory_context = self._generate_memory_context()
         if memory_context:

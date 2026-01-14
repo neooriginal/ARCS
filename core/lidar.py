@@ -160,6 +160,7 @@ class TFLunaLidar:
         # Read remaining frame data
         data = self._serial.read(self.FRAME_SIZE - 2)
         if len(data) != self.FRAME_SIZE - 2:
+            logger.debug(f"Lidar: Incomplete frame (got {len(data)})")
             return None
         
         # Parse frame
@@ -168,6 +169,7 @@ class TFLunaLidar:
         # Verify checksum
         calc_checksum = (self.HEADER + self.HEADER + sum(data[:-1])) & 0xFF
         if calc_checksum != checksum:
+            logger.debug(f"Lidar: Checksum mismatch (calc {calc_checksum} != {checksum})")
             return None
         
         # Extract values
@@ -269,11 +271,19 @@ def get_lidar() -> Optional[TFLunaLidar]:
 
 
 def init_lidar():
-    """Initialize lidar from config (called at startup)."""
+    """Initialize lidar from config and start continuous reading."""
     lidar = get_lidar()
     if lidar and lidar.connected:
         from state import state
         state.lidar = lidar
+        
+        
+        # Initial synchronous read to populate state immediately
         state.lidar_distance = lidar.get_distance()
+
+        def on_distance(distance):
+            state.lidar_distance = distance
+        
+        lidar.start_reading(callback=on_distance, interval=0.05)
         return True
     return False
