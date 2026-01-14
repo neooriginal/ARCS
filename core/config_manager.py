@@ -76,11 +76,6 @@ DEFAULTS = {
     "LIDAR_BAUD_RATE": 115200,     # For UART mode
     "LIDAR_I2C_ADDRESS": 16,       # Default TF-Luna I2C address (0x10 = 16)
     
-    # LIDAR Obstacle Detection Thresholds
-    "LIDAR_STOP_DISTANCE": 30,     # cm - block forward movement
-    "LIDAR_WARN_DISTANCE": 80,     # cm - show caution zone
-    "LIDAR_MAX_DISPLAY": 200,      # cm - max distance for bar display
-    
     # Head Homing Position (for ACT recording and execution)
     "HEAD_HOMING_YAW": 0.0,        # Degrees (-180 to 180), 0 = centered
     "HEAD_HOMING_PITCH": 45.0,     # Degrees (-90 to 90), default VLA position

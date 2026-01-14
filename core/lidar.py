@@ -269,16 +269,11 @@ def get_lidar() -> Optional[TFLunaLidar]:
 
 
 def init_lidar():
-    """Initialize lidar from config and start continuous reading."""
+    """Initialize lidar from config (called at startup)."""
     lidar = get_lidar()
     if lidar and lidar.connected:
         from state import state
         state.lidar = lidar
-        
-        def on_distance(distance):
-            state.lidar_distance = distance
-        
-        lidar.start_reading(callback=on_distance, interval=0.05)
         state.lidar_distance = lidar.get_distance()
         return True
     return False
