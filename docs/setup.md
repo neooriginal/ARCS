@@ -38,9 +38,9 @@ The installer will:
 1. Start the server: `python main.py`
 2. Open [http://localhost:5000/settings](http://localhost:5000/settings)
 3. Configure:
-   - **Hardware Ports**: Camera, Wheel USB, Head USB
+   - **Hardware Ports**: Camera, Wheel USB, Head USB, LIDAR Port
    - **TTS**: Enable/disable, audio device, accent
-   - **Safety**: Stall thresholds, brightness limits
+   - **Safety**: Stall thresholds, brightness limits, LIDAR thresholds
    - **Advanced**: Stream quality, VR settings
 
 > [!TIP]

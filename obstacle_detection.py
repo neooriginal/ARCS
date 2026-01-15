@@ -1,7 +1,4 @@
-"""
-ARCS - Hybrid Obstacle Detection (LIDAR + Visual Gap Finding)
-Uses LIDAR for precise safety stopping and Visual Analysis for gap finding.
-"""
+
 
 import cv2
 import numpy as np
@@ -18,13 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 class ObstacleDetector:
-    """
-    Hybrid Obstacle Detector.
-    
-    Safety: Purely LIDAR-based (Forward distance > Stop Distance)
-    Guidance: Visual-based (Finds smoothest/darkest path in camera view)
-    """
-    
     def __init__(self, width=None, height=None):
         self.width = width or CAMERA_WIDTH
         self.height = height or CAMERA_HEIGHT

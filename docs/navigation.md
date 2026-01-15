@@ -4,22 +4,36 @@ The ARCS navigation system provides robust obstacle detection, safety reflexes, 
 
 ## Core Components
 
-### 1. Vision-Based Obstacle Detection
-The system analyzes video frames in real-time to detect physical obstacles.
-- **Preprocessing**: Converts to grayscale and applies `Gaussian Blur` to reduce noise.
-- **Edge Detection**: Uses **Gradient Magnitude** (Sobel-X + Sobel-Y) to detect edges in *any* direction. This allows detection of both vertical obstacles (walls, legs) and horizontal boundaries (baseboards).
-- **Column Scanning**: The frame is scanned vertically to find the lowest (closest) edge points, creating a depth-map approximation where lower pixels in the frame (higher Y-values) represent closer obstacles.
+### 1. Hybrid LIDAR & Vision System
+The system combines single-point LIDAR for robust safety with computer vision for guidance.
+
+#### **A. Safety Layer (LIDAR)**
+- **Sensor**: TF-Luna Single-Point LIDAR (0.2m - 8m range).
+- **Function**: Continuously measures the distance directly in front of the robot.
+- **Process**:
+    - **STOP Condition**: If distance < `LIDAR_STOP_DISTANCE` (default 30cm), forward movement is hard-blocked.
+    - **CAUTION Zone**: If distance < `LIDAR_WARN_DISTANCE` (default 80cm), the system flags a warning, but movement is allowed.
+
+#### **B. Guidance Layer (Visual Gap Detection)**
+- **Active Mode**: Only active during **Precision Mode**.
+- **Function**: Scans the camera feed to find the "path of least resistance" (gaps).
+- **Algorithm**:
+    1. Extracts a horizontal strip from the center of the camera frame.
+    2. Analyzes vertical pixel columns for intensity variance and brightness.
+    3. Identifies the "smoothest" (low variance) and "darkest" (depth) area as the potential gap.
+- **Output**: Visual target line on the HUD and rotation hints (`ROTATE LEFT` / `ROTATE RIGHT`) to align the robot with the gap.
 
 ### 2. Safety Reflex
 A low-level safety layer runs continuously during autonomous movement commands.
-- **Monitoring**: While moving, the system checks the obstacle detector at 10Hz.
-- **Emergency Stop**: If an obstacle appears within the critical threshold (calculated from `OBSTACLE_THRESHOLD_RATIO` in `config.py`), the robot triggers an immediate "Safety Reflex" brake, canceling the current action to prevent collision.
+- **Monitoring**: While moving, the system checks the LIDAR distance at 20Hz.
+- **Emergency Stop**: If an obstacle breaches the stop threshold, the robot triggers an immediate brake.
 
 ### 3. Precision Mode
-Designed for navigating narrow doorways or tight gaps where standard safety thresholds would prevent movement.
-- **Adaptive Thresholds**: When enabled, side safety margins are relaxed to allow the robot to pass close to door frames.
-- **Gap Alignment**: The system identifies the widest contiguous gap in the field of view.
-- **Visual Guidance**: Overlays alignment targets and text instructions (e.g., "ALIGNMENT: TARGET LEFT") on the video feed to assist the operator or AI agent in aligning perfectly with the opening.
+Designed for finding and navigating narrow doorways.
+- **Hybrid Operation**:
+    - **Vision**: Finds the doorway and guides alignment.
+    - **LIDAR**: Ensures the path through the door is actually clear.
+- **Usage**: Toggle Precision Mode, follow the yellow "GAP" target line until aligned, then drive forward.
 
 
 
