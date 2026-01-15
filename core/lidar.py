@@ -75,32 +75,11 @@ class TFLunaLidar:
             )
             self._connected = True
             logger.info(f"Lidar: Connected via UART on {self.port} @ {self.baud_rate}")
-            
-            # Wake up sensor sequence
-            try:
-                # 1. Set format to 9-byte cm (5A 05 05 01 65)
-                self._send_command(bytes([0x5A, 0x05, 0x05, 0x01, 0x65]))
-                time.sleep(0.1)
-                
-                # 2. Enable output (5A 05 07 01 67)
-                self._send_command(bytes([0x5A, 0x05, 0x07, 0x01, 0x67]))
-                time.sleep(0.1)
-                
-                logger.info("Lidar: Sent wake-up commands")
-            except Exception as e:
-                logger.warning(f"Lidar: Failed to send wake-up commands: {e}")
-                
             return True
         except Exception as e:
             logger.error(f"Lidar: UART connection failed - {e}")
             self._connected = False
             return False
-
-    def _send_command(self, cmd: bytes):
-        """Send a raw command to the sensor."""
-        if self._serial:
-            self._serial.write(cmd)
-            self._serial.flush()
     
     def _connect_i2c(self) -> bool:
         """Connect via I2C (Linux/RPi only)."""
