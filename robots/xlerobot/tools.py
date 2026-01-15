@@ -515,3 +515,118 @@ def create_run_robot_policy():
 
     return run_robot_policy
 
+
+def create_scan_doorway():
+    @tool
+    def scan_doorway() -> str:
+        """
+        Performs a 'Wiggle Scan' (Left 25 -> Right 50 -> Left 25) to map the doorway ahead.
+        Use this when approaching a narrow gap to precisely identify the center.
+        If a clear gap is found, the robot will AUTOMATICALLY ALIGN to face the center.
+        """
+        import time
+        import math
+        from state import state as robot_state
+        
+        scanner = robot_state.get_scanner()
+        if not scanner:
+            return "Error: Scanner system not available."
+            
+        controller = robot_state.controller
+        if not controller:
+             return "Error: Robot controller not found."
+        
+        # Enable Precision Mode for visualization
+        robot_state.precision_mode = True
+        scanner.clear()
+        
+        # Scan Parameters
+        SWEEP_ANGLE = 25.0
+        ROT_SPEED = 0.5 
+        DEG_PER_SEC = 30.0 
+        DURATION = SWEEP_ANGLE / DEG_PER_SEC
+        
+        print(f"[TOOL] scan_doorway: Starting scan...")
+        
+        # Recording Loop
+        is_scanning = True
+        current_angle = 0.0
+        
+        def recording_loop():
+            start_time = time.time()
+            phase = "L1" 
+            t0 = start_time
+            
+            while is_scanning:
+                t = time.time()
+                dt = t - t0
+                
+                # Estimate current angle
+                if phase == "L1":
+                    current_angle = (dt / DURATION) * SWEEP_ANGLE
+                elif phase == "R":
+                    current_angle = SWEEP_ANGLE - ((dt / (DURATION*2)) * (SWEEP_ANGLE*2))
+                elif phase == "L2":
+                     current_angle = -SWEEP_ANGLE + ((dt / DURATION) * SWEEP_ANGLE)
+                     
+                dist = robot_state.lidar_distance
+                if dist is not None:
+                     scanner.add_reading(current_angle, dist)
+                
+                time.sleep(0.04)
+        
+        # Start Recorder
+        recorder = threading.Thread(target=recording_loop, daemon=True)
+        recorder.start()
+        
+        try:
+            # 1. Turn Left
+            controller.set_velocity_vector(0, 0, ROT_SPEED)
+            time.sleep(DURATION)
+            
+            # 2. Turn Right (Sweep across center)
+            controller.set_velocity_vector(0, 0, -ROT_SPEED)
+            time.sleep(DURATION * 2)
+            
+            # 3. Turn Left (Return to Center)
+            controller.set_velocity_vector(0, 0, ROT_SPEED)
+            time.sleep(DURATION)
+            
+            # Stop
+            controller.set_velocity_vector(0, 0, 0)
+            
+        except Exception as e:
+            print(f"Scan interrupted: {e}")
+            controller.set_velocity_vector(0, 0, 0)
+            return f"Scan failed: {e}"
+        finally:
+            is_scanning = False
+            recorder.join()
+            
+        # Analysis
+        result = scanner.analyze_gap()
+        robot_state.last_scan_result = result
+        
+        if not result['found']:
+            return f"Scan Complete. NO GAP FOUND. Reason: {result.get('reason')}. Please reposition and try again."
+            
+        # Alignment
+        center_angle = result['center_angle']
+        width = result['width_deg']
+        
+        align_msg = ""
+        if abs(center_angle) > 2.0:
+            print(f"[TOOL] Aligning to gap center at {center_angle:.1f} deg")
+            align_dur = abs(center_angle) / DEG_PER_SEC
+            align_speed = ROT_SPEED if center_angle > 0 else -ROT_SPEED
+            
+            controller.set_velocity_vector(0, 0, align_speed)
+            time.sleep(align_dur)
+            controller.set_velocity_vector(0, 0, 0)
+            align_msg = f"ALIGNED to center ({center_angle:.1f}°)."
+        else:
+            align_msg = "ALREADY ALIGNED."
+            
+        return f"Scan Successful! GAP FOUND. Width: {width:.1f}°. {align_msg} Robot is facing the center. READY FOR BLIND ENTRY."
+
+    return scan_doorway

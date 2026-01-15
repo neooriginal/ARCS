@@ -80,6 +80,8 @@ class RobotState:
         # Lidar sensor state
         self.lidar = None
         self.lidar_distance = None  # Last distance reading in cm
+        self.lidar_scanner = None   # LidarScanner instance
+        self.last_scan_result = None # Latest gap analysis result
 
     
     def update_movement(self, data):
@@ -151,6 +153,18 @@ class RobotState:
                     print(f"Error creating detector: {e}")
                     return None
             return self.detector
+    
+    def get_scanner(self):
+        """Get or create shared LidarScanner instance."""
+        with self.lock:
+            if self.lidar_scanner is None:
+                try:
+                    from core.scanner import LidarScanner
+                    self.lidar_scanner = LidarScanner()
+                except Exception as e:
+                    print(f"Error creating scanner: {e}")
+                    return None
+            return self.lidar_scanner
     
     def set_wheel_speed(self, speed):
         """Set manual wheel speed."""

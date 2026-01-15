@@ -94,6 +94,10 @@ class ObstacleDetector:
             if target_x != -1:
                 self._draw_target_guidance(overlay, target_x, w, h)
         
+        # --- 4. SCAN RESULT OVERLAY ---
+        if state.last_scan_result:
+             self._draw_scan_result(overlay, state.last_scan_result, w, h)
+        
         self._draw_mode_status(overlay, w, h)
         
         if vision_blocked and "FORWARD" in instant_blocked:
@@ -236,6 +240,69 @@ class ObstacleDetector:
     def _draw_no_lidar(self, overlay, w, h, status="DISCONNECTED"):
         cv2.rectangle(overlay, (0, 0), (w, 30), (50, 50, 50), -1)
         cv2.putText(overlay, f"LIDAR: {status}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 100), 2)
+
+    def _draw_scan_result(self, overlay, result, w, h):
+        """Draw the LIDAR scan profile and detected gap."""
+        if not result:
+            return
+
+        # 1. Draw Background Box
+        box_h = 100
+        box_y = h - 150
+        cv2.rectangle(overlay, (10, box_y), (w-10, box_y + box_h), (0, 0, 0), -1)
+        cv2.rectangle(overlay, (10, box_y), (w-10, box_y + box_h), (50, 50, 50), 1)
+        
+        if not result.get('found', False):
+            cv2.putText(overlay, f"SCAN FAILED: {result.get('reason')}", (20, box_y + 50), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+            return
+
+        # 2. Draw Graph
+        raw = result.get('raw_profile')
+        if not raw:
+            return
+            
+        angles, dists = raw
+        if len(dists) == 0:
+            return
+            
+        # Scaling
+        # Angles: -25 to +25 mapped to 10 to w-10
+        # Dists: 0 to 200cm mapped to box_h to 0 (inverted)
+        min_angle = angles.min()
+        max_angle = angles.max()
+        angle_range = max_angle - min_angle if max_angle != min_angle else 1
+        
+        max_dist = 200.0 # Clip at 2m
+        
+        points = []
+        for a, d in zip(angles, dists):
+            x = 10 + int(((a - min_angle) / angle_range) * (w - 20))
+            y = box_y + box_h - int(min(d, max_dist) / max_dist * box_h)
+            points.append((x, y))
+            
+        if len(points) > 1:
+            cv2.polylines(overlay, [np.array(points)], False, (0, 255, 255), 2)
+            
+        # 3. Draw Gap Markers
+        # Left Edge
+        left_a = result['left_edge_angle']
+        lx = 10 + int(((left_a - min_angle) / angle_range) * (w - 20))
+        cv2.line(overlay, (lx, box_y), (lx, box_y + box_h), (0, 0, 255), 2)
+        
+        # Right Edge
+        right_a = result['right_edge_angle']
+        rx = 10 + int(((right_a - min_angle) / angle_range) * (w - 20))
+        cv2.line(overlay, (rx, box_y), (rx, box_y + box_h), (0, 0, 255), 2)
+        
+        # Center Target
+        center_a = result['center_angle']
+        cx = 10 + int(((center_a - min_angle) / angle_range) * (w - 20))
+        cv2.line(overlay, (cx, box_y), (cx, box_y + box_h), (0, 255, 0), 2)
+        
+        # Text Info
+        info = f"GAP: {result['width_deg']:.1f}deg CENTER: {center_a:.1f}deg"
+        cv2.putText(overlay, info, (20, box_y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
     def _draw_mode_status(self, overlay, w, h):
         mode_text = "MODE: STANDARD"

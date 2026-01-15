@@ -32,7 +32,7 @@ from robots.xlerobot.tools import (
     create_look_around, create_slide_left, create_slide_right,
     create_end_task, create_enable_precision_mode, create_disable_precision_mode,
     create_save_note, create_enable_approach_mode, create_disable_approach_mode,
-    create_speak, create_run_robot_policy
+    create_speak, create_run_robot_policy, create_scan_doorway
 )
 
 load_dotenv()
@@ -165,7 +165,8 @@ def _setup_agent(robot: RobotSystem) -> None:
         create_enable_approach_mode(),
         create_disable_approach_mode(),
         create_speak(),
-        create_run_robot_policy()
+        create_run_robot_policy(),
+        create_scan_doorway()
     ]
 
     model_name = os.getenv("AI_MODEL", "openai/gpt-5.2")
