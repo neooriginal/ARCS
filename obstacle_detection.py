@@ -61,10 +61,6 @@ class ObstacleDetector:
         h, w = frame.shape[:2]
         overlay = frame.copy()
         
-        # --- 1. LIDAR SAFETY CHECK ---
-        instant_blocked = set()
-        avg_distance = 0
-        
         if distance is None:
             status = "NO SIGNAL" if state.lidar is not None else "DISCONNECTED"
             self._draw_no_lidar(overlay, w, h, status)
@@ -72,7 +68,7 @@ class ObstacleDetector:
             self.distance_history.append(distance)
             avg_distance = sum(self.distance_history) / len(self.distance_history)
             
-            # Determine threshold based on mode
+            # Use approach distance if active
             current_stop_dist = self.approach_stop_distance if state.approach_mode else self.stop_distance
             
             if avg_distance < current_stop_dist:
@@ -80,8 +76,7 @@ class ObstacleDetector:
             
             self._draw_proximity_overlay(overlay, avg_distance, w, h)
         
-        # --- 3. VISION SAFETY CHECKS (Low Obstacles / Width) ---
-        # Only if NOT in approach mode (approach mode ignores vision blocking)
+        # Check low obstacles if not in approach mode
         vision_blocked = False
         if not state.approach_mode:
             vision_blocked = self._check_visual_obstacles(frame, overlay)
@@ -90,7 +85,6 @@ class ObstacleDetector:
         
         safe_actions = self._update_safety_state(instant_blocked)
         
-        # --- 2. VISUAL GAP FINDING (Guidance) ---
         guidance = ""
         rotation_hint = None
         target_x = -1
@@ -100,7 +94,6 @@ class ObstacleDetector:
             if target_x != -1:
                 self._draw_target_guidance(overlay, target_x, w, h)
         
-        # Draw Mode
         self._draw_mode_status(overlay, w, h)
         
         if vision_blocked and "FORWARD" in instant_blocked:
@@ -122,12 +115,8 @@ class ObstacleDetector:
         return result
 
     def _check_visual_obstacles(self, frame, overlay):
-        """
-        Check for low obstacles or objects wider than LIDAR beam using edge density.
-        Returns True if blocked.
-        """
+        """Check for obstacles using edge density in lower center region."""
         h, w = frame.shape[:2]
-        # Look at bottom 35% of image
         roi_y = int(h * 0.65)
         roi = frame[roi_y:h, :]
         
@@ -135,19 +124,16 @@ class ObstacleDetector:
         blur = cv2.GaussianBlur(gray, (5, 5), 0)
         edges = cv2.Canny(blur, 50, 150)
         
-        # Check center region (width of robot approx)
         center_x = w // 2
-        check_w = int(w * 0.4) # Check 40% width
+        check_w = int(w * 0.4)
         center_roi = edges[:, center_x - check_w//2 : center_x + check_w//2]
         
         edge_density = np.mean(center_roi) / 255.0
         
-        # If density is high, likely a complex object (carpet edges might trigger this, so threshold heavily)
-        # 0.05 means 5% of pixels are edges.
+        # High edge density suggests complex object
         is_blocked = edge_density > 0.08
         
         if is_blocked:
-            # Draw debug box
             p1 = (center_x - check_w//2, roi_y)
             p2 = (center_x + check_w//2, h)
             cv2.rectangle(overlay, p1, p2, (0, 0, 255), 2)
@@ -155,12 +141,7 @@ class ObstacleDetector:
         return is_blocked
 
     def _find_visual_gap(self, frame, w, h):
-        """
-        Simple heuristic to find Open Space:
-        Look for the 'smoothest' (low variance) and 'darkest' (low intensity) 
-        vertical column in the center strip.
-        """
-        # Crop center strip
+        """Find path of least resistance using intensity variance."""
         roi = frame[self.scan_height_start:self.scan_height_end, :]
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
         
@@ -168,8 +149,6 @@ class ObstacleDetector:
         gray = cv2.GaussianBlur(gray, (15, 15), 0)
         
         # Analyze columns (axis 0 = vertical in ROI)
-        # We want columns with LOW standard deviation (smooth floor/space)
-        # and LOW mean brightness (often depth/shadows in indoor hallways)
         col_means = np.mean(gray, axis=0)
         col_vars = np.var(gray, axis=0)
         
@@ -177,15 +156,13 @@ class ObstacleDetector:
         norm_means = col_means / 255.0
         norm_vars = col_vars / np.max(col_vars) if np.max(col_vars) > 0 else col_vars
         
-        # Combined score: We want minimal score
-        # Weight smoothness (variance) higher than brightness
+        # Combined score: weight smoothness higher than brightness
         scores = (norm_means * 0.4) + (norm_vars * 0.6)
         
-        # Smooth scores horizontally
         kernel_size = 50
         scores_smooth = np.convolve(scores, np.ones(kernel_size)/kernel_size, mode='same')
         
-        # Find minimum score index (Best Gap)
+        # Find minimum score index
         best_x = np.argmin(scores_smooth)
         
         # Calculate offset from center
