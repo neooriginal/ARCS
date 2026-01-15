@@ -65,7 +65,8 @@ class ObstacleDetector:
         avg_distance = 0
         
         if distance is None:
-            self._draw_no_lidar(overlay, w, h)
+            status = "NO SIGNAL" if state.lidar is not None else "DISCONNECTED"
+            self._draw_no_lidar(overlay, w, h, status)
         else:
             self.distance_history.append(distance)
             avg_distance = sum(self.distance_history) / len(self.distance_history)
@@ -203,9 +204,9 @@ class ObstacleDetector:
         cv2.circle(overlay, (target_x, int(h*0.7)), 5, (255, 255, 0), -1)
         cv2.putText(overlay, "GAP", (target_x - 15, int(h*0.4)-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
 
-    def _draw_no_lidar(self, overlay, w, h):
+    def _draw_no_lidar(self, overlay, w, h, status="DISCONNECTED"):
         cv2.rectangle(overlay, (0, 0), (w, 30), (50, 50, 50), -1)
-        cv2.putText(overlay, "LIDAR DISCONNECTED", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 100), 2)
+        cv2.putText(overlay, f"LIDAR: {status}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 100), 2)
 
     def _draw_mode_status(self, overlay, w, h):
         mode_text = "MODE: STANDARD"

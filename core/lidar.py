@@ -160,6 +160,7 @@ class TFLunaLidar:
         # Read remaining frame data
         data = self._serial.read(self.FRAME_SIZE - 2)
         if len(data) != self.FRAME_SIZE - 2:
+            logger.debug(f"Lidar: Incomplete frame (got {len(data)})")
             return None
         
         # Parse frame
@@ -168,6 +169,7 @@ class TFLunaLidar:
         # Verify checksum
         calc_checksum = (self.HEADER + self.HEADER + sum(data[:-1])) & 0xFF
         if calc_checksum != checksum:
+            logger.debug(f"Lidar: Checksum mismatch (calc {calc_checksum} != {checksum})")
             return None
         
         # Extract values
