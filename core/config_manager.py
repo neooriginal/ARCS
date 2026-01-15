@@ -80,6 +80,7 @@ DEFAULTS = {
     "LIDAR_STOP_DISTANCE": 30,     # cm - block forward movement
     "LIDAR_WARN_DISTANCE": 80,     # cm - show caution zone
     "LIDAR_MAX_DISPLAY": 200,      # cm - max distance for bar display
+    "LIDAR_APPROACH_DISTANCE": 2,  # cm - stop distance in Approach Mode
     
     # Head Homing Position (for ACT recording and execution)
     "HEAD_HOMING_YAW": 0.0,        # Degrees (-180 to 180), 0 = centered

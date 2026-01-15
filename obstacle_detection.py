@@ -1,5 +1,4 @@
 
-
 import cv2
 import numpy as np
 import logging
@@ -22,6 +21,7 @@ class ObstacleDetector:
         # LIDAR Thresholds
         self.stop_distance = get_config("LIDAR_STOP_DISTANCE", 30)
         self.warn_distance = get_config("LIDAR_WARN_DISTANCE", 80)
+        self.approach_stop_distance = get_config("LIDAR_APPROACH_DISTANCE", 2)
         self.max_display_distance = get_config("LIDAR_MAX_DISPLAY", 200)
         
         # Visual Gap Finding
@@ -47,6 +47,7 @@ class ObstacleDetector:
         Process frame.
         1. Read LIDAR for safety (Stop/Go).
         2. Analyze image for "Gap" (Guidance).
+        3. Analyze low-image for "Ground/Low Obstacles".
         """
         if frame is None:
             return ["STOP"], None, {}
@@ -71,10 +72,21 @@ class ObstacleDetector:
             self.distance_history.append(distance)
             avg_distance = sum(self.distance_history) / len(self.distance_history)
             
-            if avg_distance < self.stop_distance:
+            # Determine threshold based on mode
+            current_stop_dist = self.approach_stop_distance if state.approach_mode else self.stop_distance
+            
+            if avg_distance < current_stop_dist:
                 instant_blocked.add("FORWARD")
             
             self._draw_proximity_overlay(overlay, avg_distance, w, h)
+        
+        # --- 3. VISION SAFETY CHECKS (Low Obstacles / Width) ---
+        # Only if NOT in approach mode (approach mode ignores vision blocking)
+        vision_blocked = False
+        if not state.approach_mode:
+            vision_blocked = self._check_visual_obstacles(frame, overlay)
+            if vision_blocked:
+                instant_blocked.add("FORWARD")
         
         safe_actions = self._update_safety_state(instant_blocked)
         
@@ -91,6 +103,10 @@ class ObstacleDetector:
         # Draw Mode
         self._draw_mode_status(overlay, w, h)
         
+        if vision_blocked and "FORWARD" in instant_blocked:
+             cv2.putText(overlay, "BLOCKED: LOW OBSTACLE", (w//2 - 100, h - 80), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        
         metrics = {
             'distance': distance,
             'guidance': guidance,
@@ -104,6 +120,39 @@ class ObstacleDetector:
             self.cached_result = result
             
         return result
+
+    def _check_visual_obstacles(self, frame, overlay):
+        """
+        Check for low obstacles or objects wider than LIDAR beam using edge density.
+        Returns True if blocked.
+        """
+        h, w = frame.shape[:2]
+        # Look at bottom 35% of image
+        roi_y = int(h * 0.65)
+        roi = frame[roi_y:h, :]
+        
+        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        blur = cv2.GaussianBlur(gray, (5, 5), 0)
+        edges = cv2.Canny(blur, 50, 150)
+        
+        # Check center region (width of robot approx)
+        center_x = w // 2
+        check_w = int(w * 0.4) # Check 40% width
+        center_roi = edges[:, center_x - check_w//2 : center_x + check_w//2]
+        
+        edge_density = np.mean(center_roi) / 255.0
+        
+        # If density is high, likely a complex object (carpet edges might trigger this, so threshold heavily)
+        # 0.05 means 5% of pixels are edges.
+        is_blocked = edge_density > 0.08
+        
+        if is_blocked:
+            # Draw debug box
+            p1 = (center_x - check_w//2, roi_y)
+            p2 = (center_x + check_w//2, h)
+            cv2.rectangle(overlay, p1, p2, (0, 0, 255), 2)
+            
+        return is_blocked
 
     def _find_visual_gap(self, frame, w, h):
         """
@@ -158,10 +207,13 @@ class ObstacleDetector:
 
     def _draw_proximity_overlay(self, overlay, distance, w, h):
         """Draw top bar showing LIDAR distance."""
-        if distance <= self.stop_distance:
+        # Calculate thresholds based on mode for display color
+        limit = self.approach_stop_distance if state.approach_mode else self.stop_distance
+        
+        if distance <= limit:
             color = (0, 0, 255) # Red
             text = "STOP"
-        elif distance <= self.warn_distance:
+        elif distance <= self.warn_distance and not state.approach_mode:
             color = (0, 165, 255) # Orange
             text = "CAUTION"
         else:
@@ -213,7 +265,7 @@ class ObstacleDetector:
         color = (0, 255, 0)
         
         if state.approach_mode:
-            mode_text = "MODE: APPROACH (UNSAFE)"
+            mode_text = "MODE: APPROACH (UNSAFE - 2cm)"
             color = (0, 0, 255)
         elif state.precision_mode:
             mode_text = "MODE: PRECISION (GAP FINDING)"
