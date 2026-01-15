@@ -536,7 +536,8 @@ def create_scan_doorway():
         if not controller:
              return "Error: Robot controller not found."
         
-        # Enable Precision Mode for visualization
+        # Enable Precision Mode for visualization (and save previous)
+        previous_mode = robot_state.precision_mode
         robot_state.precision_mode = True
         scanner.clear()
         
@@ -550,18 +551,23 @@ def create_scan_doorway():
         
         # Recording Loop
         is_scanning = True
-        current_angle = 0.0
+        
+        # Shared state for thread synchronization
+        scan_state = {
+            "phase": "L1",
+            "phase_start_time": time.time(),
+            "angle": 0.0
+        }
         
         def recording_loop():
-            start_time = time.time()
-            phase = "L1" 
-            t0 = start_time
-            
             while is_scanning:
                 t = time.time()
+                phase = scan_state["phase"]
+                t0 = scan_state["phase_start_time"]
                 dt = t - t0
                 
                 # Estimate current angle
+                current_angle = 0.0
                 if phase == "L1":
                     current_angle = (dt / DURATION) * SWEEP_ANGLE
                 elif phase == "R":
@@ -581,14 +587,20 @@ def create_scan_doorway():
         
         try:
             # 1. Turn Left
+            scan_state["phase"] = "L1"
+            scan_state["phase_start_time"] = time.time()
             controller.set_velocity_vector(0, 0, ROT_SPEED)
             time.sleep(DURATION)
             
             # 2. Turn Right (Sweep across center)
+            scan_state["phase"] = "R"
+            scan_state["phase_start_time"] = time.time()
             controller.set_velocity_vector(0, 0, -ROT_SPEED)
             time.sleep(DURATION * 2)
             
             # 3. Turn Left (Return to Center)
+            scan_state["phase"] = "L2"
+            scan_state["phase_start_time"] = time.time()
             controller.set_velocity_vector(0, 0, ROT_SPEED)
             time.sleep(DURATION)
             
@@ -602,6 +614,7 @@ def create_scan_doorway():
         finally:
             is_scanning = False
             recorder.join()
+            robot_state.precision_mode = previous_mode
             
         # Analysis
         result = scanner.analyze_gap()

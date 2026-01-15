@@ -277,10 +277,13 @@ def init_lidar():
         from state import state
         state.lidar = lidar
         
+        
+        # Initial synchronous read to populate state immediately
+        state.lidar_distance = lidar.get_distance()
+
         def on_distance(distance):
             state.lidar_distance = distance
         
         lidar.start_reading(callback=on_distance, interval=0.05)
-        state.lidar_distance = lidar.get_distance()
         return True
     return False

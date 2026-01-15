@@ -61,6 +61,8 @@ class ObstacleDetector:
         h, w = frame.shape[:2]
         overlay = frame.copy()
         
+        instant_blocked = set()
+        
         if distance is None:
             status = "NO SIGNAL" if state.lidar is not None else "DISCONNECTED"
             self._draw_no_lidar(overlay, w, h, status)
@@ -95,8 +97,9 @@ class ObstacleDetector:
                 self._draw_target_guidance(overlay, target_x, w, h)
         
         # --- 4. SCAN RESULT OVERLAY ---
+        # --- 4. SCAN RESULT OVERLAY ---
         if state.last_scan_result:
-             self._draw_scan_result(overlay, state.last_scan_result, w, h)
+            self._draw_scan_result(overlay, state.last_scan_result, w, h)
         
         self._draw_mode_status(overlay, w, h)
         

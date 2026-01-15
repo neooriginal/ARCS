@@ -33,7 +33,7 @@ Designed for finding and navigating narrow doorways.
 - **Hybrid Operation**:
     - **Vision**: Finds the doorway and guides alignment.
     - **LIDAR**: Ensures the path through the door is actually clear.
-- **Usage**: Toggle Precision Mode, follow the yellow "GAP" target line until aligned, then drive forward.
+- **Usage**: Toggle Precision Mode, follow the yellow "TARGET" line until aligned, then drive forward.
 
 
 

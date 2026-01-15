@@ -17,7 +17,7 @@ class LidarScanner:
     def clear(self):
         self.buffer = []
         
-    def add_reading(self, angle: float, distance: float):
+    def add_reading(self, angle: float, distance: Optional[float]):
         if distance is not None:
             self.buffer.append((angle, distance))
             
@@ -31,9 +31,10 @@ class LidarScanner:
             - 'found': bool
             - 'center_angle': float (angle to aim for)
             - 'width_deg': float (angular width of gap)
-            - 'left_edge': float (angle)
-            - 'right_edge': float (angle)
-            - 'confidence': float (0-1)
+            - 'left_edge_angle': float (angle)
+            - 'right_edge_angle': float (angle)
+            - 'wall_dists': Tuple[float, float]
+            - 'raw_profile': Tuple[np.ndarray, np.ndarray]
         """
         if len(self.buffer) < 10:
             return {'found': False, 'reason': 'insufficient_data'}
@@ -42,7 +43,7 @@ class LidarScanner:
         angles = np.array([x[0] for x in data])
         dists = np.array([x[1] for x in data])
         
-        # Median filter
+        # 3-point moving average
         dists_smooth = np.convolve(dists, np.ones(3)/3, mode='same')
         
         # Dynamic thresholding for gap detection

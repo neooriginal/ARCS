@@ -170,15 +170,20 @@ class TestSimulation(unittest.TestCase):
         self.assertEqual(data['lidar_distance'], 123)
         print(f"  -> Lidar distance verified: {data['lidar_distance']}")
 
+    def _ensure_agent_ready(self):
+        """Helper to init agent if needed."""
+        from state import state
+        if not state.agent and state.robot_system:
+             from main import _setup_agent
+             _setup_agent(state.robot_system)
+
     def test_05_navigation_logic(self):
         """Verify basic navigation/AI logic init."""
         print("Test 05: Navigation Logic")
         
         from state import state
         # Ensure agent is ready (might have missed it during async init)
-        if not state.agent and state.robot_system:
-             from main import _setup_agent
-             _setup_agent(state.robot_system)
+        self._ensure_agent_ready()
 
         # Start AI
         response = requests.post(f'http://localhost:{self.port}/ai/start')

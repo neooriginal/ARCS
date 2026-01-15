@@ -10,6 +10,7 @@ class MockVideoCapture:
         self.opened = True
         self.width = 640
         self.height = 480
+        self._props = {}
         
     def isOpened(self):
         return self.opened
@@ -41,6 +42,7 @@ class MockVideoCapture:
         return self.read()
         
     def set(self, propId, value):
+        self._props[propId] = value
         if propId == 3: # CV_CAP_PROP_FRAME_WIDTH
             self.width = int(value)
         elif propId == 4: # CV_CAP_PROP_FRAME_HEIGHT
@@ -48,7 +50,7 @@ class MockVideoCapture:
         return True
         
     def get(self, propId):
-        return 0
+        return self._props.get(propId, 0)
 
 def cv2_add(img1, img2):
     # Simple addition allowing overflow wrap-around (uint8 behavior)
@@ -59,7 +61,8 @@ def cv2_add(img1, img2):
 class MockRobot(BaseRobot):
     """Mock implementation of BaseRobot."""
     def __init__(self, name="mock_robot"):
-        self._name = name
+        super().__init__(name)
+        self._name = name # BaseRobot sets this but we keep it explicitly if needed
         self.connected = False
         self._arm_positions = {
             'shoulder_pan': 0.0,
@@ -89,10 +92,10 @@ class MockRobot(BaseRobot):
         return True
         
     def connect(self) -> None:
-        pass # Always successful
+        self.connected = True
         
     def disconnect(self) -> None:
-        pass
+        self.connected = False
         
     # --- Wheel/Movement ---
     def drive(self, forward: float, lateral: float = 0.0, rotation: float = 0.0) -> None:
