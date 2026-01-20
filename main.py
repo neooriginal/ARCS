@@ -23,17 +23,8 @@ from movement import movement_loop
 import routes
 import tts
 from core.robot_system import RobotSystem
-from core.navigation_agent import NavigationAgent
 from core.config_manager import get_config
 from core.log_handler import CircularLogHandler
-from robots.xlerobot.tools import (
-    create_move_forward, create_move_backward,
-    create_turn_left, create_turn_right,
-    create_look_around, create_slide_left, create_slide_right,
-    create_end_task, create_enable_precision_mode, create_disable_precision_mode,
-    create_save_note, create_enable_approach_mode, create_disable_approach_mode,
-    create_speak, create_run_robot_policy, create_scan_doorway
-)
 
 load_dotenv()
 
@@ -144,39 +135,6 @@ def cleanup(signum=None, frame=None) -> NoReturn:
 
     sys.exit(0)
 
-def _setup_agent(robot: RobotSystem) -> None:
-    if not robot.controller:
-        logger.warning("Robot controller not ready, AI disabled")
-        return
-
-    logger.info("Initializing AI Agent...")
-    tools = [
-        create_move_forward(robot.controller),
-        create_move_backward(robot.controller),
-        create_turn_left(robot.controller),
-        create_turn_right(robot.controller),
-        create_slide_left(robot.controller),
-        create_slide_right(robot.controller),
-        create_look_around(robot.controller, robot.camera),
-        create_end_task(),
-        create_enable_precision_mode(),
-        create_disable_precision_mode(),
-        create_save_note(),
-        create_enable_approach_mode(),
-        create_disable_approach_mode(),
-        create_speak(),
-        create_run_robot_policy(),
-        create_scan_doorway()
-    ]
-
-    model_name = os.getenv("AI_MODEL", "openai/gpt-5.2")
-
-    try:
-        agent = NavigationAgent(robot, model_name, tools)
-        state.agent = agent
-        logger.info("AI Agent ready")
-    except Exception as e:
-        logger.warning(f"AI Agent init failed: {e}")
 
 def _deferred_init() -> None:
     logger.info("Initializing Robot System...")
@@ -186,7 +144,7 @@ def _deferred_init() -> None:
     logger.info("Initializing TTS...")
     tts.init()
 
-    _setup_agent(robot)
+    # AI Agent is now initialized in robot_system._init_agent_deferred() after robot connects
 
     threading.Thread(target=movement_loop, daemon=True).start()
     threading.Thread(target=agent_loop, daemon=True).start()

@@ -24,9 +24,6 @@
                 style="width: 100%; padding: 10px; background: #000; border: 1px solid var(--border-color); color: #fff; border-radius: 6px; resize: none;"
                 placeholder="Enter task... (e.g., 'go through the door')"></textarea>
 
-            <button id="btn-set-task" class="btn"
-                style="background: var(--bg-panel); border: 1px solid var(--border-color); color: var(--text-secondary);">Set
-                Task</button>
 
             <div style="display: flex; gap: 10px; margin-top: auto;">
                 <button id="btn-start" class="btn btn-primary" style="flex: 1; justify-content: center;">Start
@@ -149,14 +146,6 @@
             .catch(function (e) { console.error('Stop failed:', e); });
     });
 
-    document.getElementById('btn-set-task').addEventListener('click', function () {
-        var task = document.getElementById('task-input').value.trim();
-        if (task) {
-            setTask(task)
-                .then(function () { return startAI(); })
-                .catch(function (e) { console.error('Set task failed:', e); });
-        }
-    });
 
     document.getElementById('btn-estop').addEventListener('click', function () {
         fetch('/emergency_stop', { method: 'POST' })

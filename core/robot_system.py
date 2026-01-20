@@ -82,10 +82,56 @@ class RobotSystem:
                     logger.warning(f"Could not read head: {e}")
                     
             logger.info(f"Robot '{self.robot.name}' connected successfully")
+            
+            # Initialize AI agent now that controller is ready
+            self._init_agent_deferred()
         except Exception as e:
             logger.error(f"Robot connection failed: {e}")
             state.last_error = str(e)
             self.robot = None
+    
+    def _init_agent_deferred(self):
+        """Initialize the AI agent after robot is connected."""
+        if not self.controller:
+            return
+            
+        try:
+            import os
+            from core.navigation_agent import NavigationAgent
+            from robots.xlerobot.tools import (
+                create_move_forward, create_move_backward,
+                create_turn_left, create_turn_right,
+                create_look_around, create_slide_left, create_slide_right,
+                create_end_task, create_enable_precision_mode, create_disable_precision_mode,
+                create_save_note, create_enable_approach_mode, create_disable_approach_mode,
+                create_speak, create_run_robot_policy, create_scan_doorway
+            )
+            
+            tools = [
+                create_move_forward(self.controller),
+                create_move_backward(self.controller),
+                create_turn_left(self.controller),
+                create_turn_right(self.controller),
+                create_slide_left(self.controller),
+                create_slide_right(self.controller),
+                create_look_around(self.controller, self.camera),
+                create_end_task(),
+                create_enable_precision_mode(),
+                create_disable_precision_mode(),
+                create_save_note(),
+                create_enable_approach_mode(),
+                create_disable_approach_mode(),
+                create_speak(),
+                create_run_robot_policy(),
+                create_scan_doorway()
+            ]
+            
+            model_name = os.getenv("AI_MODEL", "openai/gpt-5.2")
+            agent = NavigationAgent(self, model_name, tools)
+            state.agent = agent
+            logger.info("AI Agent ready")
+        except Exception as e:
+            logger.warning(f"AI Agent init failed: {e}")
 
     # Backwards compatibility: expose controller from robot
     @property
