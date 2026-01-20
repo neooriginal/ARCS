@@ -552,26 +552,31 @@ def create_scan_doorway():
         robot_state.precision_mode = True
         scanner.clear()
         
-        # Scan Parameters - one-way sweep design
-        # 1. Turn Left 45 deg (Prep)
-        # 2. Sweep Right 90 deg (Scan) -> End at -45 deg
-        # 3. Align from -45 deg to Target
+        # Scan Parameters - Time-Based "Replay" Strategy
+        # We scan at a constant speed. We find *when* the gap appeared.
+        # We then simply reverse for that duration. eliminating angle calibration errors.
         
         SWEEP_HALF_ANGLE = 45.0 
-        SCAN_RANGE = SWEEP_HALF_ANGLE * 2.0 # 90 degrees
-        ROT_SPEED = 0.3  # Reduced for precision
-        DEG_PER_SEC = 25.0 
+        SCAN_RANGE = SWEEP_HALF_ANGLE * 2.0 
+        ROT_SPEED = 0.35  # Slightly higher torque to ensure consistent movement
+        ESTIMATED_DEG_PER_SEC = 25.0 
         
-        PREP_DURATION = SWEEP_HALF_ANGLE / DEG_PER_SEC
-        SCAN_DURATION = SCAN_RANGE / DEG_PER_SEC
+        LIDAR_LATENCY = 0.15 # seconds to compensate for sensor lag
+        
+        PREP_DURATION = SWEEP_HALF_ANGLE / ESTIMATED_DEG_PER_SEC
+        SCAN_DURATION = SCAN_RANGE / ESTIMATED_DEG_PER_SEC
         
         # Shared state
         scan_state = {
             "phase": "PREP",
             "phase_start_time": time.time(),
+            "scan_start_timestamp": 0.0
         }
         
         is_scanning = True
+        
+        # We need to map Time -> Angle for the LidarScanner to work (it expects degrees),
+        # then map Result Angle -> Time for our physical action.
         
         def recording_loop():
             while is_scanning:
@@ -581,14 +586,14 @@ def create_scan_doorway():
                 if scan_state["phase"] != "SCAN":
                     time.sleep(0.02)
                     continue
-                    
-                t = time.time()
-                t0 = scan_state["phase_start_time"]
-                dt = t - t0
                 
-                # Calculate angle in Global Frame (relative to Start 0)
-                # Scan goes from Left (+45) to Right (-45)
-                # Angle = +45 - (dt / Duration) * 90
+                t = time.time()
+                t_scan_start = scan_state["scan_start_timestamp"]
+                dt = t - t_scan_start
+                
+                # Map Time to "Pseudo-Angle" for the scanner logic
+                # 0s = +45 deg, End = -45 deg
+                # This linear mapping is just for the graph/analysis.
                 current_angle = SWEEP_HALF_ANGLE - ((dt / SCAN_DURATION) * SCAN_RANGE)
                 
                 dist = robot_state.lidar_distance
@@ -602,24 +607,29 @@ def create_scan_doorway():
         recorder.start()
         
         try:
-            # 1. Prep: Turn Left to +45
-            print(f"[SCAN] Pre-positioning: Left {SWEEP_HALF_ANGLE}°")
+            # 1. Prep: Turn Left to Start Position
+            print(f"[SCAN] Pre-positioning: Left...")
             scan_state["phase"] = "PREP"
             robot_state.update_movement({'left': ROT_SPEED})
             time.sleep(PREP_DURATION)
             robot_state.stop_all_movement()
             time.sleep(0.5) # Settle
             
-            # 2. Scan: Turn Right to -45
-            print(f"[SCAN] Scanning: Right {SCAN_RANGE}°")
+            # 2. Scan: Turn Right
+            print(f"[SCAN] Scanning: Right, looking for gap...")
             scan_state["phase"] = "SCAN"
+            scan_state["scan_start_timestamp"] = time.time()
             scan_state["phase_start_time"] = time.time()
+            
             robot_state.update_movement({'right': ROT_SPEED})
+            
+            # We enforce exact duration
             time.sleep(SCAN_DURATION)
             
-            # Stop at End Position (approx -45 deg)
+            # Stop
             robot_state.stop_all_movement()
-            is_scanning = False # Stop recording immediately
+            is_scanning = False 
+            scan_end_time = time.time()
             time.sleep(0.2)
             
         except Exception as e:
@@ -636,42 +646,53 @@ def create_scan_doorway():
         robot_state.last_scan_result = result
         
         if not result['found']:
-            # Fallback logic removed for one-way sweep simplification; recommend retry
-            return f"Scan Complete. NO GAP FOUND. Reason: {result.get('reason')}. Please reposition and try again."
+            return f"Scan Complete. NO GAP FOUND. Reason: {result.get('reason')}. Please reposition."
             
-        # Alignment
-        center_angle = result['center_angle']
-        width = result['width_deg']
+        # TIME-REVERSAL ALIGNMENT
+        # 1. Get center "Pseudo-Angle"
+        center_pseudo_angle = result['center_angle']
         
-        # Current assumed orientation is -SWEEP_HALF_ANGLE (-45)
-        current_orientation = -SWEEP_HALF_ANGLE
+        # 2. Convert back to Time (relative to scan start)
+        # Angle = 45 - (t / Dur) * 90  =>  (t/Dur)*90 = 45 - Angle  => t = (45 - Angle)/90 * Dur
+        time_from_start = ((SWEEP_HALF_ANGLE - center_pseudo_angle) / SCAN_RANGE) * SCAN_DURATION
         
-        # Required turn = Target - Current
-        # e.g. Target 0 (Center) - (-45) = +45 (Left)
-        # e.g. Target +20 (Left) - (-45) = +65 (Left)
-        # e.g. Target -20 (Right) - (-45) = +25 (Left)
-        turn_needed = center_angle - current_orientation
+        # 3. Calculate time passed since we saw the gap
+        # We are currently at SCAN_DURATION (roughly)
+        # But we need to account for Lidar DELAY.
+        # The gap was seen at `time_from_start`, but it actually happened `LIDAR_LATENCY` earlier.
+        # So physically, we were at `time_from_start - latency` when the gap was in front of us.
+        # Actually...
+        # Value recorded at T corresponds to reality at T-Lat.
+        # We want to go to the physical location.
+        # The sensor said "Gap" at T_rec.
+        # The robot was at Position(T_rec) when it recorded it.
+        # BUT the sensor data came from Position(T_rec - Lat).
+        # So the Gap is at Position(T_rec - Lat).
+        # We are currently at Position(T_end).
+        # We need to travel back: T_travel = T_end - (T_rec - Lat) = T_end - T_rec + Lat.
         
-        align_msg = ""
-        if abs(turn_needed) > 2.0:
-            align_dur = abs(turn_needed) / DEG_PER_SEC
-            align_speed = ROT_SPEED if turn_needed > 0 else -ROT_SPEED
-            
-            direction = "Left" if turn_needed > 0 else "Right"
-            print(f"[SCAN] Aligning: {direction} {abs(turn_needed):.1f}° (Target {center_angle:.1f}°)")
-            
-            robot_state.update_movement({'left': align_speed} if align_speed > 0 else {'right': abs(align_speed)})
+        # Latency means we have traveled FURTHER past the object than the log says.
+        # So we need to travel BACK more.
+        
+        wait_time_at_end = 0.2 # We waited 0.2s before analysis
+        
+        return_duration = (SCAN_DURATION - time_from_start) + LIDAR_LATENCY
+        
+        print(f"[SCAN] Gap found at t={time_from_start:.2f}s (val={center_pseudo_angle:.1f}°). Latency={LIDAR_LATENCY}s.")
+        print(f"[SCAN] Returning Left for {return_duration:.2f}s")
+        
+        if return_duration > 0.1:
+            # Reverse direction (Left) using same speed
+            robot_state.update_movement({'left': ROT_SPEED})
             
             start_align = time.time()
-            while time.time() - start_align < align_dur:
+            while time.time() - start_align < return_duration:
                  robot_state.last_movement_activity = time.time()
                  time.sleep(0.05)
                  
             robot_state.stop_all_movement()
-            align_msg = f"ALIGNED to {center_angle:.1f}° (Turned {turn_needed:.1f}°)."
-        else:
-            align_msg = "ALREADY ALIGNED."
-            
-        return f"Scan Successful! GAP FOUND. Width: {width:.1f}°. {align_msg} Robot is facing the center. READY FOR BLIND ENTRY."
+            return f"Scan Successful! Width: {result['width_deg']:.1f}°. Realigned by reversing {return_duration:.2f}s. Facing center."
+        
+        return f"Scan Successful! Width: {result['width_deg']:.1f}°. Already aligned."
 
     return scan_doorway
