@@ -126,7 +126,7 @@ class ObstacleDetector:
     def _check_visual_obstacles(self, frame, overlay):
         """Check for obstacles using gradient magnitude (Sobel) in lower center region."""
         h, w = frame.shape[:2]
-        roi_y = int(h * 0.65)
+        roi_y = int(h * 0.8)
         roi = frame[roi_y:h, :]
         
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
