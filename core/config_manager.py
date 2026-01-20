@@ -35,7 +35,7 @@ DEFAULTS = {
     "CAMERA_BUFFER_SIZE": 1,
     
     # Obstacle Detection
-    "OBSTACLE_SOBEL_THRESHOLD": 20,
+    "OBSTACLE_SOBEL_THRESHOLD": 30,
     "OBSTACLE_THRESHOLD_RATIO": 0.875,
     
     # Video Stream
