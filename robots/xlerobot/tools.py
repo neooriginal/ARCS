@@ -552,43 +552,45 @@ def create_scan_doorway():
         robot_state.precision_mode = True
         scanner.clear()
         
-        # Scan Parameters - larger sweep angle to catch door frame walls
-        SWEEP_ANGLE = 40.0  # Increased from 25 to catch walls even when aligned
-        ROT_SPEED = 0.4  # Reduced from 0.7 to prevent stall/jerkiness
-        DEG_PER_SEC = 25.0  # Slower rotation for better data quality
-        DURATION = SWEEP_ANGLE / DEG_PER_SEC
+        # Scan Parameters - one-way sweep design
+        # 1. Turn Left 45 deg (Prep)
+        # 2. Sweep Right 90 deg (Scan) -> End at -45 deg
+        # 3. Align from -45 deg to Target
         
-
+        SWEEP_HALF_ANGLE = 45.0 
+        SCAN_RANGE = SWEEP_HALF_ANGLE * 2.0 # 90 degrees
+        ROT_SPEED = 0.3  # Reduced for precision
+        DEG_PER_SEC = 25.0 
         
-        # Recording Loop
-        is_scanning = True
+        PREP_DURATION = SWEEP_HALF_ANGLE / DEG_PER_SEC
+        SCAN_DURATION = SCAN_RANGE / DEG_PER_SEC
         
-        # Shared state for thread synchronization
+        # Shared state
         scan_state = {
-            "phase": "L1",
+            "phase": "PREP",
             "phase_start_time": time.time(),
-            "angle": 0.0
         }
+        
+        is_scanning = True
         
         def recording_loop():
             while is_scanning:
                 # Keep movement loop alive
                 robot_state.last_movement_activity = time.time()
                 
+                if scan_state["phase"] != "SCAN":
+                    time.sleep(0.02)
+                    continue
+                    
                 t = time.time()
-                phase = scan_state["phase"]
                 t0 = scan_state["phase_start_time"]
                 dt = t - t0
                 
-                # Estimate current angle
-                current_angle = 0.0
-                if phase == "L1":
-                    current_angle = (dt / DURATION) * SWEEP_ANGLE
-                elif phase == "R":
-                    current_angle = SWEEP_ANGLE - ((dt / (DURATION*2)) * (SWEEP_ANGLE*2))
-                elif phase == "L2":
-                     current_angle = -SWEEP_ANGLE + ((dt / DURATION) * SWEEP_ANGLE)
-                     
+                # Calculate angle in Global Frame (relative to Start 0)
+                # Scan goes from Left (+45) to Right (-45)
+                # Angle = +45 - (dt / Duration) * 90
+                current_angle = SWEEP_HALF_ANGLE - ((dt / SCAN_DURATION) * SCAN_RANGE)
+                
                 dist = robot_state.lidar_distance
                 if dist is not None:
                      scanner.add_reading(current_angle, dist)
@@ -600,27 +602,25 @@ def create_scan_doorway():
         recorder.start()
         
         try:
-            # 1. Turn Left
-            scan_state["phase"] = "L1"
-            scan_state["phase_start_time"] = time.time()
-            # USE STATE updates to allow movement loop to handle it
+            # 1. Prep: Turn Left to +45
+            print(f"[SCAN] Pre-positioning: Left {SWEEP_HALF_ANGLE}°")
+            scan_state["phase"] = "PREP"
             robot_state.update_movement({'left': ROT_SPEED})
-            time.sleep(DURATION)
+            time.sleep(PREP_DURATION)
+            robot_state.stop_all_movement()
+            time.sleep(0.5) # Settle
             
-            # 2. Turn Right (Sweep across center)
-            scan_state["phase"] = "R"
+            # 2. Scan: Turn Right to -45
+            print(f"[SCAN] Scanning: Right {SCAN_RANGE}°")
+            scan_state["phase"] = "SCAN"
             scan_state["phase_start_time"] = time.time()
             robot_state.update_movement({'right': ROT_SPEED})
-            time.sleep(DURATION * 2)
+            time.sleep(SCAN_DURATION)
             
-            # 3. Turn Left (Return to Center)
-            scan_state["phase"] = "L2"
-            scan_state["phase_start_time"] = time.time()
-            robot_state.update_movement({'left': ROT_SPEED})
-            time.sleep(DURATION)
-            
-            # Stop
+            # Stop at End Position (approx -45 deg)
             robot_state.stop_all_movement()
+            is_scanning = False # Stop recording immediately
+            time.sleep(0.2)
             
         except Exception as e:
             print(f"Scan interrupted: {e}")
@@ -635,81 +635,31 @@ def create_scan_doorway():
         result = scanner.analyze_gap()
         robot_state.last_scan_result = result
         
-        # Fallback: If no depth contrast, do a wider SEARCH SCAN to find walls
-        if not result['found'] and result.get('reason') == 'no_depth_contrast':
-            robot_state.precision_mode = True
-            scanner.clear()
-            
-            SEARCH_ANGLE = 60.0  # Wider sweep
-            SEARCH_DURATION = SEARCH_ANGLE / DEG_PER_SEC
-            
-            is_scanning = True
-            scan_state = {"phase": "SEARCH_L", "phase_start_time": time.time(), "angle": 0.0}
-            
-            def search_recording_loop():
-                while is_scanning:
-                    # Keep movement loop alive
-                    robot_state.last_movement_activity = time.time()
-                    
-                    t = time.time()
-                    phase = scan_state["phase"]
-                    t0 = scan_state["phase_start_time"]
-                    dt = t - t0
-                    
-                    if phase == "SEARCH_L":
-                        current_angle = (dt / SEARCH_DURATION) * SEARCH_ANGLE
-                    elif phase == "SEARCH_R":
-                        current_angle = SEARCH_ANGLE - ((dt / (SEARCH_DURATION*2)) * (SEARCH_ANGLE*2))
-                    else:
-                        current_angle = -SEARCH_ANGLE + ((dt / SEARCH_DURATION) * SEARCH_ANGLE)
-                        
-                    dist = robot_state.lidar_distance
-                    if dist is not None:
-                        scanner.add_reading(current_angle, dist)
-                    time.sleep(0.04)
-            
-            search_recorder = threading.Thread(target=search_recording_loop, daemon=True)
-            search_recorder.start()
-            
-            try:
-                # Wider search: Left 60 -> Right 120 -> Left 60
-                scan_state["phase"] = "SEARCH_L"
-                scan_state["phase_start_time"] = time.time()
-                robot_state.update_movement({'left': ROT_SPEED})
-                time.sleep(SEARCH_DURATION)
-                
-                scan_state["phase"] = "SEARCH_R"
-                scan_state["phase_start_time"] = time.time()
-                robot_state.update_movement({'right': ROT_SPEED})
-                time.sleep(SEARCH_DURATION * 2)
-                
-                scan_state["phase"] = "SEARCH_L2"
-                scan_state["phase_start_time"] = time.time()
-                robot_state.update_movement({'left': ROT_SPEED})
-                time.sleep(SEARCH_DURATION)
-                
-                robot_state.stop_all_movement()
-            finally:
-                is_scanning = False
-                search_recorder.join()
-            
-            # Re-analyze with more data
-            result = scanner.analyze_gap()
-            robot_state.last_scan_result = result
-        
         if not result['found']:
-            return f"Scan Complete. NO GAP FOUND. Reason: {result.get('reason')}. The door may be too wide or you may not be facing it. Try turning slightly and scanning again."
+            # Fallback logic removed for one-way sweep simplification; recommend retry
+            return f"Scan Complete. NO GAP FOUND. Reason: {result.get('reason')}. Please reposition and try again."
             
         # Alignment
         center_angle = result['center_angle']
         width = result['width_deg']
         
+        # Current assumed orientation is -SWEEP_HALF_ANGLE (-45)
+        current_orientation = -SWEEP_HALF_ANGLE
+        
+        # Required turn = Target - Current
+        # e.g. Target 0 (Center) - (-45) = +45 (Left)
+        # e.g. Target +20 (Left) - (-45) = +65 (Left)
+        # e.g. Target -20 (Right) - (-45) = +25 (Left)
+        turn_needed = center_angle - current_orientation
+        
         align_msg = ""
-        if abs(center_angle) > 2.0:
-            align_dur = abs(center_angle) / DEG_PER_SEC
-            align_speed = ROT_SPEED if center_angle > 0 else -ROT_SPEED
+        if abs(turn_needed) > 2.0:
+            align_dur = abs(turn_needed) / DEG_PER_SEC
+            align_speed = ROT_SPEED if turn_needed > 0 else -ROT_SPEED
             
-            # Use movement loop for alignment too to be safe/consistent
+            direction = "Left" if turn_needed > 0 else "Right"
+            print(f"[SCAN] Aligning: {direction} {abs(turn_needed):.1f}° (Target {center_angle:.1f}°)")
+            
             robot_state.update_movement({'left': align_speed} if align_speed > 0 else {'right': abs(align_speed)})
             
             start_align = time.time()
@@ -718,7 +668,7 @@ def create_scan_doorway():
                  time.sleep(0.05)
                  
             robot_state.stop_all_movement()
-            align_msg = f"ALIGNED to center ({center_angle:.1f}°)."
+            align_msg = f"ALIGNED to {center_angle:.1f}° (Turned {turn_needed:.1f}°)."
         else:
             align_msg = "ALREADY ALIGNED."
             
