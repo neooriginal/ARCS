@@ -61,6 +61,36 @@
                 <span style="font-weight: 500;">Control Mode</span>
                 <span id="status-mode" style="color: var(--primary); font-weight: 700;">LOADING...</span>
             </div>
+
+            <!-- Health Indicator -->
+            <div onclick="toggleHealthDetails()"
+                style="display: flex; flex-direction: column; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid rgba(255,255,255,0.02); cursor: pointer; transition: background 0.2s;"
+                onmouseover="this.style.background='rgba(255,255,255,0.05)'"
+                onmouseout="this.style.background='rgba(255,255,255,0.03)'">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px;">
+                    <span style="font-weight: 500;">System Health</span>
+                    <span id="status-health" class="status-dot"></span>
+                </div>
+
+                <div id="health-details"
+                    style="display: none; padding: 0 16px 12px 16px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.75rem; color: var(--text-secondary);">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
+                        <div style="display: flex; justify-content: space-between;">CPU: <span id="health-cpu"
+                                style="color: white; font-weight: 600;">-</span></div>
+                        <div style="display: flex; justify-content: space-between;">RAM: <span id="health-ram"
+                                style="color: white; font-weight: 600;">-</span></div>
+                        <div style="display: flex; justify-content: space-between;">DISK: <span id="health-disk"
+                                style="color: white; font-weight: 600;">-</span></div>
+                        <div style="display: flex; justify-content: space-between;">PWR: <span id="health-pwr"
+                                style="color: white; font-weight: 600;">-</span></div>
+                        <div style="display: flex; justify-content: space-between;">TEMP: <span id="health-temp"
+                                style="color: white; font-weight: 600;">-</span></div>
+                    </div>
+                    <div id="health-warning"
+                        style="display: none; color: var(--danger); font-size: 0.65rem; margin-top: 8px; text-align: center; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid var(--danger); padding: 4px; border-radius: 4px; background: rgba(255, 0, 0, 0.1);">
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -136,7 +166,62 @@
             if (modeEl) modeEl.textContent = (data.control_mode || 'IDLE').toUpperCase();
 
         } catch (e) { }
+
+        // Fetch System Health
+        try {
+            const res = await fetch('/api/system/health');
+            const data = await res.json();
+
+            if (data.status === 'ok') {
+                const cpu = data.cpu;
+                const mem = data.memory;
+                const disk = data.disk;
+                const pwr = data.power;
+
+                // Update Health Dot (Red if any issue)
+                const isHealthy = cpu.status === 'normal' && mem.status === 'normal' && disk.status === 'normal' && pwr.status === 'normal';
+
+                const healthDot = document.getElementById('status-health');
+                if (healthDot) healthDot.className = 'status-dot ' + (isHealthy ? 'active' : 'busy'); // busy is usually orange/yellow, active green
+
+                // Update Details
+                document.getElementById('health-cpu').textContent = `${cpu.usage}%`;
+                document.getElementById('health-cpu').style.color = cpu.status === 'high' ? 'var(--danger)' : 'white';
+
+                document.getElementById('health-ram').textContent = `${mem.percent}%`;
+                document.getElementById('health-ram').style.color = mem.status === 'high' ? 'var(--danger)' : 'white';
+
+                document.getElementById('health-disk').textContent = `${disk.percent}%`;
+                document.getElementById('health-disk').style.color = disk.status === 'high' ? 'var(--danger)' : 'white';
+
+                document.getElementById('health-pwr').textContent = `${pwr.battery_percent}%`;
+                document.getElementById('health-pwr').style.color = pwr.status === 'low' ? 'var(--danger)' : 'white';
+
+                // Temp
+                const tempVal = cpu.temp !== 'N/A' ? `${cpu.temp}°C` : 'N/A';
+                document.getElementById('health-temp').textContent = tempVal;
+                // Warn if temp > 80C
+                document.getElementById('health-temp').style.color = (typeof cpu.temp === 'number' && cpu.temp > 80) ? 'var(--danger)' : 'white';
+
+                // Warnings (Throttling)
+                const warningEl = document.getElementById('health-warning');
+                if (pwr.throttled) {
+                    warningEl.textContent = pwr.throttled;
+                    warningEl.style.display = 'block';
+                    healthDot.className = 'status-dot busy'; // Force warning color
+                } else {
+                    warningEl.style.display = 'none';
+                }
+            }
+        } catch (e) { }
     }, 1000);
+
+    function toggleHealthDetails() {
+        const el = document.getElementById('health-details');
+        if (el) {
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+    }
 
     // Listen for log updates from the global LogManager (notifications.js)
     document.addEventListener('log-update', (e) => {

@@ -4,6 +4,9 @@
 import cv2
 import time
 import numpy as np
+import psutil
+import subprocess
+import os
 
 from typing import Any, Optional, Union
 from flask import Blueprint, Response, jsonify, request, render_template, redirect, make_response
@@ -188,6 +191,99 @@ def get_status():
         'arm_positions': state.get_arm_positions(),
         'error': state.last_error
     })
+
+
+@bp.route('/api/system/health')
+def get_system_health():
+    """Get system resource usage and health metrics."""
+    try:
+        # CPU Usage
+        cpu_percent = psutil.cpu_percent(interval=None)
+        
+        # Memory Usage
+        memory = psutil.virtual_memory()
+        memory_percent = memory.percent
+        memory_used_gb = round(memory.used / (1024**3), 1)
+        memory_total_gb = round(memory.total / (1024**3), 1)
+        
+        # Disk Usage (Root)
+        disk = psutil.disk_usage('/')
+        disk_percent = disk.percent
+        disk_free_gb = round(disk.free / (1024**3), 1)
+        
+        # Voltage (Mocked for PC, real for some SBCs if available via file reading, but sticking to generic PC stats)
+        # If running on battery (like a laptop), we can try to get battery status
+        battery = psutil.sensors_battery()
+        power_plugged = battery.power_plugged if battery else True
+        battery_percent = battery.percent if battery else 100
+        
+        # Temperature & Throttling (Raspberry Pi / Linux specific)
+        temp = 'N/A'
+        throttled = None
+        
+        try:
+            # Try psutil first (portable)
+            if hasattr(psutil, 'sensors_temperatures'):
+                temps = psutil.sensors_temperatures()
+                if 'cpu_thermal' in temps:
+                    temp = temps['cpu_thermal'][0].current
+                elif 'coretemp' in temps:
+                    temp = temps['coretemp'][0].current
+            
+            # Fallback for Raspberry Pi if psutil didn't find it
+            if temp == 'N/A' and os.path.exists('/sys/class/thermal/thermal_zone0/temp'):
+                with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
+                    temp = round(int(f.read()) / 1000.0, 1)
+                    
+            # Check for Throttling (Raspberry Pi specific)
+            # vcgencmd get_throttled
+            # 0x50005 = Throttled (under-voltage detected)
+            if os.path.exists('/usr/bin/vcgencmd'):
+                res = subprocess.check_output(['/usr/bin/vcgencmd', 'get_throttled']).decode('utf-8')
+                # Output like: throttled=0x0
+                val = int(res.strip().split('=')[1], 16)
+                if val != 0:
+                    throttled_msg = []
+                    if val & 0x1:
+                        throttled_msg.append("Under-voltage detected")
+                    if val & 0x2:
+                        throttled_msg.append("Arm frequency capped")
+                    if val & 0x4:
+                        throttled_msg.append("Throttled")
+                    if val & 0x8:
+                        throttled_msg.append("Soft temp limit")
+                    throttled = ", ".join(throttled_msg)
+            
+        except Exception:
+            pass
+
+        return jsonify({
+            'status': 'ok',
+            'cpu': {
+                'usage': cpu_percent,
+                'temp': temp,
+                'status': 'high' if cpu_percent > 80 else 'normal'
+            },
+            'memory': {
+                'percent': memory_percent,
+                'used_gb': memory_used_gb,
+                'total_gb': memory_total_gb,
+                'status': 'high' if memory_percent > 85 else 'normal'
+            },
+            'disk': {
+                'percent': disk_percent,
+                'free_gb': disk_free_gb,
+                'status': 'high' if disk_percent > 90 else 'normal'
+            },
+            'power': {
+                'battery_percent': battery_percent,
+                'plugged': power_plugged,
+                'throttled': throttled,
+                'status': 'low' if (battery_percent < 20 and not power_plugged) or throttled else 'normal'
+            }
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)})
 
 
 @bp.route('/video_feed')
