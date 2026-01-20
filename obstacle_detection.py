@@ -31,6 +31,7 @@ class ObstacleDetector:
         self.history_len = 8
         self.distance_history = deque(maxlen=self.history_len)
         self.block_history = deque(maxlen=self.history_len)
+        self.visual_block_history = deque(maxlen=6)  # History for visual obstacle smoothing
         self.lock = threading.Lock()
         
         self.latest_blockage = {
@@ -129,16 +130,16 @@ class ObstacleDetector:
         
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
         
-        # Blur to reduce noise (floor texture)
-        blur = cv2.GaussianBlur(gray, (5, 5), 0)
+        # Larger blur kernel to reduce floor texture/shadow noise
+        blur = cv2.GaussianBlur(gray, (9, 9), 0)
         
         # Use Sobel (as per docs/visual_intelligence.md)
         sobelx = cv2.Sobel(blur, cv2.CV_64F, 1, 0, ksize=3)
         sobely = cv2.Sobel(blur, cv2.CV_64F, 0, 1, ksize=3)
         magnitude = cv2.magnitude(sobelx, sobely)
         
-        # Get threshold from config
-        sobel_thresh = get_config("OBSTACLE_SOBEL_THRESHOLD", 45)
+        # Get threshold from config (higher default to filter shadows)
+        sobel_thresh = get_config("OBSTACLE_SOBEL_THRESHOLD", 55)
         
         # Create binary mask of strong edges
         _, mask = cv2.threshold(magnitude, sobel_thresh, 255, cv2.THRESH_BINARY)
@@ -162,8 +163,15 @@ class ObstacleDetector:
         # Calculate density (0.0 to 1.0)
         edge_density = np.count_nonzero(center_roi) / center_roi.size
         
-        # Density threshold (tunable via code or future config, default 5%)
-        is_blocked = edge_density > 0.05
+        # Add to history for temporal smoothing
+        self.visual_block_history.append(edge_density)
+        
+        # Use averaged density for smoother detection
+        avg_density = sum(self.visual_block_history) / len(self.visual_block_history)
+        
+        # Higher density threshold (8% instead of 5%) and require consistency
+        density_threshold = get_config("OBSTACLE_DENSITY_THRESHOLD", 0.08)
+        is_blocked = avg_density > density_threshold
         
         if is_blocked:
             p1 = (center_x - check_w//2, roi_y)

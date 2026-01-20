@@ -113,7 +113,10 @@ def _interruptible_sleep(duration: float, check_interval: float = 0.1, check_saf
     movement_type: 'FORWARD', 'BACKWARD', 'LEFT', 'RIGHT' for validation.
     """
     elapsed = 0
-    # Safety Check Throttling (Don't check every 0.1s if not needed, but 10Hz is fine)
+    safety_check_interval = 0.2  # Check safety at 5Hz max
+    last_safety_check = 0
+    consecutive_blocks = 0  # Require multiple consecutive blocks for smoothing
+    BLOCK_THRESHOLD = 3  # Require 3 consecutive blocked checks before stopping
     
     while elapsed < duration:
         if not robot_state.ai_enabled:
@@ -124,20 +127,28 @@ def _interruptible_sleep(duration: float, check_interval: float = 0.1, check_saf
         # Update heartbeat to prevent watchdog from killing the movement
         robot_state.last_movement_activity = time.time()
         
-        # --- CONTINUOUS SAFETY MONITORING ---
+        # --- CONTINUOUS SAFETY MONITORING (throttled) ---
+        current_time = time.time()
         if check_safety and movement_type == 'FORWARD' and robot_state.robot_system:
-            try:
-                if frame is not None:
-                    detector = robot_state.get_detector()
-                    if detector:
-                        safe_actions, _, _ = detector.process(frame)
-                        if "FORWARD" not in safe_actions:
-                            print("[SAFETY] EMERGENCY BRAKE: Obstacle appeared!")
-                            robot_state.add_ai_log("SAFETY REFLEX: EMERGENCY STOP (Obstacle appeared)")
-                            robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
-                            return False
-            except Exception as e:
-                print(f"[SAFETY] Error during check: {e}")
+            if current_time - last_safety_check >= safety_check_interval:
+                last_safety_check = current_time
+                try:
+                    frame = robot_state.robot_system.get_frame()
+                    if frame is not None:
+                        detector = robot_state.get_detector()
+                        if detector:
+                            safe_actions, _, _ = detector.process(frame)
+                            if "FORWARD" not in safe_actions:
+                                consecutive_blocks += 1
+                                if consecutive_blocks >= BLOCK_THRESHOLD:
+                                    print(f"[SAFETY] EMERGENCY BRAKE: Obstacle confirmed ({consecutive_blocks} checks)")
+                                    robot_state.add_ai_log("SAFETY REFLEX: EMERGENCY STOP (Obstacle appeared)")
+                                    robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
+                                    return False
+                            else:
+                                consecutive_blocks = 0  # Reset on clear
+                except Exception as e:
+                    print(f"[SAFETY] Error during check: {e}")
 
                 
         time.sleep(min(check_interval, duration - elapsed))
