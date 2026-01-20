@@ -122,28 +122,62 @@ class ObstacleDetector:
         return result
 
     def _check_visual_obstacles(self, frame, overlay):
-        """Check for obstacles using edge density in lower center region."""
+        """Check for obstacles using gradient magnitude (Sobel) in lower center region."""
         h, w = frame.shape[:2]
         roi_y = int(h * 0.65)
         roi = frame[roi_y:h, :]
         
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-        blur = cv2.GaussianBlur(gray, (5, 5), 0)
-        edges = cv2.Canny(blur, 50, 150)
         
+        # Blur to reduce noise (floor texture)
+        blur = cv2.GaussianBlur(gray, (5, 5), 0)
+        
+        # Use Sobel (as per docs/visual_intelligence.md)
+        sobelx = cv2.Sobel(blur, cv2.CV_64F, 1, 0, ksize=3)
+        sobely = cv2.Sobel(blur, cv2.CV_64F, 0, 1, ksize=3)
+        magnitude = cv2.magnitude(sobelx, sobely)
+        
+        # Get threshold from config
+        sobel_thresh = get_config("OBSTACLE_SOBEL_THRESHOLD", 45)
+        
+        # Create binary mask of strong edges
+        _, mask = cv2.threshold(magnitude, sobel_thresh, 255, cv2.THRESH_BINARY)
+        
+        if np.any(mask):
+            # Convert single channel mask to 3 channel BGR
+            edge_layer = np.zeros((roi.shape[0], roi.shape[1], 3), dtype=np.uint8)
+            edge_layer[mask > 0] = (255, 255, 0) # Cyan color for edges
+            
+            # Create a full-size layer for blending
+            full_layer = np.zeros_like(overlay)
+            full_layer[roi_y:h, :] = edge_layer
+
+            cv2.addWeighted(overlay, 1.0, full_layer, 0.5, 0, overlay)
+
+        # Focus on center path
         center_x = w // 2
         check_w = int(w * 0.4)
-        center_roi = edges[:, center_x - check_w//2 : center_x + check_w//2]
+        center_roi = mask[:, center_x - check_w//2 : center_x + check_w//2]
         
-        edge_density = np.mean(center_roi) / 255.0
+        # Calculate density (0.0 to 1.0)
+        edge_density = np.count_nonzero(center_roi) / center_roi.size
         
-        # High edge density suggests complex object
-        is_blocked = edge_density > 0.08
+        # Density threshold (tunable via code or future config, default 5%)
+        is_blocked = edge_density > 0.05
         
         if is_blocked:
             p1 = (center_x - check_w//2, roi_y)
             p2 = (center_x + check_w//2, h)
+            
+            # Draw solid semi-transparent red box for better visibility
+            sub_overlay = overlay.copy()
+            cv2.rectangle(sub_overlay, p1, p2, (0, 0, 255), -1)
+            cv2.addWeighted(sub_overlay, 0.3, overlay, 0.7, 0, overlay)
             cv2.rectangle(overlay, p1, p2, (0, 0, 255), 2)
+            
+            # Debug info
+            cv2.putText(overlay, f"Obstacle: {edge_density:.2f}", (p1[0], p1[1]-10), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
             
         return is_blocked
 
