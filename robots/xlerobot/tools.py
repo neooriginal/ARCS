@@ -572,6 +572,9 @@ def create_scan_doorway():
         
         def recording_loop():
             while is_scanning:
+                # Keep movement loop alive
+                robot_state.last_movement_activity = time.time()
+                
                 t = time.time()
                 phase = scan_state["phase"]
                 t0 = scan_state["phase_start_time"]
@@ -600,27 +603,28 @@ def create_scan_doorway():
             # 1. Turn Left
             scan_state["phase"] = "L1"
             scan_state["phase_start_time"] = time.time()
-            controller.set_velocity_vector(0, 0, ROT_SPEED)
+            # USE STATE updates to allow movement loop to handle it
+            robot_state.update_movement({'left': ROT_SPEED})
             time.sleep(DURATION)
             
             # 2. Turn Right (Sweep across center)
             scan_state["phase"] = "R"
             scan_state["phase_start_time"] = time.time()
-            controller.set_velocity_vector(0, 0, -ROT_SPEED)
+            robot_state.update_movement({'right': ROT_SPEED})
             time.sleep(DURATION * 2)
             
             # 3. Turn Left (Return to Center)
             scan_state["phase"] = "L2"
             scan_state["phase_start_time"] = time.time()
-            controller.set_velocity_vector(0, 0, ROT_SPEED)
+            robot_state.update_movement({'left': ROT_SPEED})
             time.sleep(DURATION)
             
             # Stop
-            controller.set_velocity_vector(0, 0, 0)
+            robot_state.stop_all_movement()
             
         except Exception as e:
             print(f"Scan interrupted: {e}")
-            controller.set_velocity_vector(0, 0, 0)
+            robot_state.stop_all_movement()
             return f"Scan failed: {e}"
         finally:
             is_scanning = False
@@ -644,6 +648,9 @@ def create_scan_doorway():
             
             def search_recording_loop():
                 while is_scanning:
+                    # Keep movement loop alive
+                    robot_state.last_movement_activity = time.time()
+                    
                     t = time.time()
                     phase = scan_state["phase"]
                     t0 = scan_state["phase_start_time"]
@@ -668,20 +675,20 @@ def create_scan_doorway():
                 # Wider search: Left 60 -> Right 120 -> Left 60
                 scan_state["phase"] = "SEARCH_L"
                 scan_state["phase_start_time"] = time.time()
-                controller.set_velocity_vector(0, 0, ROT_SPEED)
+                robot_state.update_movement({'left': ROT_SPEED})
                 time.sleep(SEARCH_DURATION)
                 
                 scan_state["phase"] = "SEARCH_R"
                 scan_state["phase_start_time"] = time.time()
-                controller.set_velocity_vector(0, 0, -ROT_SPEED)
+                robot_state.update_movement({'right': ROT_SPEED})
                 time.sleep(SEARCH_DURATION * 2)
                 
                 scan_state["phase"] = "SEARCH_L2"
                 scan_state["phase_start_time"] = time.time()
-                controller.set_velocity_vector(0, 0, ROT_SPEED)
+                robot_state.update_movement({'left': ROT_SPEED})
                 time.sleep(SEARCH_DURATION)
                 
-                controller.set_velocity_vector(0, 0, 0)
+                robot_state.stop_all_movement()
             finally:
                 is_scanning = False
                 search_recorder.join()
@@ -702,9 +709,15 @@ def create_scan_doorway():
             align_dur = abs(center_angle) / DEG_PER_SEC
             align_speed = ROT_SPEED if center_angle > 0 else -ROT_SPEED
             
-            controller.set_velocity_vector(0, 0, align_speed)
-            time.sleep(align_dur)
-            controller.set_velocity_vector(0, 0, 0)
+            # Use movement loop for alignment too to be safe/consistent
+            robot_state.update_movement({'left': align_speed} if align_speed > 0 else {'right': abs(align_speed)})
+            
+            start_align = time.time()
+            while time.time() - start_align < align_dur:
+                 robot_state.last_movement_activity = time.time()
+                 time.sleep(0.05)
+                 
+            robot_state.stop_all_movement()
             align_msg = f"ALIGNED to center ({center_angle:.1f}°)."
         else:
             align_msg = "ALREADY ALIGNED."
