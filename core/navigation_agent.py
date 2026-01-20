@@ -59,6 +59,7 @@ CRITICAL: SENSOR TRUST PROTOCOL
 - TRUST YOUR LIDAR and REFLEX SYSTEM 100%.
 - If LIDAR says 20cm, it is 20cm, even if it looks far.
 - If LIDAR says 200cm (or MAX), it means the path AHEAD is clear (e.g., through a door).
+- **LIDAR LIMITATION**: The LIDAR is a SINGLE POINT sensor mounted CENTER of the robot. It only sees straight ahead. When it says "CLEAR", it does NOT mean you fit - only that the centerline is clear. You are 30cm wide, so add margin.
 - **DOORWAY LOGIC**: When you align correctly with a door, the distance will typically jump from <1m (wall) to >3m (room inside). THIS IS YOUR SIGNAL TO GO.
 - Rely on `scan_doorway` for measuring gaps. Do not eyeball it.
 
@@ -131,6 +132,7 @@ MEMORY CONTEXT:
 - A compressed memory of your recent actions is provided (e.g., "FWD✓, TL✓, FWD✗").
 - ✓ means successful, ✗ means blocked.
 - If you see a pattern warning, it means you are repeating the same actions. STOP doing that immediately.
+- **LOOP RULE**: If you find yourself turning left then right repeatedly, you are STUCK. Either back up significantly and try a completely different route, or call `end_task` with reason "Unable to complete - stuck in loop".
 - Use the location history (from QR codes) to understand where you've been.
 
 PERSISTENT NOTES:
@@ -293,22 +295,22 @@ PERSISTENT NOTES:
         pattern = self._detect_repeating_pattern()
         
         if pattern and "SEVERE" in pattern:
-            logger.warning(f"Severe loop detected: {pattern}. Forcing intervention.")
+            logger.warning(f"Severe loop detected: {pattern}. Ending task.")
             self.pattern_warning_level = 0
             self.action_history.clear()
-            return "FORCE_TURN_AROUND"
+            return "FORCE_END_TASK"
         
-        if self.stuck_counter >= 3:
-            logger.warning(f"Stuck counter={self.stuck_counter}. Forcing intervention.")
+        if self.stuck_counter >= 5:
+            logger.warning(f"Stuck counter={self.stuck_counter}. Ending task.")
             self.stuck_counter = 0
-            return "FORCE_TURN_AROUND"
+            return "FORCE_END_TASK"
         
         if pattern:
             self.pattern_warning_level += 1
-            if self.pattern_warning_level >= 2:
-                logger.warning(f"Pattern persists: {pattern}. Forcing intervention.")
+            if self.pattern_warning_level >= 3:
+                logger.warning(f"Pattern persists: {pattern}. Ending task.")
                 self.pattern_warning_level = 0
-                return "FORCE_TURN_AROUND"
+                return "FORCE_END_TASK"
         else:
             self.pattern_warning_level = max(0, self.pattern_warning_level - 1)
         
@@ -438,16 +440,19 @@ PERSISTENT NOTES:
         self.message_history.append(HumanMessage(content=content))
 
         # 5. Forced Intervention or LLM Inference
-        if forced_action == "FORCE_TURN_AROUND":
-             # Execute hardcoded turn
-             logger.info("Executing FORCED TURN AROUND due to stuck condition")
-             if "turn_left" in self.tool_map:
-                 self.tool_map["turn_left"].invoke({"angle_degrees": 90})
-             elif "turn_right" in self.tool_map:
-                 self.tool_map["turn_right"].invoke({"angle_degrees": 90})
-                 
-             self.message_history.append(SystemMessage(content="System Notification: Forced 90 degree turn executed to unstuck robot."))
-             return "Stuck Detected - Forced Turn Executed"
+        if forced_action == "FORCE_END_TASK":
+            # End the task instead of looping forever
+            logger.info("Executing FORCED END TASK due to stuck/loop condition")
+            state.ai_enabled = False
+            state.precision_mode = False
+            state.approach_mode = False
+            state.add_ai_log("TASK ABORTED: Detected stuck in loop - unable to complete")
+            
+            import tts
+            tts.speak("Task failed. I am stuck.")
+            
+            self.message_history.append(SystemMessage(content="System Notification: Task ended due to detected loop/stuck condition."))
+            return "Task Aborted - Stuck in Loop"
         
         # 6. LLM Inference
         try:

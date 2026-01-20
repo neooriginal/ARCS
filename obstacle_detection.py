@@ -166,12 +166,16 @@ class ObstacleDetector:
         # Add to history for temporal smoothing
         self.visual_block_history.append(edge_density)
         
-        # Use averaged density for smoother detection
-        avg_density = sum(self.visual_block_history) / len(self.visual_block_history)
+        # Use current density but require minimum history for averaging
+        # This prevents single-frame false positives while staying responsive
+        density_threshold = get_config("OBSTACLE_DENSITY_THRESHOLD", 0.05)
         
-        # Higher density threshold (8% instead of 5%) and require consistency
-        density_threshold = get_config("OBSTACLE_DENSITY_THRESHOLD", 0.08)
-        is_blocked = avg_density > density_threshold
+        # Require at least 2/3 of recent frames to show obstacle before blocking
+        if len(self.visual_block_history) >= 3:
+            recent_blocks = sum(1 for d in list(self.visual_block_history)[-3:] if d > density_threshold)
+            is_blocked = recent_blocks >= 2
+        else:
+            is_blocked = edge_density > density_threshold
         
         if is_blocked:
             p1 = (center_x - check_w//2, roi_y)
