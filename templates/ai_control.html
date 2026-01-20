@@ -52,7 +52,7 @@
 
 {% block scripts %}
 <script>
-
+    var taskDebounceTimer = null;
 
     function updateStatus() {
         fetch('/ai/status')
@@ -77,29 +77,93 @@
                 logs.innerHTML = html;
                 logs.scrollTop = logs.scrollHeight;
             })
-            .catch(function (e) { });
+            .catch(function (e) { console.error('Status update failed:', e); });
     }
 
-    document.getElementById('btn-start').addEventListener('click', function () {
-        fetch('/ai/start', { method: 'POST' });
-    });
-
-    document.getElementById('btn-stop').addEventListener('click', function () {
-        fetch('/ai/stop', { method: 'POST' });
-    });
-
-    document.getElementById('btn-set-task').addEventListener('click', function () {
-        var task = document.getElementById('task-input').value;
-        fetch('/ai/task', {
+    function setTask(task) {
+        return fetch('/ai/task', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ task: task })
-        });
+        })
+            .then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(function (data) {
+                if (data.status !== 'ok') throw new Error(data.error || 'Unknown error');
+                console.log('Task set:', task);
+                return data;
+            });
+    }
+
+    function startAI() {
+        return fetch('/ai/start', { method: 'POST' })
+            .then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(function (data) {
+                if (data.status !== 'ok') throw new Error(data.error || 'Unknown error');
+                console.log('AI started');
+                return data;
+            });
+    }
+
+    // Auto-set task on input change (debounced) and auto-start AI
+    document.getElementById('task-input').addEventListener('input', function () {
+        var task = this.value.trim();
+
+        clearTimeout(taskDebounceTimer);
+
+        if (task) {
+            taskDebounceTimer = setTimeout(function () {
+                setTask(task)
+                    .then(function () {
+                        // Auto-start AI after setting task
+                        return startAI();
+                    })
+                    .catch(function (e) {
+                        console.error('Failed to set task or start AI:', e);
+                    });
+            }, 500);
+        }
+    });
+
+    document.getElementById('btn-start').addEventListener('click', function () {
+        var task = document.getElementById('task-input').value.trim();
+
+        // Set task first if present, then start
+        if (task) {
+            setTask(task)
+                .then(function () { return startAI(); })
+                .catch(function (e) { console.error('Start failed:', e); });
+        } else {
+            startAI().catch(function (e) { console.error('Start failed:', e); });
+        }
+    });
+
+    document.getElementById('btn-stop').addEventListener('click', function () {
+        fetch('/ai/stop', { method: 'POST' })
+            .then(function (r) { return r.json(); })
+            .catch(function (e) { console.error('Stop failed:', e); });
+    });
+
+    document.getElementById('btn-set-task').addEventListener('click', function () {
+        var task = document.getElementById('task-input').value.trim();
+        if (task) {
+            setTask(task)
+                .then(function () { return startAI(); })
+                .catch(function (e) { console.error('Set task failed:', e); });
+        }
     });
 
     document.getElementById('btn-estop').addEventListener('click', function () {
-        fetch('/emergency_stop', { method: 'POST' });
-        alert('EMERGENCY STOP TRIGGERED');
+        fetch('/emergency_stop', { method: 'POST' })
+            .then(function () { alert('EMERGENCY STOP TRIGGERED'); })
+            .catch(function (e) {
+                alert('EMERGENCY STOP TRIGGERED (but request may have failed)');
+            });
     });
 
     setInterval(updateStatus, 500);
