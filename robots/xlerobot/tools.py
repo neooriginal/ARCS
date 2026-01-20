@@ -633,8 +633,6 @@ def create_scan_doorway():
         
         # Fallback: If no depth contrast, do a wider SEARCH SCAN to find walls
         if not result['found'] and result.get('reason') == 'no_depth_contrast':
-        # Fallback: If no depth contrast, do a wider SEARCH SCAN to find walls
-        if not result['found'] and result.get('reason') == 'no_depth_contrast':
             robot_state.precision_mode = True
             scanner.clear()
             
