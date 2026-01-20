@@ -459,7 +459,7 @@ def create_vla_single_arm_manipulation(
 def create_run_robot_policy():
     from core.training_manager import training_manager
 
-    # Build dynamic docstring with available policies
+    # Build dynamic description with available policies
     policies = training_manager.get_policies_for_ai()
     policy_list = ""
     if policies:
@@ -468,12 +468,12 @@ def create_run_robot_policy():
             for p in policies
         )
 
-    @tool
+    description = f"""Executes a trained robot policy to perform a physical task using the arms. 
+Use this when the user asks to perform a specific learned skill (e.g. 'pickup_cup', 'wipe_table').
+The policy will take control of the arms and base for the specified duration.{policy_list}"""
+
+    @tool(description=description)
     def run_robot_policy(policy_name: str, duration_seconds: int = 45) -> str:
-        f"""Executes a trained robot policy to perform a physical task using the arms. 
-        Use this when the user asks to perform a specific learned skill (e.g. 'pickup_cup', 'wipe_table').
-        The policy will take control of the arms and base for the specified duration.{policy_list}
-        """
         from state import state
         from core.policy_executor import policy_executor
         from core.training_manager import training_manager
