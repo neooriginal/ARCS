@@ -177,6 +177,13 @@ class TFLunaLidar:
             self.distance_cm = dist_l + (dist_h << 8)
             self.strength = str_l + (str_h << 8)
             self.temperature = (temp_l + (temp_h << 8)) / 8.0 - 256
+            
+            # TF-Luna returns 0 with low signal strength when no object in range
+            # Signal strength < 100 indicates unreliable reading (free space)
+            # Return max range (800cm) instead of 0 to indicate clear path
+            if self.distance_cm == 0 and self.strength < 100:
+                self.distance_cm = 800  # Max range = 8 meters
+                logger.debug(f"Lidar: Low signal strength ({self.strength}), reporting max range")
         
         return self.distance_cm
     
@@ -186,10 +193,16 @@ class TFLunaLidar:
             return None
         
         try:
-            # TF-Luna I2C: Read 2 bytes from register 0x00 for distance
-            data = self._i2c.read_i2c_block_data(self.i2c_address, 0x00, 2)
+            # TF-Luna I2C: Read 4 bytes from register 0x00 for distance + strength
+            data = self._i2c.read_i2c_block_data(self.i2c_address, 0x00, 4)
             with self._lock:
                 self.distance_cm = data[0] + (data[1] << 8)
+                self.strength = data[2] + (data[3] << 8)
+                
+                # Handle free space (low signal strength)
+                if self.distance_cm == 0 and self.strength < 100:
+                    self.distance_cm = 800  # Max range = 8 meters
+                    logger.debug(f"Lidar: Low signal strength ({self.strength}), reporting max range")
             return self.distance_cm
         except Exception:
             return None
