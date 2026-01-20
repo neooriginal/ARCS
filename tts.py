@@ -15,11 +15,7 @@ TTS_TLD = get_config("TTS_TLD")
 
 logger = logging.getLogger(__name__)
 
-try:
-    from langdetect import detect
-    LANGDETECT_AVAILABLE = True
-except ImportError:
-    LANGDETECT_AVAILABLE = False
+
 
 
 class TTSEngine:
@@ -74,15 +70,7 @@ class TTSEngine:
             except Exception as e:
                 logger.error(f"TTS Worker error: {e}")
     
-    def _detect_language(self, text):
-        if not LANGDETECT_AVAILABLE:
-            return 'en'
-        
-        try:
-            lang = detect(text)
-            return lang if lang else 'en'
-        except Exception:
-            return 'en'
+
     
     def _speak_blocking(self, text):
         """Generate and play speech."""
@@ -91,7 +79,7 @@ class TTSEngine:
         temp_wav = None
         
         try:
-            lang = self._detect_language(text)
+            lang = 'en'
             logger.info(f"Speaking ({lang}): '{text}'")
             
             with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as fp:
