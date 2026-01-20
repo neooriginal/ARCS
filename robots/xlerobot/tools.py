@@ -648,50 +648,82 @@ def create_scan_doorway():
         if not result['found']:
             return f"Scan Complete. NO GAP FOUND. Reason: {result.get('reason')}. Please reposition."
             
-        # SEEK-EDGE ALIGNMENT (Closed Loop)
-        # 1. We are at End (-45 deg). Gap is to our Left.
-        # 2. We turn Left until Lidar sees the Gap (Distance > Threshold).
-        # 3. We continue for HalfWidth to center.
+        # SEEK-EDGE ALIGNMENT (Time-Bounded)
+        # Prevents 180-degree spins if edge is missed.
         
-        threshold = result.get('threshold', 100) # Default to 1m if missing
+        threshold = result.get('threshold', 100) 
         width_deg = result['width_deg']
+        center_pseudo_angle = result['center_angle']
         
-        # Calculate duration of the gap itself (short move, less error)
+        # Calculate theoretical return times (Time-Reversal Logic)
+        time_to_center_angle = ((SWEEP_HALF_ANGLE - center_pseudo_angle) / SCAN_RANGE) * SCAN_DURATION
+        expected_return_duration = (SCAN_DURATION - time_to_center_angle) + LIDAR_LATENCY
+        
+        # Max safe duration = Full Scan Duration (Return to +45 deg)
+        max_duration = SCAN_DURATION + 0.2
+        
+        # Calculate duration of the gap itself
         half_width_duration = (width_deg / SCAN_RANGE) * SCAN_DURATION * 0.5
         
-        print(f"[SCAN] Seek-Edge Strategy. Threshold={threshold:.0f}cm. Searching Left...")
+        print(f"[SCAN] Seek-Edge Strategy. Threshold={threshold:.0f}cm.")
+        print(f"[SCAN] Expected Return: {expected_return_duration:.2f}s. Max Safety: {max_duration:.2f}s.")
         
         robot_state.update_movement({'left': ROT_SPEED})
         
-        # Search Loop
         seek_start = time.time()
         edge_found = False
         
-        # Timeout = Return to start (PREP_DURATION + SCAN_DURATION) + margin
-        timeout = SCAN_DURATION + 2.0
-        
-        while time.time() - seek_start < timeout:
+        while time.time() - seek_start < max_duration:
              robot_state.last_movement_activity = time.time()
              
              dist = robot_state.lidar_distance
              if dist is not None and dist > threshold:
-                 # DEBOUNCE: confirm it's real
-                 time.sleep(0.05)
+                 # DEBOUNCE
+                 time.sleep(0.04)
                  if robot_state.lidar_distance > threshold:
                      edge_found = True
+                     print(f"[SCAN] Edge Found at t={time.time() - seek_start:.2f}s!")
                      break
              
              time.sleep(0.02)
+        
+        elapsed = time.time() - seek_start
+        
+        if edge_found:
+             # Center from edge
+             print(f"[SCAN] Centering (Duration: {half_width_duration:.2f}s)...")
+             time.sleep(half_width_duration)
+        else:
+             # Fallback: We missed the edge, but we are at max_duration (Start Pos).
+             # We should go to the expected center.
+             # Current Pos: +45 deg (approx). Gap Center: "center_pseudo_angle".
+             # Wait.. we turned Left for "elapsed".
+             # If elapsed < expected_return_duration, we need to go FURTHER.
+             # If elapsed > expected_return_duration, we went TOO FAR.
              
-        if not edge_found:
+             # But the loop breaks at max_duration (which is effectively "Start Position").
+             # So we are likely at +45 deg.
+             # We probably passed the gap if expected_return < max_duration.
+             
+             # Actually, simpler fallback:
+             # The seek failed. Stop immediately.
+             # Then drive to the specific timestamp blindly.
              robot_state.stop_all_movement()
-             return "Scan Failed: Could not find the gap edge during return."
              
-        # Center the gap
-        print(f"[SCAN] Edge Found! Centering (Duration: {half_width_duration:.2f}s)...")
-        time.sleep(half_width_duration)
+             remaining = expected_return_duration - elapsed
+             print(f"[SCAN] EDGE MISSED. Time-Reversal Fallback. Remaining: {remaining:.2f}s")
+             
+             if remaining > 0:
+                 robot_state.update_movement({'left': ROT_SPEED})
+                 time.sleep(remaining)
+             elif remaining < 0:
+                 # We went too far? (Unlikely with max_duration logic unless gap was at very start)
+                 robot_state.update_movement({'right': ROT_SPEED})
+                 time.sleep(abs(remaining))
+                 
         robot_state.stop_all_movement()
         
-        return f"Scan Successful! Width: {width_deg:.1f}°. Found edge and centered. Ready."
+        status = "Verified" if edge_found else "Estimated (Fallback)"
+        return f"Scan Successful! Width: {width_deg:.1f}°. Alignment: {status}. Ready."
 
     return scan_doorway
