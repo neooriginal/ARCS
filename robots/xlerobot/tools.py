@@ -554,8 +554,8 @@ def create_scan_doorway():
         
         # Scan Parameters - larger sweep angle to catch door frame walls
         SWEEP_ANGLE = 40.0  # Increased from 25 to catch walls even when aligned
-        ROT_SPEED = 0.7  # Increased from 0.5 for more noticeable sweep
-        DEG_PER_SEC = 40.0  # Faster rotation
+        ROT_SPEED = 0.4  # Reduced from 0.7 to prevent stall/jerkiness
+        DEG_PER_SEC = 25.0  # Slower rotation for better data quality
         DURATION = SWEEP_ANGLE / DEG_PER_SEC
         
 
