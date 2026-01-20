@@ -556,7 +556,7 @@ def create_scan_doorway():
         # We scan at a constant speed. We find *when* the gap appeared.
         # We then simply reverse for that duration. eliminating angle calibration errors.
         
-        SWEEP_HALF_ANGLE = 45.0 
+        SWEEP_HALF_ANGLE = 90.0 
         SCAN_RANGE = SWEEP_HALF_ANGLE * 2.0 
         ROT_SPEED = 0.35  # Slightly higher torque to ensure consistent movement
         ESTIMATED_DEG_PER_SEC = 25.0 
