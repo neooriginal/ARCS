@@ -50,7 +50,7 @@ class LidarScanner:
         p20 = np.percentile(dists_smooth, 20)
         p80 = np.percentile(dists_smooth, 80)
         
-        if (p80 - p20) < 50:
+        if (p80 - p20) < 15:  # Reduced to 15cm for close-range scanning
              return {'found': False, 'reason': 'no_depth_contrast'}
              
         threshold = (p20 + p80) / 2

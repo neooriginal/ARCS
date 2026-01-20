@@ -552,13 +552,13 @@ def create_scan_doorway():
         robot_state.precision_mode = True
         scanner.clear()
         
-        # Scan Parameters
-        SWEEP_ANGLE = 25.0
-        ROT_SPEED = 0.5 
-        DEG_PER_SEC = 30.0 
+        # Scan Parameters - larger sweep angle to catch door frame walls
+        SWEEP_ANGLE = 40.0  # Increased from 25 to catch walls even when aligned
+        ROT_SPEED = 0.7  # Increased from 0.5 for more noticeable sweep
+        DEG_PER_SEC = 40.0  # Faster rotation
         DURATION = SWEEP_ANGLE / DEG_PER_SEC
         
-        print(f"[TOOL] scan_doorway: Starting scan...")
+
         
         # Recording Loop
         is_scanning = True
@@ -631,8 +631,69 @@ def create_scan_doorway():
         result = scanner.analyze_gap()
         robot_state.last_scan_result = result
         
+        # Fallback: If no depth contrast, do a wider SEARCH SCAN to find walls
+        if not result['found'] and result.get('reason') == 'no_depth_contrast':
+        # Fallback: If no depth contrast, do a wider SEARCH SCAN to find walls
+        if not result['found'] and result.get('reason') == 'no_depth_contrast':
+            robot_state.precision_mode = True
+            scanner.clear()
+            
+            SEARCH_ANGLE = 60.0  # Wider sweep
+            SEARCH_DURATION = SEARCH_ANGLE / DEG_PER_SEC
+            
+            is_scanning = True
+            scan_state = {"phase": "SEARCH_L", "phase_start_time": time.time(), "angle": 0.0}
+            
+            def search_recording_loop():
+                while is_scanning:
+                    t = time.time()
+                    phase = scan_state["phase"]
+                    t0 = scan_state["phase_start_time"]
+                    dt = t - t0
+                    
+                    if phase == "SEARCH_L":
+                        current_angle = (dt / SEARCH_DURATION) * SEARCH_ANGLE
+                    elif phase == "SEARCH_R":
+                        current_angle = SEARCH_ANGLE - ((dt / (SEARCH_DURATION*2)) * (SEARCH_ANGLE*2))
+                    else:
+                        current_angle = -SEARCH_ANGLE + ((dt / SEARCH_DURATION) * SEARCH_ANGLE)
+                        
+                    dist = robot_state.lidar_distance
+                    if dist is not None:
+                        scanner.add_reading(current_angle, dist)
+                    time.sleep(0.04)
+            
+            search_recorder = threading.Thread(target=search_recording_loop, daemon=True)
+            search_recorder.start()
+            
+            try:
+                # Wider search: Left 60 -> Right 120 -> Left 60
+                scan_state["phase"] = "SEARCH_L"
+                scan_state["phase_start_time"] = time.time()
+                controller.set_velocity_vector(0, 0, ROT_SPEED)
+                time.sleep(SEARCH_DURATION)
+                
+                scan_state["phase"] = "SEARCH_R"
+                scan_state["phase_start_time"] = time.time()
+                controller.set_velocity_vector(0, 0, -ROT_SPEED)
+                time.sleep(SEARCH_DURATION * 2)
+                
+                scan_state["phase"] = "SEARCH_L2"
+                scan_state["phase_start_time"] = time.time()
+                controller.set_velocity_vector(0, 0, ROT_SPEED)
+                time.sleep(SEARCH_DURATION)
+                
+                controller.set_velocity_vector(0, 0, 0)
+            finally:
+                is_scanning = False
+                search_recorder.join()
+            
+            # Re-analyze with more data
+            result = scanner.analyze_gap()
+            robot_state.last_scan_result = result
+        
         if not result['found']:
-            return f"Scan Complete. NO GAP FOUND. Reason: {result.get('reason')}. Please reposition and try again."
+            return f"Scan Complete. NO GAP FOUND. Reason: {result.get('reason')}. The door may be too wide or you may not be facing it. Try turning slightly and scanning again."
             
         # Alignment
         center_angle = result['center_angle']
@@ -640,7 +701,6 @@ def create_scan_doorway():
         
         align_msg = ""
         if abs(center_angle) > 2.0:
-            print(f"[TOOL] Aligning to gap center at {center_angle:.1f} deg")
             align_dur = abs(center_angle) / DEG_PER_SEC
             align_speed = ROT_SPEED if center_angle > 0 else -ROT_SPEED
             

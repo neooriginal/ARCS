@@ -79,9 +79,10 @@ class ObstacleDetector:
             
             self._draw_proximity_overlay(overlay, avg_distance, w, h)
         
-        # Check low obstacles if not in approach mode
+        # Check low obstacles if not in approach mode or precision mode
+        # Precision mode disables visual check because door frames/thresholds cause false positives
         vision_blocked = False
-        if not state.approach_mode:
+        if not state.approach_mode and not state.precision_mode:
             vision_blocked = self._check_visual_obstacles(frame, overlay)
             if vision_blocked:
                 instant_blocked.add("FORWARD")
@@ -92,10 +93,10 @@ class ObstacleDetector:
         rotation_hint = None
         target_x = -1
         
+        # In precision mode, don't use visual gap detection - it's unreliable
+        # AI should use scan_doorway for LIDAR-based alignment instead
         if state.precision_mode:
-            target_x, guidance = self._find_visual_gap(frame, w, h)
-            if target_x != -1:
-                self._draw_target_guidance(overlay, target_x, w, h)
+            guidance = "USE scan_doorway FOR ALIGNMENT"
         
         # --- 4. SCAN RESULT OVERLAY ---
         # --- 4. SCAN RESULT OVERLAY ---
@@ -194,36 +195,40 @@ class ObstacleDetector:
         return is_blocked
 
     def _find_visual_gap(self, frame, w, h):
-        """Find path of least resistance using intensity variance."""
+        """Find path of least resistance by looking for the DARKEST column (gap = dark)."""
         roi = frame[self.scan_height_start:self.scan_height_end, :]
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
         
-        # Gaussian blur to remove noise
-        gray = cv2.GaussianBlur(gray, (15, 15), 0)
+        # Heavy blur to smooth out floor patterns
+        gray = cv2.GaussianBlur(gray, (21, 21), 0)
         
-        # Analyze columns (axis 0 = vertical in ROI)
+        # Analyze columns - gaps appear DARK (light doesn't reflect back from far away)
         col_means = np.mean(gray, axis=0)
-        col_vars = np.var(gray, axis=0)
         
-        # Normalize scores
-        norm_means = col_means / 255.0
-        norm_vars = col_vars / np.max(col_vars) if np.max(col_vars) > 0 else col_vars
+        # Smooth the column scores
+        kernel_size = 60
+        scores_smooth = np.convolve(col_means, np.ones(kernel_size)/kernel_size, mode='same')
         
-        # Combined score: weight smoothness higher than brightness
-        scores = (norm_means * 0.4) + (norm_vars * 0.6)
+        # RESTRICT SEARCH TO CENTER 40% of frame to avoid false detections at edges
+        # This prevents detecting door frame edges/shadows as "gaps"
+        margin = int(w * 0.3)  # 30% margin on each side
+        center_scores = scores_smooth.copy()
+        center_scores[:margin] = 255  # High = not a gap
+        center_scores[-margin:] = 255
         
-        kernel_size = 50
-        scores_smooth = np.convolve(scores, np.ones(kernel_size)/kernel_size, mode='same')
+        # Strong center bias - prefer center when no clear gap
+        center_x = w // 2
+        center_bias = np.abs(np.arange(w) - center_x) / (w / 2) * 30  # Up to 30 brightness units bias
+        center_scores = center_scores + center_bias
         
-        # Find minimum score index
-        best_x = np.argmin(scores_smooth)
+        # Find DARKEST column (minimum brightness = likely gap)
+        best_x = np.argmin(center_scores)
         
         # Calculate offset from center
-        center_x = w // 2
         offset = best_x - center_x
         
         guidance = ""
-        threshold_pixels = 50
+        threshold_pixels = 40  # Reduced threshold for guidance
         
         if abs(offset) > threshold_pixels:
             if offset < 0:
@@ -302,8 +307,7 @@ class ObstacleDetector:
         cv2.rectangle(overlay, (10, box_y), (w-10, box_y + box_h), (50, 50, 50), 1)
         
         if not result.get('found', False):
-            cv2.putText(overlay, f"SCAN FAILED: {result.get('reason')}", (20, box_y + 50), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+            # Don't overlay error - it's already logged
             return
 
         # 2. Draw Graph

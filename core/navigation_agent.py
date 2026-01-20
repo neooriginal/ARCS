@@ -76,20 +76,23 @@ ROBOT CHARACTERISTICS:
 - The wheels drift slightly. After turns, you may not be perfectly aligned.
 
 DOORWAYS AND TIGHT OPENINGS:
-- ALWAYS enable `precision_mode` BEFORE approaching any door or narrow gap.
-- NEVER attempt to drive through a door without Precision Mode enabled.
+- **DO NOT enable `precision_mode` immediately**. First, visually identify the door and drive towards it normally.
+- **ONLY enable `precision_mode` when LIDAR shows <150cm** (you are close enough to see door frame clearly).
+- Precision mode is for the final approach and alignment, not for finding the door.
 - Only go through openings that are clearly at least 2x your width.
 
 PRECISION MODE PROTOCOL (DOOR ENTRY):
 - **Use `scan_doorway`** when you need to pass through a narrow door or gap.
+- **CRITICAL: `scan_doorway` ONLY WORKS within 0.8m - 1.2m of the door**. From further away, it will fail.
 - **Micro-Plan**:
-  1. **APPROACH**: Drive to about 0.8 - 1.0 meter from the door. Face it roughly.
-  2. **SCAN**: Call `scan_doorway`. The robot will 'wiggle' to map the edges and AUTOMATICALLY ALIGN to the center.
-  3. **COMMIT**: If scan says "GAP FOUND", you are now perfectly aligned. Drive FORWARD blindly (0.5m - 1.0m) to cross the threshold.
-     - **TRUST THE ALIGNMENT**. Do not hesitate. The scanner is more precise than your camera.
-  4. **EXIT**: Once clearly through, `disable_precision_mode`.
+  1. **APPROACH FIRST**: If LIDAR shows >120cm, drive forward until you are 80-100cm from the door.
+  2. **SCAN**: Once within 0.8-1.2m, call `scan_doorway`. It will 'wiggle' to map the edges and AUTOMATICALLY ALIGN to the center.
+  3. **COMMIT**: If scan says "GAP FOUND", drive FORWARD 1.0-1.5m to fully cross through. Do NOT stop halfway.
+     - **TRUST THE ALIGNMENT**. Do not hesitate or try to adjust.
+  4. **VERIFY BEFORE EXIT**: Only `disable_precision_mode` when you can see you are CLEARLY in a new room (walls on both sides are far, no door frame visible in lower camera view).
+     - **COMMON MISTAKE**: Disabling too early and crashing into frame. Drive at least 1.5m after scan before considering disable.
 
-- **Visual Guidance**: If not using scan, you can still use visual lines, but `scan_doorway` is preferred for tight spaces.
+- **NEVER call scan_doorway when LIDAR shows >150cm** - you are too far away.
 
 APPROACH MODE (MANIPULATION):
 - Use `enable_approach_mode` ONLY when you need to get within touching distance of a surface (counter, table, button).
@@ -459,10 +462,11 @@ PERSISTENT NOTES:
             response = self.llm.invoke(self.message_history)
             self.message_history.append(response)
             
-            # Prune history very aggressively - images take huge tokens
-            # Keep only system message + last 2 exchanges (4 messages)
-            if len(self.message_history) > 5:
-                self.message_history = [self.message_history[0]] + self.message_history[-4:]
+            # Log AI reasoning if present (text content from model)
+            if hasattr(response, 'content') and response.content:
+                reasoning = str(response.content)[:200]  # Truncate for log
+                if reasoning.strip():
+                    state.add_ai_log(f"💭 {reasoning}")
             
             # 7. Execute Tools with SAFETY INTERCEPTION
             if response.tool_calls:
@@ -526,6 +530,11 @@ PERSISTENT NOTES:
                             logger.error(result)
                             
                     self.message_history.append(ToolMessage(content=str(result), tool_call_id=tool_call["id"]))
+
+                # Prune history AFTER all tool messages added to avoid orphans
+                # Keep system message + last 3 exchanges (6 messages max)
+                if len(self.message_history) > 7:
+                    self.message_history = [self.message_history[0]] + self.message_history[-6:]
 
                 return f"Executed {len(response.tool_calls)} actions"
             else:

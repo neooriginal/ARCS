@@ -107,25 +107,7 @@
             });
     }
 
-    // Auto-set task on input change (debounced) and auto-start AI
-    document.getElementById('task-input').addEventListener('input', function () {
-        var task = this.value.trim();
 
-        clearTimeout(taskDebounceTimer);
-
-        if (task) {
-            taskDebounceTimer = setTimeout(function () {
-                setTask(task)
-                    .then(function () {
-                        // Auto-start AI after setting task
-                        return startAI();
-                    })
-                    .catch(function (e) {
-                        console.error('Failed to set task or start AI:', e);
-                    });
-            }, 500);
-        }
-    });
 
     document.getElementById('btn-start').addEventListener('click', function () {
         var task = document.getElementById('task-input').value.trim();
