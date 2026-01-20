@@ -104,5 +104,6 @@ class LidarScanner:
             'left_edge_angle': left_angle,
             'right_edge_angle': right_angle,
             'wall_dists': (wall_left_dist, wall_right_dist),
-            'raw_profile': (angles, dists_smooth)
+            'raw_profile': (angles, dists_smooth),
+            'threshold': threshold
         }

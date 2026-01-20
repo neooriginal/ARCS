@@ -648,51 +648,50 @@ def create_scan_doorway():
         if not result['found']:
             return f"Scan Complete. NO GAP FOUND. Reason: {result.get('reason')}. Please reposition."
             
-        # TIME-REVERSAL ALIGNMENT
-        # 1. Get center "Pseudo-Angle"
-        center_pseudo_angle = result['center_angle']
+        # SEEK-EDGE ALIGNMENT (Closed Loop)
+        # 1. We are at End (-45 deg). Gap is to our Left.
+        # 2. We turn Left until Lidar sees the Gap (Distance > Threshold).
+        # 3. We continue for HalfWidth to center.
         
-        # 2. Convert back to Time (relative to scan start)
-        # Angle = 45 - (t / Dur) * 90  =>  (t/Dur)*90 = 45 - Angle  => t = (45 - Angle)/90 * Dur
-        time_from_start = ((SWEEP_HALF_ANGLE - center_pseudo_angle) / SCAN_RANGE) * SCAN_DURATION
+        threshold = result.get('threshold', 100) # Default to 1m if missing
+        width_deg = result['width_deg']
         
-        # 3. Calculate time passed since we saw the gap
-        # We are currently at SCAN_DURATION (roughly)
-        # But we need to account for Lidar DELAY.
-        # The gap was seen at `time_from_start`, but it actually happened `LIDAR_LATENCY` earlier.
-        # So physically, we were at `time_from_start - latency` when the gap was in front of us.
-        # Actually...
-        # Value recorded at T corresponds to reality at T-Lat.
-        # We want to go to the physical location.
-        # The sensor said "Gap" at T_rec.
-        # The robot was at Position(T_rec) when it recorded it.
-        # BUT the sensor data came from Position(T_rec - Lat).
-        # So the Gap is at Position(T_rec - Lat).
-        # We are currently at Position(T_end).
-        # We need to travel back: T_travel = T_end - (T_rec - Lat) = T_end - T_rec + Lat.
+        # Calculate duration of the gap itself (short move, less error)
+        half_width_duration = (width_deg / SCAN_RANGE) * SCAN_DURATION * 0.5
         
-        # Latency means we have traveled FURTHER past the object than the log says.
-        # So we need to travel BACK more.
+        print(f"[SCAN] Seek-Edge Strategy. Threshold={threshold:.0f}cm. Searching Left...")
         
-        wait_time_at_end = 0.2 # We waited 0.2s before analysis
+        robot_state.update_movement({'left': ROT_SPEED})
         
-        return_duration = (SCAN_DURATION - time_from_start) + LIDAR_LATENCY
+        # Search Loop
+        seek_start = time.time()
+        edge_found = False
         
-        print(f"[SCAN] Gap found at t={time_from_start:.2f}s (val={center_pseudo_angle:.1f}°). Latency={LIDAR_LATENCY}s.")
-        print(f"[SCAN] Returning Left for {return_duration:.2f}s")
+        # Timeout = Return to start (PREP_DURATION + SCAN_DURATION) + margin
+        timeout = SCAN_DURATION + 2.0
         
-        if return_duration > 0.1:
-            # Reverse direction (Left) using same speed
-            robot_state.update_movement({'left': ROT_SPEED})
-            
-            start_align = time.time()
-            while time.time() - start_align < return_duration:
-                 robot_state.last_movement_activity = time.time()
+        while time.time() - seek_start < timeout:
+             robot_state.last_movement_activity = time.time()
+             
+             dist = robot_state.lidar_distance
+             if dist is not None and dist > threshold:
+                 # DEBOUNCE: confirm it's real
                  time.sleep(0.05)
-                 
-            robot_state.stop_all_movement()
-            return f"Scan Successful! Width: {result['width_deg']:.1f}°. Realigned by reversing {return_duration:.2f}s. Facing center."
+                 if robot_state.lidar_distance > threshold:
+                     edge_found = True
+                     break
+             
+             time.sleep(0.02)
+             
+        if not edge_found:
+             robot_state.stop_all_movement()
+             return "Scan Failed: Could not find the gap edge during return."
+             
+        # Center the gap
+        print(f"[SCAN] Edge Found! Centering (Duration: {half_width_duration:.2f}s)...")
+        time.sleep(half_width_duration)
+        robot_state.stop_all_movement()
         
-        return f"Scan Successful! Width: {result['width_deg']:.1f}°. Already aligned."
+        return f"Scan Successful! Width: {width_deg:.1f}°. Found edge and centered. Ready."
 
     return scan_doorway
