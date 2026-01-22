@@ -531,7 +531,7 @@ def create_scan_doorway():
     @tool
     def scan_doorway() -> str:
         """
-        Performs a 'Wiggle Scan' (Left 25 -> Right 50 -> Left 25) to map the doorway ahead.
+        Performs a 'Wiggle Scan' (Left 90 -> Right 180 -> Left 90) to map the doorway ahead.
         Use this when approaching a narrow gap to precisely identify the center.
         If a clear gap is found, the robot will AUTOMATICALLY ALIGN to face the center.
         """
@@ -559,7 +559,7 @@ def create_scan_doorway():
         SWEEP_HALF_ANGLE = 90.0 
         SCAN_RANGE = SWEEP_HALF_ANGLE * 2.0 
         ROT_SPEED = 0.35  # Slightly higher torque to ensure consistent movement
-        ESTIMATED_DEG_PER_SEC = 25.0 
+        ESTIMATED_DEG_PER_SEC = 50.0 
         
         LIDAR_LATENCY = 0.15 # seconds to compensate for sensor lag
         
