@@ -531,9 +531,8 @@ def create_scan_doorway():
     @tool
     def scan_doorway() -> str:
         """
-        Performs a 'Wiggle Scan' (Left 90 -> Right 180 -> Left 90) to map the doorway ahead.
+        Performs a 'Wiggle Scan' (Left 90 -> Right 180 -> Left 90) using ENCODER FEEDBACK.
         Use this when approaching a narrow gap to precisely identify the center.
-        If a clear gap is found, the robot will AUTOMATICALLY ALIGN to face the center.
         """
         import time
         import math
@@ -547,91 +546,115 @@ def create_scan_doorway():
         if not controller:
              return "Error: Robot controller not found."
         
-        # Enable Precision Mode for visualization (and save previous)
+        # Enable Precision Mode
         previous_mode = robot_state.precision_mode
         robot_state.precision_mode = True
         scanner.clear()
         
-        # Scan Parameters - Time-Based "Replay" Strategy
-        # We scan at a constant speed. We find *when* the gap appeared.
-        # We then simply reverse for that duration. eliminating angle calibration errors.
+        # --- ENCODER CONSTANTS ---
+        # STS3215 = 4096 steps / 360 degrees
+        # Assuming 1:1 drive ratio for rotation (or modify if geared)
+        STEPS_PER_DEGREE = 11.37  # 4096 / 360
+        ROT_SPEED = 0.2
         
-        SWEEP_HALF_ANGLE = 90.0 
-        SCAN_RANGE = SWEEP_HALF_ANGLE * 2.0 
-        ROT_SPEED = 0.35  # Slightly higher torque to ensure consistent movement
-        ESTIMATED_DEG_PER_SEC = 50.0 
+        SWEEP_HALF_ANGLE = 90.0
+        SCAN_RANGE_DEG = SWEEP_HALF_ANGLE * 2.0
         
-        LIDAR_LATENCY = 0.15 # seconds to compensate for sensor lag
+        TARGET_STEPS_PREP = int(SWEEP_HALF_ANGLE * STEPS_PER_DEGREE)
+        TARGET_STEPS_SCAN = int(SCAN_RANGE_DEG * STEPS_PER_DEGREE)
         
-        PREP_DURATION = SWEEP_HALF_ANGLE / ESTIMATED_DEG_PER_SEC
-        SCAN_DURATION = SCAN_RANGE / ESTIMATED_DEG_PER_SEC
+        TIMEOUT_SAFETY = 10.0 # Stopping if not reached in 10s
         
-        # Shared state
         scan_state = {
-            "phase": "PREP",
-            "phase_start_time": time.time(),
-            "scan_start_timestamp": 0.0
+            "phase": "PREP", 
+            "start_time": time.time(),
+            "scan_start_timestamp": 0.0,
+            "scan_start_angle": 0.0 # Pseudo-angle for graph
         }
-        
         is_scanning = True
-        
-        # We need to map Time -> Angle for the LidarScanner to work (it expects degrees),
-        # then map Result Angle -> Time for our physical action.
-        
+
+        def get_avg_wheel_pos():
+            positions = controller.get_wheel_positions()
+            if not positions:
+                return 0
+            # Averaging absolute positions might be tricky if they wrap, 
+            # but STS3215 multi-turn usually accumulates. 
+            # We use the average of available wheels.
+            valid_vals = [p for p in positions.values()]
+            if not valid_vals: return 0
+            return sum(valid_vals) / len(valid_vals)
+
+        # Background Recorder
         def recording_loop():
+            # For the scanner graph, we still need to map "Progress" to Angle.
+            # We can use Time or encoder percentage.
+            # Using Time is smoother for the graph if speed is constant.
             while is_scanning:
-                # Keep movement loop alive
                 robot_state.last_movement_activity = time.time()
                 
-                if scan_state["phase"] != "SCAN":
-                    time.sleep(0.02)
-                    continue
-                
-                t = time.time()
-                t_scan_start = scan_state["scan_start_timestamp"]
-                dt = t - t_scan_start
-                
-                # Map Time to "Pseudo-Angle" for the scanner logic
-                # 0s = +45 deg, End = -45 deg
-                # This linear mapping is just for the graph/analysis.
-                current_angle = SWEEP_HALF_ANGLE - ((dt / SCAN_DURATION) * SCAN_RANGE)
-                
-                dist = robot_state.lidar_distance
-                if dist is not None:
-                     scanner.add_reading(current_angle, dist)
+                if scan_state["phase"] == "SCAN":
+                    t = time.time()
+                    t_scan_start = scan_state["scan_start_timestamp"]
+                    # We can't map perfect angle without reading encoders here too, 
+                    # but let's assume linear progress for the visualization to keep it simple 
+                    # or read encoders if thread-safe. 
+                    # Visualizer expects angle decrease from +90 to -90.
+                    # Let's simple time-based projection for visualization ONLY.
+                    
+                    dt = t - t_scan_start
+                    # Estimate progress based on speed
+                    # speed 0.2 ~ 55 dps
+                    est_angle = SWEEP_HALF_ANGLE - (dt * 55.0) 
+                    
+                    dist = robot_state.lidar_distance
+                    if dist is not None:
+                         scanner.add_reading(est_angle, dist)
                 
                 time.sleep(0.04)
         
-        # Start Recorder
         recorder = threading.Thread(target=recording_loop, daemon=True)
         recorder.start()
         
         try:
-            # 1. Prep: Turn Left to Start Position
-            print(f"[SCAN] Pre-positioning: Left...")
+            # Helper to rotate by steps
+            def rotate_by_steps(steps, direction_key):
+                start_avg = get_avg_wheel_pos()
+                robot_state.update_movement({direction_key: ROT_SPEED})
+                
+                start_time = time.time()
+                while time.time() - start_time < TIMEOUT_SAFETY:
+                    current_avg = get_avg_wheel_pos()
+                    delta = abs(current_avg - start_avg)
+                    
+                    if delta >= steps:
+                        robot_state.stop_all_movement()
+                        print(f"[SCAN] Reached target {steps} steps (Delta: {delta:.1f}). Duration: {time.time()-start_time:.2f}s")
+                        return True
+                    
+                    time.sleep(0.02)
+                
+                robot_state.stop_all_movement()
+                print("[SCAN] Timeout waiting for encoders!")
+                return False
+
+            # 1. Prep: Turn Left 90 deg
+            print(f"[SCAN] Encoder Prep: Left {SWEEP_HALF_ANGLE} deg ({TARGET_STEPS_PREP} steps)...")
             scan_state["phase"] = "PREP"
-            robot_state.update_movement({'left': ROT_SPEED})
-            time.sleep(PREP_DURATION)
-            robot_state.stop_all_movement()
-            time.sleep(0.5) # Settle
-            
-            # 2. Scan: Turn Right
-            print(f"[SCAN] Scanning: Right, looking for gap...")
+            if not rotate_by_steps(TARGET_STEPS_PREP, 'left'):
+                return "Scan Failed: Encoder Timeout (Prep)"
+            time.sleep(0.5)
+
+            # 2. Scan: Turn Right 180 deg
+            print(f"[SCAN] Encoder Scan: Right {SCAN_RANGE_DEG} deg ({TARGET_STEPS_SCAN} steps)...")
             scan_state["phase"] = "SCAN"
             scan_state["scan_start_timestamp"] = time.time()
-            scan_state["phase_start_time"] = time.time()
             
-            robot_state.update_movement({'right': ROT_SPEED})
-            
-            # We enforce exact duration
-            time.sleep(SCAN_DURATION)
-            
-            # Stop
-            robot_state.stop_all_movement()
-            is_scanning = False 
-            scan_end_time = time.time()
+            if not rotate_by_steps(TARGET_STEPS_SCAN, 'right'):
+                return "Scan Failed: Encoder Timeout (Scan)"
+                
+            is_scanning = False
             time.sleep(0.2)
-            
+
         except Exception as e:
             print(f"Scan interrupted: {e}")
             robot_state.stop_all_movement()
@@ -640,90 +663,67 @@ def create_scan_doorway():
             is_scanning = False
             recorder.join()
             robot_state.precision_mode = previous_mode
-            
-        # Analysis
+
+        # Analysis & Alignment
         result = scanner.analyze_gap()
         robot_state.last_scan_result = result
         
         if not result['found']:
-            return f"Scan Complete. NO GAP FOUND. Reason: {result.get('reason')}. Please reposition."
+            return f"Scan Complete (Encoder Mode). NO GAP FOUND. Reason: {result.get('reason')}"
+
+        # 3. Align: Return to center
+        # We need to turn LEFT.
+        # Target Angle is 'center_angle' (e.g., 5 degrees).
+        # Current physical pos is -90 deg (Right end).
+        # We need to go from -90 to +5.
+        # Wait, the scanner uses pseudo-angles +90 to -90.
+        # So 'center_angle' is relative to the FRONT (0).
+        # If center is +5, means it's slightly Left.
+        # We are at -90 (Right). We need to turn Left by (90 + 5) = 95 degrees.
+        
+        center_angle = result['center_angle'] # e.g., 0.0 or 10.0
+        
+        # We ended at -90 (conceptually).
+        # Steps to returning to 0 = TARGET_STEPS_PREP.
+        # Steps to center = Steps_per_deg * (90 + center_angle)
+        
+        # Correction: The scanner coordinates: +90 (Left Start) -> 0 (Front) -> -90 (Right End).
+        # If gap is at 0, we are at -90. We turn Left 90.
+        
+        degrees_to_turn = SWEEP_HALF_ANGLE + center_angle
+        steps_to_turn = int(degrees_to_turn * STEPS_PER_DEGREE)
+        
+        print(f"[SCAN] Aligning: Target {center_angle:.1f}deg. Turning Left {degrees_to_turn:.1f}deg ({steps_to_turn} steps).")
+        
+        # Using SEEK_SPEED for precision
+        SEEK_SPEED = 0.15
+        
+        start_avg = get_avg_wheel_pos()
+        robot_state.update_movement({'left': SEEK_SPEED})
+        
+        # Simplified alignment loop (just steps, no seek logic for now to verify encoders first)
+        # Or we can add the "Seek Edge" logic back if encoders are reliable.
+        # For this first encoder test, let's trust the encoders blindly to prove they work.
+        
+        start_time = time.time()
+        completed = False
+        while time.time() - start_time < TIMEOUT_SAFETY:
+            current_avg = get_avg_wheel_pos()
+            delta = abs(current_avg - start_avg)
             
-        # SEEK-EDGE ALIGNMENT (Time-Bounded)
-        # Prevents 180-degree spins if edge is missed.
-        
-        threshold = result.get('threshold', 100) 
-        width_deg = result['width_deg']
-        center_pseudo_angle = result['center_angle']
-        
-        # Calculate theoretical return times (Time-Reversal Logic)
-        time_to_center_angle = ((SWEEP_HALF_ANGLE - center_pseudo_angle) / SCAN_RANGE) * SCAN_DURATION
-        expected_return_duration = (SCAN_DURATION - time_to_center_angle) + LIDAR_LATENCY
-        
-        # Max safe duration = Full Scan Duration (Return to +45 deg)
-        max_duration = SCAN_DURATION + 0.2
-        
-        # Calculate duration of the gap itself
-        half_width_duration = (width_deg / SCAN_RANGE) * SCAN_DURATION * 0.5
-        
-        print(f"[SCAN] Seek-Edge Strategy. Threshold={threshold:.0f}cm.")
-        print(f"[SCAN] Expected Return: {expected_return_duration:.2f}s. Max Safety: {max_duration:.2f}s.")
-        
-        robot_state.update_movement({'left': ROT_SPEED})
-        
-        seek_start = time.time()
-        edge_found = False
-        
-        while time.time() - seek_start < max_duration:
-             robot_state.last_movement_activity = time.time()
-             
-             dist = robot_state.lidar_distance
-             if dist is not None and dist > threshold:
-                 # DEBOUNCE
-                 time.sleep(0.04)
-                 if robot_state.lidar_distance > threshold:
-                     edge_found = True
-                     print(f"[SCAN] Edge Found at t={time.time() - seek_start:.2f}s!")
-                     break
-             
-             time.sleep(0.02)
-        
-        elapsed = time.time() - seek_start
-        
-        if edge_found:
-             # Center from edge
-             print(f"[SCAN] Centering (Duration: {half_width_duration:.2f}s)...")
-             time.sleep(half_width_duration)
-        else:
-             # Fallback: We missed the edge, but we are at max_duration (Start Pos).
-             # We should go to the expected center.
-             # Current Pos: +45 deg (approx). Gap Center: "center_pseudo_angle".
-             # Wait.. we turned Left for "elapsed".
-             # If elapsed < expected_return_duration, we need to go FURTHER.
-             # If elapsed > expected_return_duration, we went TOO FAR.
-             
-             # But the loop breaks at max_duration (which is effectively "Start Position").
-             # So we are likely at +45 deg.
-             # We probably passed the gap if expected_return < max_duration.
-             
-             # Actually, simpler fallback:
-             # The seek failed. Stop immediately.
-             # Then drive to the specific timestamp blindly.
-             robot_state.stop_all_movement()
-             
-             remaining = expected_return_duration - elapsed
-             print(f"[SCAN] EDGE MISSED. Time-Reversal Fallback. Remaining: {remaining:.2f}s")
-             
-             if remaining > 0:
-                 robot_state.update_movement({'left': ROT_SPEED})
-                 time.sleep(remaining)
-             elif remaining < 0:
-                 # We went too far? (Unlikely with max_duration logic unless gap was at very start)
-                 robot_state.update_movement({'right': ROT_SPEED})
-                 time.sleep(abs(remaining))
-                 
+            if delta >= steps_to_turn:
+                completed = True
+                break
+                
+            # Optional: If we cross the "Gap Edge" we could stop? 
+            # Let's keep it simple: Pure Encoder Positioning.
+            time.sleep(0.02)
+            
         robot_state.stop_all_movement()
         
-        status = "Verified" if edge_found else "Estimated (Fallback)"
-        return f"Scan Successful! Width: {width_deg:.1f}°. Alignment: {status}. Ready."
+        if completed:
+            return f"Scan & Align Complete (Encoder). Gap at {center_angle:.1f}°. Turned {steps_to_turn} steps."
+        else:
+             return "Alignment Timeout."
 
     return scan_doorway

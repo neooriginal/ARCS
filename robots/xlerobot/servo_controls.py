@@ -285,6 +285,15 @@ class ServoControler:
         except Exception:
             return {}
 
+    def get_wheel_positions(self) -> Dict[int, int]:
+        """Read the current position (steps) from wheel motors."""
+        if not self.wheel_bus:
+            return {}
+        try:
+            return self.wheel_bus.sync_read("Present_Position", list(self._wheel_ids))
+        except Exception:
+            return {}
+
     # Head control
 
     def apply_head_modes(self) -> None:
