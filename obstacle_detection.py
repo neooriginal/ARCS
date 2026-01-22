@@ -42,6 +42,13 @@ class ObstacleDetector:
         
         self.last_frame_id = -1
         self.cached_result = (["STOP"], None, {})
+
+    def _get_camera_right_frame(self):
+        """Helper to get right camera frame safely."""
+        # Check if right camera is active and has a frame
+        if state.camera_right and state.latest_frame_right is not None:
+             return state.latest_frame_right
+        return None
         
     def process(self, frame):
         """
@@ -81,11 +88,20 @@ class ObstacleDetector:
         
         # Check low obstacles if not in approach mode or precision mode
         # Precision mode disables visual check because door frames/thresholds cause false positives
-        vision_blocked = False
+        visual_blocks = set()
         if not state.approach_mode and not state.precision_mode:
-            vision_blocked = self._check_visual_obstacles(frame, overlay)
-            if vision_blocked:
-                instant_blocked.add("FORWARD")
+            visual_blocks = self._check_visual_obstacles(frame, overlay)
+            # Merge visual blocks into instant_blocked
+            instant_blocked.update(visual_blocks)
+            
+            # Check Right Camera
+            right_frame = self._get_camera_right_frame()
+            if right_frame is not None:
+                if self._check_right_camera_obstacle(right_frame):
+                    instant_blocked.add("RIGHT")
+                    # Draw warning on main overlay
+                    cv2.putText(overlay, "RIGHT CAM: BLOCKED", (w - 220, 80), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
         
         safe_actions = self._update_safety_state(instant_blocked)
         
@@ -94,18 +110,17 @@ class ObstacleDetector:
         target_x = -1
         
         # In precision mode, don't use visual gap detection - it's unreliable
-        # AI should use scan_doorway for LIDAR-based alignment instead
+        # AI should use scan_doorway FOR LIDAR-based alignment instead
         if state.precision_mode:
             guidance = "USE scan_doorway FOR ALIGNMENT"
         
-        # --- 4. SCAN RESULT OVERLAY ---
         # --- 4. SCAN RESULT OVERLAY ---
         if state.last_scan_result:
             self._draw_scan_result(overlay, state.last_scan_result, w, h)
         
         self._draw_mode_status(overlay, w, h)
         
-        if vision_blocked and "FORWARD" in instant_blocked:
+        if "FORWARD" in visual_blocks:
              cv2.putText(overlay, "BLOCKED: LOW OBSTACLE", (w//2 - 100, h - 80), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
         
@@ -124,9 +139,13 @@ class ObstacleDetector:
         return result
 
     def _check_visual_obstacles(self, frame, overlay):
-        """Check for obstacles using gradient magnitude (Sobel) in lower center region."""
+        """
+        Check for obstacles using gradient magnitude (Sobel).
+        Splits view into LEFT, CENTER, RIGHT zones.
+        Returns a set of blocked directions.
+        """
         h, w = frame.shape[:2]
-        roi_y = int(h * 0.8)
+        roi_y = int(h * 0.75)  # Look slightly higher up (75% down)
         roi = frame[roi_y:h, :]
         
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
@@ -134,65 +153,80 @@ class ObstacleDetector:
         # Larger blur kernel to reduce floor texture/shadow noise
         blur = cv2.GaussianBlur(gray, (9, 9), 0)
         
-        # Use Sobel (as per docs/visual_intelligence.md)
+        # Use Sobel
         sobelx = cv2.Sobel(blur, cv2.CV_64F, 1, 0, ksize=3)
         sobely = cv2.Sobel(blur, cv2.CV_64F, 0, 1, ksize=3)
         magnitude = cv2.magnitude(sobelx, sobely)
         
-        # Get threshold from config (higher default to filter shadows)
+        # Get threshold
         sobel_thresh = get_config("OBSTACLE_SOBEL_THRESHOLD", 55)
         
         # Create binary mask of strong edges
         _, mask = cv2.threshold(magnitude, sobel_thresh, 255, cv2.THRESH_BINARY)
         
+        # Visualization of edges
         if np.any(mask):
-            # Convert single channel mask to 3 channel BGR
             edge_layer = np.zeros((roi.shape[0], roi.shape[1], 3), dtype=np.uint8)
-            edge_layer[mask > 0] = (255, 255, 0) # Cyan color for edges
+            edge_layer[mask > 0] = (255, 255, 0) # Cyan
             
-            # Create a full-size layer for blending
             full_layer = np.zeros_like(overlay)
             full_layer[roi_y:h, :] = edge_layer
 
             cv2.addWeighted(overlay, 1.0, full_layer, 0.5, 0, overlay)
 
-        # Focus on center path
-        center_x = w // 2
-        check_w = int(w * 0.4)
-        center_roi = mask[:, center_x - check_w//2 : center_x + check_w//2]
+        # Zone Definitions
+        zone_w = w // 3
+        zones = {
+            "LEFT":  (0, zone_w),
+            "FORWARD": (zone_w, 2 * zone_w),
+            "RIGHT": (2 * zone_w, w)
+        }
         
-        # Calculate density (0.0 to 1.0)
-        edge_density = np.count_nonzero(center_roi) / center_roi.size
-        
-        # Add to history for temporal smoothing
-        self.visual_block_history.append(edge_density)
-        
-        # Use current density but require minimum history for averaging
-        # This prevents single-frame false positives while staying responsive
+        blocked_directions = set()
         density_threshold = get_config("OBSTACLE_DENSITY_THRESHOLD", 0.05)
+
+        for direction, (start_x, end_x) in zones.items():
+            zone_roi = mask[:, start_x:end_x]
+            if zone_roi.size == 0: continue
+            
+            edge_density = np.count_nonzero(zone_roi) / zone_roi.size
+            
+            # Simple temporal smoothing could be added per-zone here if needed.
+            # For now, using direct density.
+            
+            if edge_density > density_threshold:
+                blocked_directions.add(direction)
+                
+                # Draw Box on Overlay
+                p1 = (start_x, roi_y)
+                p2 = (end_x, h)
+                cv2.rectangle(overlay, p1, p2, (0, 0, 255), 2)
+                cv2.putText(overlay, f"{direction} BLOCKED", (start_x + 10, roi_y - 10), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+        return blocked_directions
+
+    def _check_right_camera_obstacle(self, frame):
+        """Simple check for obstacles in the right camera view."""
+        # Using similar logic to main camera but full width since it's a side view
+        h, w = frame.shape[:2]
+        roi = frame[int(h*0.5):, :] # Look at bottom half
         
-        # Require at least 2/3 of recent frames to show obstacle before blocking
-        if len(self.visual_block_history) >= 3:
-            recent_blocks = sum(1 for d in list(self.visual_block_history)[-3:] if d > density_threshold)
-            is_blocked = recent_blocks >= 2
-        else:
-            is_blocked = edge_density > density_threshold
+        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        blur = cv2.GaussianBlur(gray, (9, 9), 0)
         
-        if is_blocked:
-            p1 = (center_x - check_w//2, roi_y)
-            p2 = (center_x + check_w//2, h)
-            
-            # Draw solid semi-transparent red box for better visibility
-            sub_overlay = overlay.copy()
-            cv2.rectangle(sub_overlay, p1, p2, (0, 0, 255), -1)
-            cv2.addWeighted(sub_overlay, 0.3, overlay, 0.7, 0, overlay)
-            cv2.rectangle(overlay, p1, p2, (0, 0, 255), 2)
-            
-            # Debug info
-            cv2.putText(overlay, f"Obstacle: {edge_density:.2f}", (p1[0], p1[1]-10), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-            
-        return is_blocked
+        sobelx = cv2.Sobel(blur, cv2.CV_64F, 1, 0, ksize=3)
+        sobely = cv2.Sobel(blur, cv2.CV_64F, 0, 1, ksize=3)
+        magnitude = cv2.magnitude(sobelx, sobely)
+        
+        sobel_thresh = get_config("OBSTACLE_SOBEL_THRESHOLD", 55)
+        _, mask = cv2.threshold(magnitude, sobel_thresh, 255, cv2.THRESH_BINARY)
+        
+        # Check center-ish area of right cam
+        center_roi = mask[:, int(w*0.2):int(w*0.8)]
+        density = np.count_nonzero(center_roi) / center_roi.size
+        
+        return density > get_config("OBSTACLE_DENSITY_THRESHOLD", 0.05)
 
     def _find_visual_gap(self, frame, w, h):
         """Find path of least resistance by looking for the DARKEST column (gap = dark)."""
@@ -373,13 +407,24 @@ class ObstacleDetector:
     def _update_safety_state(self, instant_blocked):
         with self.lock:
             self.block_history.append(instant_blocked)
-            # Filter noise (require > 50% frames to be blocked)
-            count = sum(1 for b in self.block_history if "FORWARD" in b)
-            is_blocked = count > (len(self.block_history) / 2)
             
-            self.latest_blockage['forward'] = is_blocked
+            # Check blockage for each direction
+            # Require > 50% frames in history to have the block to trigger it (structural temporal smoothing)
+            threshold = len(self.block_history) / 2
             
-        actions = ["LEFT", "RIGHT", "BACKWARD"]
-        if not is_blocked:
-            actions.append("FORWARD")
-        return actions
+            forward_blocked = sum(1 for b in self.block_history if "FORWARD" in b) > threshold
+            left_blocked = sum(1 for b in self.block_history if "LEFT" in b) > threshold
+            right_blocked = sum(1 for b in self.block_history if "RIGHT" in b) > threshold
+            
+            self.latest_blockage = {
+                'forward': forward_blocked,
+                'left': left_blocked,
+                'right': right_blocked
+            }
+            
+        allowed_actions = ["BACKWARD"]
+        if not forward_blocked: allowed_actions.append("FORWARD")
+        if not left_blocked: allowed_actions.append("LEFT")
+        if not right_blocked: allowed_actions.append("RIGHT")
+        
+        return allowed_actions
