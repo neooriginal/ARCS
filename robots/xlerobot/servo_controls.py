@@ -122,6 +122,7 @@ class ServoControler:
                 port=right_arm_wheel_usb,
                 motors=motors,
                 calibration=calibration,
+                baudrate=DEFAULT_BAUDRATE,
             )
             
             try:
@@ -149,6 +150,7 @@ class ServoControler:
                         port=right_arm_wheel_usb,
                         motors=motors,
                         calibration=None,
+                        baudrate=DEFAULT_BAUDRATE,
                     )
                     self.wheel_bus.connect()
                     self.apply_wheel_modes()
