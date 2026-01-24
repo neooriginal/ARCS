@@ -24,7 +24,14 @@ def scan_ports():
             bus = FeetechMotorsBus(port=port, motors={})
             
             # Manually open packet handler without full bus validation
-            bus.packet_handler.open_port(port, bus.baudrate)
+            # The FeetechMotorsBus has a port_handler, not packet_handler for opening
+            if hasattr(bus, 'port_handler'):
+                bus.port_handler.openPort()
+                bus.port_handler.setBaudRate(bus.baudrate)
+            else:
+                # Fallback if structure is different
+                print("  -> Unknown bus structure, trying standard connect...")
+                bus.connect()
             
             print("  -> Port opened. Scanning IDs 1-20...")
             found = []
