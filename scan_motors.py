@@ -27,7 +27,7 @@ def scan_ports():
             # The FeetechMotorsBus has a port_handler, not packet_handler for opening
             if hasattr(bus, 'port_handler'):
                 bus.port_handler.openPort()
-                bus.port_handler.setBaudRate(bus.baudrate)
+                bus.port_handler.setBaudRate(1000000) # Hardcoded default for XLeRobot/Feetech
             else:
                 # Fallback if structure is different
                 print("  -> Unknown bus structure, trying standard connect...")
