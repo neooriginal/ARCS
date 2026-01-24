@@ -10,7 +10,7 @@ try:
 except:
     pass
 
-from lerobot.motors.feetech.feetech import FeetechMotorsBus, Motor, MotorNormMode
+from lerobot.motors.feetech.feetech import FeetechMotorsBus
 
 def scan_ports():
     ports = sorted(glob.glob('/dev/ttyACM*') + glob.glob('/dev/robot_acm*'))
