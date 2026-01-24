@@ -379,11 +379,23 @@ class ServoControler:
     # Cleanup
 
     def disconnect(self) -> None:
-        self._wheels_stop()
+        try:
+            self._wheels_stop()
+        except Exception:
+            pass
+            
         if self.wheel_bus:
-            self.wheel_bus.disconnect()
+            try:
+                self.wheel_bus.disconnect()
+            except Exception as e:
+                # If already disconnected or never connected, this might fail.
+                # Suppress error during cleanup to avoid noisy tracebacks.
+                pass
+            self.wheel_bus = None
 
     def __del__(self) -> None:
-        if hasattr(self, "wheel_bus") and self.wheel_bus and self.wheel_bus.is_connected:
+        # Check if attribute exists to avoid errors if __init__ failed early
+        if hasattr(self, "wheel_bus") and self.wheel_bus:
+            # We skip checking is_connected because it might be unreliable during partial failure
             self.disconnect()
 
