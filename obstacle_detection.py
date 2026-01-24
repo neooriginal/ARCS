@@ -65,7 +65,8 @@ class ObstacleDetector:
             if state.frame_id == self.last_frame_id:
                 return self.cached_result
         
-        # 360° LIDAR: Get forward distance and directional blocks
+        # 360° LIDAR SAFETY CHECK (STRICT)
+        # This overrides everything. If a wall is close, movement is physically blocked.
         distance = state.lidar_distance
         lidar = state.lidar360
         h, w = frame.shape[:2]
@@ -83,20 +84,35 @@ class ObstacleDetector:
             # Use approach distance if active
             current_stop_dist = self.approach_stop_distance if state.approach_mode else self.stop_distance
             
-            if avg_distance < current_stop_dist:
-                instant_blocked.add("FORWARD")
-            
-            # 360° LIDAR: Check left and right using directional ranges
+            # --- 360° LIDAR SAFETY BUBBLE ---
             if lidar and lidar.connected:
-                # Left: 60° to 120° (robot's left side)
+                # 1. FORWARD: Check frontal arc (-30° to +30°)
+                # More robust than single point
+                fwd_min = lidar.get_min_distance_in_range(-30, 30)
+                if fwd_min is not None and fwd_min < current_stop_dist:
+                    instant_blocked.add("FORWARD")
+                elif avg_distance < current_stop_dist: # Fallback to single point if necessary
+                    instant_blocked.add("FORWARD")
+                    
+                # 2. BACKWARD: Check rear arc (150° to 210°)
+                # Prevent backing into walls
+                back_min = lidar.get_min_distance_in_range(150, 210)
+                if back_min is not None and back_min < current_stop_dist:
+                    instant_blocked.add("BACKWARD")
+                    
+                # 3. LEFT: Check left side (60° to 120°)
                 left_min = lidar.get_min_distance_in_range(60, 120)
-                if left_min is not None and left_min < current_stop_dist:
+                if left_min is not None and left_min < 35: # 35cm side clearance
                     instant_blocked.add("LEFT")
                 
-                # Right: 240° to 300° (robot's right side, or -60° to -120°)
+                # 4. RIGHT: Check right side (240° to 300°)
                 right_min = lidar.get_min_distance_in_range(240, 300)
-                if right_min is not None and right_min < current_stop_dist:
+                if right_min is not None and right_min < 35:
                     instant_blocked.add("RIGHT")
+            else:
+                # Fallback to single point if 360 not ready
+                if avg_distance < current_stop_dist:
+                    instant_blocked.add("FORWARD")
             
             self._draw_proximity_overlay(overlay, avg_distance, w, h)
         
@@ -105,17 +121,20 @@ class ObstacleDetector:
         visual_blocks = set()
         if not state.approach_mode and not state.precision_mode:
             visual_blocks = self._check_visual_obstacles(frame, overlay)
-            # Merge visual blocks into instant_blocked
-            instant_blocked.update(visual_blocks)
+            
+            # PASSIVE MODE: Visual blocks do NOT stop movement due to 2m blind spot.
+            # They serve as warnings only.
+            # instant_blocked.update(visual_blocks)  <-- DISABLED
             
             # Check Right Camera
             right_frame = self._get_camera_right_frame()
             if right_frame is not None:
                 if self._check_right_camera_obstacle(right_frame):
-                    instant_blocked.add("RIGHT")
+                    # Right camera also passive
+                    # instant_blocked.add("RIGHT") 
                     # Draw warning on main overlay
-                    cv2.putText(overlay, "RIGHT CAM: BLOCKED", (w - 220, 80), 
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                    cv2.putText(overlay, "RIGHT CAM: ALERT", (w - 220, 80), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
         
         safe_actions = self._update_safety_state(instant_blocked)
         
@@ -134,9 +153,9 @@ class ObstacleDetector:
         
         self._draw_mode_status(overlay, w, h)
         
-        if "FORWARD" in visual_blocks:
-             cv2.putText(overlay, "BLOCKED: LOW OBSTACLE", (w//2 - 100, h - 80), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        if len(visual_blocks) > 0:
+             cv2.putText(overlay, "VISUAL ALERT: LOW OBSTACLE", (w//2 - 120, h - 80), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
         
         metrics = {
             'distance': distance,
@@ -159,7 +178,12 @@ class ObstacleDetector:
         Returns a set of blocked directions.
         """
         h, w = frame.shape[:2]
-        roi_y = int(h * 0.75)  # Look slightly higher up (75% down)
+        
+        # FIXED HEAD: Camera is ~1m high looking straight.
+        # Horizon is roughly center. Floor is lower half.
+        # We only check the LOWER 40% of the image to find objects on ground.
+        # Ignoring top 60% prevents seeing walls/furniture at eye level as obstacles.
+        roi_y = int(h * 0.60) 
         roi = frame[roi_y:h, :]
         
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
@@ -427,17 +451,20 @@ class ObstacleDetector:
             threshold = len(self.block_history) / 2
             
             forward_blocked = sum(1 for b in self.block_history if "FORWARD" in b) > threshold
+            backward_blocked = sum(1 for b in self.block_history if "BACKWARD" in b) > threshold
             left_blocked = sum(1 for b in self.block_history if "LEFT" in b) > threshold
             right_blocked = sum(1 for b in self.block_history if "RIGHT" in b) > threshold
             
             self.latest_blockage = {
                 'forward': forward_blocked,
+                'backward': backward_blocked,
                 'left': left_blocked,
                 'right': right_blocked
             }
             
-        allowed_actions = ["BACKWARD"]
+        allowed_actions = []
         if not forward_blocked: allowed_actions.append("FORWARD")
+        if not backward_blocked: allowed_actions.append("BACKWARD")
         if not left_blocked: allowed_actions.append("LEFT")
         if not right_blocked: allowed_actions.append("RIGHT")
         
