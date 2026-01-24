@@ -86,7 +86,6 @@ class ServoControler:
                 # Try to load calibration from lerobot's cache directory
                 # lerobot-calibrate saves to: ~/.cache/.../robots/so101_follower/{robot_id}.json
                 cal_path = self.LEROBOT_CALIBRATION_DIR / "so101_follower" / f"{arm_calibration_id}.json"
-                print(f"[CONTROLLER] Looking for arm calibration at: {cal_path}")
                 
                 if cal_path.exists():
                     try:
@@ -118,8 +117,6 @@ class ServoControler:
                 else:
                     print(f"[ARM] No calibration found at {cal_path}")
                     print(f"[ARM] Run: lerobot-calibrate --robot.type=so101_follower --robot.port={right_arm_wheel_usb} --robot.id={arm_calibration_id}")
-            
-            print(f"[CONTROLLER] Initializing bus on {right_arm_wheel_usb} with motors: {list(motors.keys())}")
             
             self.wheel_bus = FeetechMotorsBus(
                 port=right_arm_wheel_usb,
