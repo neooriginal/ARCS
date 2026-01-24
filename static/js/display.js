@@ -16,7 +16,7 @@ class Dashboard {
         this.statusLidar = document.getElementById('status-lidar');
 
         // Metrics
-        this.lidarBar = document.getElementById('lidar-bar');
+        this.lidarViz = new LidarVisualizer('lidar-radar', { maxDist: 400 });
         this.lidarValue = document.getElementById('lidar-value');
 
         // Core Animation
@@ -75,22 +75,15 @@ class Dashboard {
         this.setIndicator(this.statusCamera, data.camera_connected);
         this.setIndicator(this.statusLidar, data.lidar_connected);
 
-        // 2. Metrics (Lidar)
+        // 2. Metrics (Lidar Radar)
+        if (this.lidarViz) {
+            this.lidarViz.draw(data.lidar_scan);
+        }
+
         if (data.lidar_distance !== null && data.lidar_distance !== undefined) {
-            const dist = data.lidar_distance;
-            const maxDist = 200; // cm for full bar roughly
-            const percent = Math.min(100, Math.max(0, (dist / maxDist) * 100));
-
-            this.lidarBar.style.width = `${percent}%`;
-            this.lidarValue.textContent = `${dist.toFixed(1)} cm`;
-
-            // Color coding based on distance
-            if (dist < 30) this.lidarBar.style.backgroundColor = 'var(--accent-red)';
-            else if (dist < 80) this.lidarBar.style.backgroundColor = 'var(--accent-blue)';
-            else this.lidarBar.style.backgroundColor = 'var(--accent-green)';
+            this.lidarValue.textContent = `FRONT: ${data.lidar_distance.toFixed(0)} cm`;
         } else {
-            this.lidarBar.style.width = '0%';
-            this.lidarValue.textContent = '--- cm';
+            this.lidarValue.textContent = 'FRONT: --- cm';
         }
 
         // 3. Control Mode & Core Config
@@ -172,6 +165,8 @@ class Dashboard {
         if (visible) el.classList.add('visible');
         else el.classList.remove('visible');
     }
+
+
 
     setOffline() {
         this.modeBadge.textContent = 'OFFLINE';

@@ -71,20 +71,13 @@
 
 
 
-            <!-- Lidar Sensor -->
+            <!-- 360° Lidar Sensor -->
             <div class="settings-card">
-                <h3>📡 Lidar Sensor</h3>
-                <p style="color:#888; font-size:0.85em; margin-bottom:15px;">TF-Luna single-point distance sensor.</p>
+                <h3>📡 360° LIDAR (LD19)</h3>
+                <p style="color:#888; font-size:0.85em; margin-bottom:15px;">LDROBOT LD19 360° distance sensor for
+                    obstacle detection.</p>
 
                 <div class="form-group">
-                    <label>Protocol</label>
-                    <select id="cfg_LIDAR_PROTOCOL" onchange="onLidarProtocolChange()">
-                        <option value="uart">UART (Serial)</option>
-                        <option value="i2c">I2C</option>
-                    </select>
-                </div>
-
-                <div class="form-group" id="lidarPortGroup">
                     <label>Serial Port</label>
                     <div class="port-row">
                         <select id="cfg_LIDAR_PORT"></select>
@@ -93,24 +86,14 @@
                     <input type="text" id="cfg_LIDAR_PORT_manual" class="manual-input" placeholder="/dev/ttyUSB0">
                 </div>
 
-                <div class="form-group" id="lidarBaudGroup">
+                <div class="form-group">
                     <label>Baud Rate</label>
                     <select id="cfg_LIDAR_BAUD_RATE">
-                        <option value="9600">9600</option>
-                        <option value="19200">19200</option>
-                        <option value="38400">38400</option>
-                        <option value="57600">57600</option>
                         <option value="115200">115200</option>
-                        <option value="230400">230400</option>
+                        <option value="230400" selected>230400</option>
                         <option value="460800">460800</option>
                     </select>
-                    <div class="hint">TF-Luna default: 115200</div>
-                </div>
-
-                <div class="form-group" id="lidarI2CGroup" style="display: none;">
-                    <label>I2C Address (decimal)</label>
-                    <input type="number" id="cfg_LIDAR_I2C_ADDRESS" min="1" max="127" value="16">
-                    <div class="hint">TF-Luna default: 16 (0x10)</div>
+                    <div class="hint">LD19 default: 230400</div>
                 </div>
             </div>
 
@@ -502,15 +485,11 @@
     }
 
     function onLidarProtocolChange() {
-        const protocol = document.getElementById('cfg_LIDAR_PROTOCOL').value;
-        const isUart = protocol === 'uart';
-        document.getElementById('lidarPortGroup').style.display = isUart ? 'block' : 'none';
-        document.getElementById('lidarBaudGroup').style.display = isUart ? 'block' : 'none';
-        document.getElementById('lidarI2CGroup').style.display = isUart ? 'none' : 'block';
+        // Deprecated
     }
 
     function initLidarUI() {
-        onLidarProtocolChange();
+        // Deprecated
     }
 
     async function saveConfig() {

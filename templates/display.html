@@ -51,12 +51,13 @@
                     </div>
                 </div>
 
-                <div class="metric-box">
-                    <div class="metric-label">LIDAR PROXIMITY</div>
-                    <div class="metric-bar-container">
-                        <div class="metric-bar-fill" id="lidar-bar" style="width: 0%"></div>
+                <div class="metric-box" style="padding: 10px;">
+                    <div class="metric-label">360° LIDAR RADAR</div>
+                    <div style="display: flex; justify-content: center; align-items: center; margin-top: 10px;">
+                        <canvas id="lidar-radar" width="180" height="180"
+                            style="background: rgba(0,0,0,0.3); border-radius: 50%;"></canvas>
                     </div>
-                    <div class="metric-value" id="lidar-value">--- cm</div>
+                    <div class="metric-value" id="lidar-value" style="margin-top: 8px;">FRONT: --- cm</div>
                 </div>
             </section>
 
@@ -94,6 +95,7 @@
     <div class="warning-overlay right" id="warn-right"></div>
     <div class="warning-overlay center" id="warn-center"></div>
 
+    <script src="{{ url_for('static', filename='js/lidar_visualizer.js') }}"></script>
     <script src="{{ url_for('static', filename='js/display.js') }}"></script>
 </body>
 

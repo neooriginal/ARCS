@@ -477,8 +477,6 @@ def ai_start():
     # Reset wheel speed to default when AI starts
     state.reset_wheel_speed()
     
-
-    
     state.ai_enabled = True
     state.add_ai_log("AI Started")
     return jsonify({'status': 'ok'})
@@ -593,13 +591,17 @@ def display_state():
         'camera_right_connected': state.camera_right is not None and state.camera_right.isOpened() if state.camera_right else False,
         
         # Lidar Status
-        'lidar_connected': state.lidar is not None and state.lidar.connected if state.lidar else False,
+        'lidar_connected': state.lidar360 is not None and state.lidar360.connected if state.lidar360 else False,
         'lidar_distance': state.lidar_distance,
+        'lidar_scan': state.lidar360.get_decimated_scan(10) if state.lidar360 else None,
         
         'control_mode': control_mode,
         'precision_mode': state.precision_mode,
         'blockage': state.get_detector().latest_blockage if state.detector else {}
     })
+
+
+
 
 
 def generate_cv_frames():

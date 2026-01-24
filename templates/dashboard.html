@@ -26,13 +26,38 @@
             </div>
             <div
                 style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid rgba(255,255,255,0.02);">
-                <span style="font-weight: 500;">Head</span>
-                <span id="status-head" class="status-dot"></span>
-            </div>
-            <div
-                style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid rgba(255,255,255,0.02);">
                 <span style="font-weight: 500;">Right Arm</span>
                 <span id="status-arm" class="status-dot"></span>
+            </div>
+
+            <!-- Sensors Section -->
+            <div
+                style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-top: 10px;">
+                Sensors</div>
+
+            <div onclick="toggleLidarDetails()"
+                style="display: flex; flex-direction: column; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid rgba(255,255,255,0.02); cursor: pointer; transition: background 0.2s;"
+                onmouseover="this.style.background='rgba(255,255,255,0.05)'"
+                onmouseout="this.style.background='rgba(255,255,255,0.03)'">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px;">
+                    <span style="font-weight: 500;">360° LIDAR</span>
+                    <span id="status-lidar" class="status-dot"></span>
+                </div>
+
+                <div id="lidar-details"
+                    style="display: none; padding: 0 16px 12px 16px; border-top: 1px solid rgba(255,255,255,0.05);">
+                    <div style="display: flex; justify-content: center; margin: 10px 0;">
+                        <canvas id="lidar-radar-mini" width="120" height="120"
+                            style="background: rgba(0,0,0,0.4); border-radius: 50%;"></canvas>
+                    </div>
+                    <div
+                        style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 0.75rem; text-align: center;">
+                        <div>F: <span id="lidar-front" style="color: var(--primary);">---</span></div>
+                        <div>B: <span id="lidar-back" style="color: var(--primary);">---</span></div>
+                        <div>L: <span id="lidar-left" style="color: var(--primary);">---</span></div>
+                        <div>R: <span id="lidar-right" style="color: var(--primary);">---</span></div>
+                    </div>
+                </div>
             </div>
 
             <!-- Vision Section -->
@@ -138,6 +163,7 @@
     </div>
 </div>
 
+<script src="{{ url_for('static', filename='js/lidar_visualizer.js') }}"></script>
 <script>
     // Poll for status updates on the dashboard (System Status)
     setInterval(async () => {
@@ -154,8 +180,12 @@
             };
 
             setStatus('status-wheels', data.wheels_connected);
-            setStatus('status-head', data.head_connected);
             setStatus('status-arm', data.arm_connected);
+            setStatus('status-lidar', data.lidar_connected);
+
+            // Draw LIDAR radar and update directional distances
+            lidarViz.draw(data.lidar_scan);
+            updateLidarDistances(data.lidar_scan, data.lidar_distance);
 
             setStatus('status-camera-main', data.camera_main_connected);
             setStatus('status-camera-right', data.camera_right_connected);
@@ -215,6 +245,38 @@
             }
         } catch (e) { }
     }, 1000);
+
+
+
+    // Update directional distance displays
+    function updateLidarDistances(scanData, frontDist) {
+        const updateEl = (id, val) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (val !== null && val !== undefined) {
+                el.textContent = `${Math.round(val)} cm`;
+                el.style.color = val < 30 ? 'var(--danger)' : val < 80 ? '#ff9800' : 'var(--primary)';
+            } else {
+                el.textContent = '---';
+            }
+        };
+
+        updateEl('lidar-front', frontDist);
+
+        if (scanData) {
+            // Back ~180°, Left ~90°, Right ~270°
+            updateEl('lidar-back', scanData[180]);
+            updateEl('lidar-left', scanData[90]);
+            updateEl('lidar-right', scanData[270]);
+        }
+    }
+
+    function toggleLidarDetails() {
+        const el = document.getElementById('lidar-details');
+        if (el) {
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+    }
 
     function toggleHealthDetails() {
         const el = document.getElementById('health-details');

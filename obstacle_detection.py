@@ -65,14 +65,16 @@ class ObstacleDetector:
             if state.frame_id == self.last_frame_id:
                 return self.cached_result
         
+        # 360° LIDAR: Get forward distance and directional blocks
         distance = state.lidar_distance
+        lidar = state.lidar360
         h, w = frame.shape[:2]
         overlay = frame.copy()
         
         instant_blocked = set()
         
         if distance is None:
-            status = "NO SIGNAL" if state.lidar is not None else "DISCONNECTED"
+            status = "NO SIGNAL" if state.lidar360 is not None else "DISCONNECTED"
             self._draw_no_lidar(overlay, w, h, status)
         else:
             self.distance_history.append(distance)
@@ -83,6 +85,18 @@ class ObstacleDetector:
             
             if avg_distance < current_stop_dist:
                 instant_blocked.add("FORWARD")
+            
+            # 360° LIDAR: Check left and right using directional ranges
+            if lidar and lidar.connected:
+                # Left: 60° to 120° (robot's left side)
+                left_min = lidar.get_min_distance_in_range(60, 120)
+                if left_min is not None and left_min < current_stop_dist:
+                    instant_blocked.add("LEFT")
+                
+                # Right: 240° to 300° (robot's right side, or -60° to -120°)
+                right_min = lidar.get_min_distance_in_range(240, 300)
+                if right_min is not None and right_min < current_stop_dist:
+                    instant_blocked.add("RIGHT")
             
             self._draw_proximity_overlay(overlay, avg_distance, w, h)
         

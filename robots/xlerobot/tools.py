@@ -481,203 +481,46 @@ The policy will take control of the arms and base for the specified duration.{po
     return run_robot_policy
 
 
-def create_scan_doorway():
+def create_find_gap():
     @tool
-    def scan_doorway() -> str:
+    def find_gap() -> str:
         """
-        Performs a 'Wiggle Scan' (Left 90 -> Right 180 -> Left 90) using ENCODER FEEDBACK.
-        Use this when approaching a narrow gap to precisely identify the center.
+        Analyze 360° LIDAR data to find passable gaps in the forward direction (±90°).
+        Use this in precision mode to find door openings without physically rotating.
+        Returns gap location and alignment instructions.
         """
-        import time
-        import math
         from state import state as robot_state
+        from core.lidar360 import get_lidar360
         
-        scanner = robot_state.get_scanner()
-        if not scanner:
-            return "Error: Scanner system not available."
-            
-        controller = robot_state.controller
-        if not controller:
-             return "Error: Robot controller not found."
+        lidar = get_lidar360()
+        if not lidar or not lidar.connected:
+            return "Error: 360° LIDAR not available. Is AI navigation enabled?"
         
         # Enable Precision Mode
         previous_mode = robot_state.precision_mode
         robot_state.precision_mode = True
-        scanner.clear()
         
-        # --- ENCODER CONSTANTS ---
-        # STS3215 = 4096 steps / 360 degrees
-        # Assuming 1:1 drive ratio for rotation (or modify if geared)
-        STEPS_PER_DEGREE = 11.37  # 4096 / 360
-        ROT_SPEED = 0.2
+        # Analyze forward arc (±90° from center)
+        gap_info = lidar.find_gap_in_range(-90, 90)
         
-        SWEEP_HALF_ANGLE = 90.0
-        SCAN_RANGE_DEG = SWEEP_HALF_ANGLE * 2.0
+        robot_state.last_scan_result = gap_info
+        robot_state.precision_mode = previous_mode
         
-        TARGET_STEPS_PREP = int(SWEEP_HALF_ANGLE * STEPS_PER_DEGREE)
-        TARGET_STEPS_SCAN = int(SCAN_RANGE_DEG * STEPS_PER_DEGREE)
+        if not gap_info['found']:
+            reason = gap_info.get('reason', 'unknown')
+            return f"NO GAP FOUND in forward arc. Reason: {reason}. Try moving to a different position."
         
-        TIMEOUT_SAFETY = 10.0 # Stopping if not reached in 10s
+        center = gap_info['center_angle']
+        width = gap_info['width_deg']
         
-        scan_state = {
-            "phase": "PREP", 
-            "start_time": time.time(),
-            "scan_start_timestamp": 0.0,
-            "scan_start_angle": 0.0 # Pseudo-angle for graph
-        }
-        is_scanning = True
-
-        def get_avg_wheel_pos():
-            positions = controller.get_wheel_positions()
-            if not positions:
-                return 0
-            # Averaging absolute positions might be tricky if they wrap, 
-            # but STS3215 multi-turn usually accumulates. 
-            # We use the average of available wheels.
-            valid_vals = [p for p in positions.values()]
-            if not valid_vals: return 0
-            return sum(valid_vals) / len(valid_vals)
-
-        # Background Recorder
-        def recording_loop():
-            # For the scanner graph, we still need to map "Progress" to Angle.
-            # We can use Time or encoder percentage.
-            # Using Time is smoother for the graph if speed is constant.
-            while is_scanning:
-                robot_state.last_movement_activity = time.time()
-                
-                if scan_state["phase"] == "SCAN":
-                    t = time.time()
-                    t_scan_start = scan_state["scan_start_timestamp"]
-                    # We can't map perfect angle without reading encoders here too, 
-                    # but let's assume linear progress for the visualization to keep it simple 
-                    # or read encoders if thread-safe. 
-                    # Visualizer expects angle decrease from +90 to -90.
-                    # Let's simple time-based projection for visualization ONLY.
-                    
-                    dt = t - t_scan_start
-                    # Estimate progress based on speed
-                    # speed 0.2 ~ 55 dps
-                    est_angle = SWEEP_HALF_ANGLE - (dt * 55.0) 
-                    
-                    dist = robot_state.lidar_distance
-                    if dist is not None:
-                         scanner.add_reading(est_angle, dist)
-                
-                time.sleep(0.04)
-        
-        recorder = threading.Thread(target=recording_loop, daemon=True)
-        recorder.start()
-        
-        try:
-            # Helper to rotate by steps
-            def rotate_by_steps(steps, direction_key):
-                start_avg = get_avg_wheel_pos()
-                robot_state.update_movement({direction_key: ROT_SPEED})
-                
-                start_time = time.time()
-                while time.time() - start_time < TIMEOUT_SAFETY:
-                    current_avg = get_avg_wheel_pos()
-                    delta = abs(current_avg - start_avg)
-                    
-                    if delta >= steps:
-                        robot_state.stop_all_movement()
-                        print(f"[SCAN] Reached target {steps} steps (Delta: {delta:.1f}). Duration: {time.time()-start_time:.2f}s")
-                        return True
-                    
-                    time.sleep(0.02)
-                
-                robot_state.stop_all_movement()
-                print("[SCAN] Timeout waiting for encoders!")
-                return False
-
-            # 1. Prep: Turn Left 90 deg
-            print(f"[SCAN] Encoder Prep: Left {SWEEP_HALF_ANGLE} deg ({TARGET_STEPS_PREP} steps)...")
-            scan_state["phase"] = "PREP"
-            if not rotate_by_steps(TARGET_STEPS_PREP, 'left'):
-                return "Scan Failed: Encoder Timeout (Prep)"
-            time.sleep(0.5)
-
-            # 2. Scan: Turn Right 180 deg
-            print(f"[SCAN] Encoder Scan: Right {SCAN_RANGE_DEG} deg ({TARGET_STEPS_SCAN} steps)...")
-            scan_state["phase"] = "SCAN"
-            scan_state["scan_start_timestamp"] = time.time()
-            
-            if not rotate_by_steps(TARGET_STEPS_SCAN, 'right'):
-                return "Scan Failed: Encoder Timeout (Scan)"
-                
-            is_scanning = False
-            time.sleep(0.2)
-
-        except Exception as e:
-            print(f"Scan interrupted: {e}")
-            robot_state.stop_all_movement()
-            return f"Scan failed: {e}"
-        finally:
-            is_scanning = False
-            recorder.join()
-            robot_state.precision_mode = previous_mode
-
-        # Analysis & Alignment
-        result = scanner.analyze_gap()
-        robot_state.last_scan_result = result
-        
-        if not result['found']:
-            return f"Scan Complete (Encoder Mode). NO GAP FOUND. Reason: {result.get('reason')}"
-
-        # 3. Align: Return to center
-        # We need to turn LEFT.
-        # Target Angle is 'center_angle' (e.g., 5 degrees).
-        # Current physical pos is -90 deg (Right end).
-        # We need to go from -90 to +5.
-        # Wait, the scanner uses pseudo-angles +90 to -90.
-        # So 'center_angle' is relative to the FRONT (0).
-        # If center is +5, means it's slightly Left.
-        # We are at -90 (Right). We need to turn Left by (90 + 5) = 95 degrees.
-        
-        center_angle = result['center_angle'] # e.g., 0.0 or 10.0
-        
-        # We ended at -90 (conceptually).
-        # Steps to returning to 0 = TARGET_STEPS_PREP.
-        # Steps to center = Steps_per_deg * (90 + center_angle)
-        
-        # Correction: The scanner coordinates: +90 (Left Start) -> 0 (Front) -> -90 (Right End).
-        # If gap is at 0, we are at -90. We turn Left 90.
-        
-        degrees_to_turn = SWEEP_HALF_ANGLE + center_angle
-        steps_to_turn = int(degrees_to_turn * STEPS_PER_DEGREE)
-        
-        print(f"[SCAN] Aligning: Target {center_angle:.1f}deg. Turning Left {degrees_to_turn:.1f}deg ({steps_to_turn} steps).")
-        
-        # Using SEEK_SPEED for precision
-        SEEK_SPEED = 0.15
-        
-        start_avg = get_avg_wheel_pos()
-        robot_state.update_movement({'left': SEEK_SPEED})
-        
-        # Simplified alignment loop (just steps, no seek logic for now to verify encoders first)
-        # Or we can add the "Seek Edge" logic back if encoders are reliable.
-        # For this first encoder test, let's trust the encoders blindly to prove they work.
-        
-        start_time = time.time()
-        completed = False
-        while time.time() - start_time < TIMEOUT_SAFETY:
-            current_avg = get_avg_wheel_pos()
-            delta = abs(current_avg - start_avg)
-            
-            if delta >= steps_to_turn:
-                completed = True
-                break
-                
-            # Optional: If we cross the "Gap Edge" we could stop? 
-            # Let's keep it simple: Pure Encoder Positioning.
-            time.sleep(0.02)
-            
-        robot_state.stop_all_movement()
-        
-        if completed:
-            return f"Scan & Align Complete (Encoder). Gap at {center_angle:.1f}°. Turned {steps_to_turn} steps."
+        # Determine alignment instruction
+        if abs(center) < 5:
+            alignment = "ALIGNED - Gap is directly ahead! Drive forward to pass through."
+        elif center > 0:
+            alignment = f"Turn LEFT {abs(center):.0f}° to align with gap center."
         else:
-             return "Alignment Timeout."
+            alignment = f"Turn RIGHT {abs(center):.0f}° to align with gap center."
+        
+        return f"GAP FOUND: Center at {center:.1f}°, width {width:.1f}°. {alignment}"
 
-    return scan_doorway
+    return find_gap

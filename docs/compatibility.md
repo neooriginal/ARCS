@@ -9,7 +9,7 @@ ARCS supports robots building on the XLeRobot standard with the following config
 
 *   **Manipulators**: Right Arm Only
     *   ⚠️ **Left Arm**: While present in the standard XLeRobot guide, it is **not yet supported** in ARCS.
-    *   📡 **USB LIDAR Sensor**: For AI navigation
+    *   📡 **360 degree USB LIDAR Sensor**: For AI navigation 
 *   **Optional Additions**:
     *   *These are not part of the original XLeRobot spec but are supported by ARCS:*
     *   🔊 **Speakers**: For Text-to-Speech.

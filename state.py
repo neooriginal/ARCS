@@ -75,11 +75,11 @@ class RobotState:
         # Position tracking (for QR code location logging)
         self.pose = None
         
-        # Lidar sensor state
-        self.lidar = None
-        self.lidar_distance = None  # Last distance reading in cm
-        self.lidar_scanner = None   # LidarScanner instance
-        self.last_scan_result = None # Latest gap analysis result
+        # 360° Lidar sensor state
+        self.lidar360 = None           # Lidar360 instance
+        self.lidar_distance = None     # Forward distance (0°) in cm
+        self.lidar_scan = None         # Latest full 360° scan [(angle, dist), ...]
+        self.last_scan_result = None   # Latest gap analysis result
 
     
     def update_movement(self, data):
@@ -152,17 +152,9 @@ class RobotState:
                     return None
             return self.detector
     
-    def get_scanner(self):
-        """Get or create shared LidarScanner instance."""
-        with self.lock:
-            if self.lidar_scanner is None:
-                try:
-                    from core.scanner import LidarScanner
-                    self.lidar_scanner = LidarScanner()
-                except Exception as e:
-                    print(f"Error creating scanner: {e}")
-                    return None
-            return self.lidar_scanner
+    def get_lidar360(self):
+        """Get 360° LIDAR instance."""
+        return self.lidar360
     
     def set_wheel_speed(self, speed):
         """Set manual wheel speed."""

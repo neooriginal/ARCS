@@ -123,10 +123,10 @@ def cleanup(signum=None, frame=None) -> NoReturn:
     except Exception:
         pass
     
-    # Cleanup lidar
-    if state.lidar:
+    # Cleanup 360° lidar
+    if state.lidar360:
         try:
-            state.lidar.disconnect()
+            state.lidar360.disconnect()
         except Exception:
             pass
 
@@ -150,16 +150,16 @@ def _deferred_init() -> None:
     threading.Thread(target=agent_loop, daemon=True).start()
 
     init_vr_control()
-    
-    # Initialize lidar sensor (auto-detects connection)
+
+    # Initialize 360° LIDAR (always-on for continuous obstacle detection)
     try:
-        from core.lidar import init_lidar
-        if init_lidar():
-            logger.info("Lidar sensor connected")
+        from core.lidar360 import start_lidar
+        if start_lidar():
+            logger.info("Lidar360: Connected and scanning")
         else:
-            logger.debug("Lidar sensor not available")
+            logger.warning("Lidar360: Not connected (check port in settings)")
     except Exception as e:
-        logger.debug(f"Lidar init skipped: {e}")
+        logger.warning(f"Lidar360: Init failed - {e}")
 
     tts.speak("System ready")
     logger.info("Hardware initialization complete")
