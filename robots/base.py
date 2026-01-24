@@ -23,11 +23,6 @@ class BaseRobot(ABC):
         return False
 
     @property
-    def has_head(self) -> bool:
-        """Whether this robot has a controllable head/camera gimbal."""
-        return False
-
-    @property
     def has_arm(self) -> bool:
         """Whether this robot has a manipulator arm."""
         return False
@@ -63,25 +58,7 @@ class BaseRobot(ABC):
         """Read current load from wheel motors."""
         return {}
 
-    # --- Head ---
 
-    def move_head(self, yaw: float, pitch: float) -> None:
-        """
-        Move head to absolute position.
-
-        Args:
-            yaw: Degrees, 0 is center
-            pitch: Degrees, 0 is level
-        """
-        pass
-
-    def get_head_position(self) -> Dict[str, float]:
-        """Get current head position as {yaw, pitch}."""
-        return {}
-
-    def get_head_loads(self) -> Dict[int, int]:
-        """Read current load from head motors."""
-        return {}
 
     # --- Arm ---
 

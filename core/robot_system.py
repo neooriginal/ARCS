@@ -8,7 +8,6 @@ from robots.base import BaseRobot
 from core.config_manager import get_config
 
 WHEEL_USB = get_config("WHEEL_USB")
-HEAD_USB = get_config("HEAD_USB")
 ROBOT_TYPE = get_config("ROBOT_TYPE", "xlerobot")
 
 logger = logging.getLogger(__name__)
@@ -55,7 +54,6 @@ class RobotSystem:
             self.robot = load_robot(
                 ROBOT_TYPE,
                 wheel_usb=WHEEL_USB,
-                head_usb=HEAD_USB,
                 enable_arm=True,
             )
             self.robot.connect()
@@ -73,13 +71,7 @@ class RobotSystem:
                 except Exception as e:
                     logger.warning(f"Could not read arm: {e}")
             
-            if self.robot.has_head:
-                try:
-                    pos = self.robot.get_head_position()
-                    state.head_yaw = round(pos.get("yaw", 0), 1)
-                    state.head_pitch = round(pos.get("pitch", 0), 1)
-                except Exception as e:
-                    logger.warning(f"Could not read head: {e}")
+
                     
             logger.info(f"Robot '{self.robot.name}' connected successfully")
             
@@ -101,7 +93,7 @@ class RobotSystem:
             from robots.xlerobot.tools import (
                 create_move_forward, create_move_backward,
                 create_turn_left, create_turn_right,
-                create_look_around, create_slide_left, create_slide_right,
+                create_slide_left, create_slide_right,
                 create_end_task, create_enable_precision_mode, create_disable_precision_mode,
                 create_save_note, create_enable_approach_mode, create_disable_approach_mode,
                 create_speak, create_run_robot_policy, create_scan_doorway
@@ -114,7 +106,6 @@ class RobotSystem:
                 create_turn_right(self.controller),
                 create_slide_left(self.controller),
                 create_slide_right(self.controller),
-                create_look_around(self.controller, self.camera),
                 create_end_task(),
                 create_enable_precision_mode(),
                 create_disable_precision_mode(),

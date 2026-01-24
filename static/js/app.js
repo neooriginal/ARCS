@@ -1,6 +1,6 @@
 /**
  * ARCS - Client-side JavaScript
- * Dual-mode control: Drive (WASD + mouse head) and Arm (mouse + keyboard)
+ * Dual-mode control: Drive (WASD) and Arm (mouse + keyboard)
  */
 
 // DOM Elements
@@ -12,7 +12,6 @@ const statusDot = document.getElementById('status-dot');
 const statusText = document.getElementById('global-status-text-header');
 const connectionDot = document.getElementById('connection-dot-header');
 const debugPanel = document.getElementById('debug-panel');
-const compassArrow = document.getElementById('compass-arrow');
 
 // Arm display elements
 const armPanDisplay = document.getElementById('arm-pan');
@@ -34,10 +33,7 @@ let driveLocked = false;
 let armLocked = false;
 
 // Drive state
-let currentYaw = null;
-let currentPitch = null;
 let keysPressed = { w: false, a: false, s: false, d: false, q: false, e: false };
-let baselineYaw = 0;
 
 // Arm state
 let armConnected = false;
@@ -45,17 +41,9 @@ let armPositions = {};
 let gripperClosed = false;
 
 // Throttling
-let lastHeadUpdate = 0;
 let lastArmUpdate = 0;
-let headUpdatePending = false;
 let armUpdatePending = false;
-const HEAD_UPDATE_INTERVAL = 33;
 const ARM_UPDATE_INTERVAL = 50;
-
-// Settings
-const MOUSE_SENS = 0.15;
-const YAW_MIN = -180, YAW_MAX = 180;
-const PITCH_MIN = -180, PITCH_MAX = 180;
 
 // ============== Utilities ==============
 
@@ -76,11 +64,7 @@ function updateStatus(text, state) {
     if (statusDot) statusDot.className = 'status-dot' + (state ? ' ' + state : '');
 }
 
-function updateCompass() {
-    if (currentYaw === null || !compassArrow) return;
-    const relativeYaw = currentYaw - baselineYaw;
-    compassArrow.style.transform = `translate(-50%, -100%) rotate(${-relativeYaw}deg)`;
-}
+
 
 function updateArmDisplay() {
     if (armPanDisplay) armPanDisplay.textContent = Math.round(armPositions.shoulder_pan || 0) + '°';
@@ -99,17 +83,6 @@ async function init() {
     updateStatus('Connecting...', '');
 
     try {
-        // Get head position
-        const headRes = await fetch('/head_position');
-        const headData = await headRes.json();
-
-        if (!headData.error) {
-            currentYaw = headData.yaw;
-            currentPitch = headData.pitch;
-            baselineYaw = headData.yaw;
-            updateCompass();
-        }
-
         // Get status including arm
         const statusRes = await fetch('/status');
         const status = await statusRes.json();
@@ -135,7 +108,7 @@ async function init() {
             updateStatus('Controller Offline', 'error');
         }
 
-        console.log('Initialized:', { headYaw: currentYaw, armConnected });
+        console.log('Initialized:', { armConnected });
 
     } catch (e) {
         showDebug('Connection error: ' + e.message);
@@ -237,37 +210,7 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// ============== Drive Mode: Head Control ==============
 
-function scheduleHeadUpdate() {
-    const now = Date.now();
-    const timeSinceLastUpdate = now - lastHeadUpdate;
-
-    if (timeSinceLastUpdate >= HEAD_UPDATE_INTERVAL) {
-        sendHeadUpdate();
-    } else if (!headUpdatePending) {
-        headUpdatePending = true;
-        setTimeout(() => {
-            headUpdatePending = false;
-            sendHeadUpdate();
-        }, HEAD_UPDATE_INTERVAL - timeSinceLastUpdate);
-    }
-}
-
-async function sendHeadUpdate() {
-    if (currentYaw === null || currentPitch === null) return;
-    lastHeadUpdate = Date.now();
-
-    try {
-        await fetch('/head', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ yaw: currentYaw, pitch: currentPitch })
-        });
-    } catch (e) {
-        console.log('Head update error:', e.message);
-    }
-}
 
 // ============== Drive Mode: Movement ==============
 
@@ -391,17 +334,7 @@ async function setGripper(closed) {
 
 // Mouse movement
 document.addEventListener('mousemove', (e) => {
-    if (currentMode === 'drive' && driveLocked) {
-        // Head control
-        const deltaYaw = e.movementX * MOUSE_SENS;
-        const deltaPitch = e.movementY * MOUSE_SENS;
-
-        currentYaw = Math.max(YAW_MIN, Math.min(YAW_MAX, currentYaw + deltaYaw));
-        currentPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, currentPitch + deltaPitch));
-
-        updateCompass();
-        scheduleHeadUpdate();
-    } else if (currentMode === 'arm' && armLocked) {
+    if (currentMode === 'arm' && armLocked) {
         // Arm control
         scheduleArmUpdate(e.movementX, e.movementY);
     }

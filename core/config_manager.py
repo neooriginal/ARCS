@@ -21,7 +21,7 @@ DEFAULTS = {
     "CAMERA_PORT": "/dev/video2",
     "CAMERA_RIGHT_PORT": "/dev/video0",
     "WHEEL_USB": "/dev/robot_acm0",
-    "HEAD_USB": "/dev/robot_acm1",
+
     
     # Robot type (see robots/ folder for available types)
     "ROBOT_TYPE": "xlerobot",
@@ -45,7 +45,6 @@ DEFAULTS = {
     
     # Control intervals
     "MOVEMENT_LOOP_INTERVAL": 0.05,
-    "HEAD_UPDATE_INTERVAL": 33,
     "ARM_UPDATE_INTERVAL": 50,
     
     # Arm control sensitivity
@@ -82,13 +81,6 @@ DEFAULTS = {
     "LIDAR_MAX_DISPLAY": 200,      # cm - max distance for bar display
     "LIDAR_APPROACH_DISTANCE": 2,  # cm - stop distance in Approach Mode
     
-    # Head Homing Position (for ACT recording and execution)
-    "HEAD_HOMING_YAW": 0.0,        # Degrees (-180 to 180), 0 = centered
-    "HEAD_HOMING_PITCH": 45.0,     # Degrees (-90 to 90), default VLA position
-    
-    # Head Homing Position (for AI navigation)
-    "HEAD_NAV_HOMING_YAW": 0.0,    # Degrees (-180 to 180), 0 = centered
-    "HEAD_NAV_HOMING_PITCH": 22.0, # Degrees (-90 to 90), level for obstacle detection
 }
 
 

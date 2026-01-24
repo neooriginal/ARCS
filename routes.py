@@ -185,8 +185,6 @@ def get_status():
         'camera_connected': state.camera is not None and state.camera.isOpened(),
         'arm_connected': state.arm_connected,
         'control_mode': state.get_control_mode(),
-        'head_yaw': state.head_yaw,
-        'head_pitch': state.head_pitch,
         'movement': state.movement,
         'arm_positions': state.get_arm_positions(),
         'error': state.last_error
@@ -305,46 +303,7 @@ def get_logs():
     return jsonify({'logs': []})
 
 
-@bp.route('/head_position')
-def get_head_position():
-    if state.controller is None:
-        return jsonify({'error': 'No controller'})
-    
-    try:
-        pos = state.controller.get_head_position()
-        yaw = round(pos.get(7, 0), 1)
-        pitch = round(pos.get(8, 0), 1)
-        state.head_yaw = yaw
-        state.head_pitch = pitch
-        return jsonify({'yaw': yaw, 'pitch': pitch})
-    except Exception as e:
-        state.last_error = str(e)
-        return jsonify({'error': str(e)})
 
-
-@bp.route('/head', methods=['POST'])
-def set_head():
-    if state.controller is None:
-        return jsonify({'status': 'error', 'error': 'No controller'})
-    
-    data = request.json
-    yaw = float(data.get('yaw', state.head_yaw))
-    pitch = float(data.get('pitch', state.head_pitch))
-    
-    try:
-        # Controller clamps values to safe limits and returns actual position
-        yaw_result = state.controller.turn_head_yaw(yaw)
-        pitch_result = state.controller.turn_head_pitch(pitch)
-        # Use the actual clamped values
-        actual_yaw = list(yaw_result.values())[0] if yaw_result else yaw
-        actual_pitch = list(pitch_result.values())[0] if pitch_result else pitch
-        state.head_yaw = actual_yaw
-        state.head_pitch = actual_pitch
-        state.last_remote_activity = time.time()
-        return jsonify({'status': 'ok', 'yaw': actual_yaw, 'pitch': actual_pitch})
-    except Exception as e:
-        state.last_error = str(e)
-        return jsonify({'status': 'error', 'error': str(e)})
 
 
 @bp.route('/move', methods=['POST'])
@@ -518,13 +477,7 @@ def ai_start():
     # Reset wheel speed to default when AI starts
     state.reset_wheel_speed()
     
-    # Move head to navigation homing position
-    from core.config_manager import get_config
-    if state.controller:
-        homing_yaw = get_config("HEAD_NAV_HOMING_YAW", 0.0)
-        homing_pitch = get_config("HEAD_NAV_HOMING_PITCH", 22.0)
-        state.controller.turn_head_yaw(homing_yaw)
-        state.controller.turn_head_pitch(homing_pitch)
+
     
     state.ai_enabled = True
     state.add_ai_log("AI Started")
@@ -632,7 +585,6 @@ def display_state():
         
         # Detailed Motor Status
         'wheels_connected': state.controller is not None,
-        'head_connected': state.controller is not None,
         'arm_connected': state.arm_connected,
         
         # Detailed Camera Status

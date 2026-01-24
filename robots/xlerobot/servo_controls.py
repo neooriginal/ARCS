@@ -1,4 +1,4 @@
-"""Servo controller for XLeRobot wheels, head, and arm."""
+"""Servo controller for XLeRobot wheels and arm."""
 
 from __future__ import annotations
 
@@ -25,8 +25,6 @@ ACTION_MAP = {
     "slide_right": {7: -0.15, 8: 1.0, 9: -0.15},
 }
 
-HEAD_SERVO_MAP = {"yaw": 7, "pitch": 8}
-
 ARM_SERVO_MAP = {
     "shoulder_pan": 1,
     "shoulder_lift": 2,
@@ -49,7 +47,7 @@ ARM_LIMITS = {
 
 
 class ServoControler:
-    """Controller for wheels (7-9), head (7-8), and arm (1-6)."""
+    """Controller for wheels (7-9) and arm (1-6)."""
 
     # Default lerobot calibration directory
     LEROBOT_CALIBRATION_DIR = Path.home() / ".cache" / "huggingface" / "lerobot" / "calibration" / "robots"
@@ -57,7 +55,6 @@ class ServoControler:
     def __init__(
         self,
         right_arm_wheel_usb: str = None,
-        left_arm_head_usb: str = None,
         *,
         speed: int = DEFAULT_SPEED,
         action_map: Optional[Mapping[str, Mapping[int, int]]] = None,
@@ -65,17 +62,14 @@ class ServoControler:
         arm_calibration_id: str = "xlerobot_arm",
     ) -> None:
         self.right_arm_wheel_usb = right_arm_wheel_usb
-        self.left_arm_head_usb = left_arm_head_usb
         self.speed = speed
         self.action_map = ACTION_MAP if action_map is None else action_map
         self._wheel_ids = tuple(sorted(next(iter(self.action_map.values())).keys()))
-        self._head_ids = tuple(sorted(HEAD_SERVO_MAP.values()))
         self._arm_ids = tuple(sorted(ARM_SERVO_MAP.values()))
         
         self._arm_positions = {}
         self._arm_enabled = False
         self.wheel_bus = None
-        self.head_bus = None
         self._bus_lock = threading.Lock()  # Prevent concurrent bus access
 
         if right_arm_wheel_usb:
@@ -162,30 +156,7 @@ class ServoControler:
                 else:
                     raise e
         
-        head_calibration = {
-            7: MotorCalibration(id=7, drive_mode=0, homing_offset=0, range_min=0, range_max=4095),
-            8: MotorCalibration(id=8, drive_mode=0, homing_offset=0, range_min=0, range_max=4095),
-        }
-        
-        if left_arm_head_usb:
-            try:
-                self.head_bus = FeetechMotorsBus(
-                    port=left_arm_head_usb,
-                    motors={
-                        HEAD_SERVO_MAP["yaw"]: Motor(HEAD_SERVO_MAP["yaw"], "sts3215", MotorNormMode.DEGREES),
-                        HEAD_SERVO_MAP["pitch"]: Motor(HEAD_SERVO_MAP["pitch"], "sts3215", MotorNormMode.DEGREES),
-                    },
-                    calibration=head_calibration,
-                )
-                self.head_bus.connect()
-                self.apply_head_modes()
-                self._head_positions = self.get_head_position()
-                for sid in self._head_ids:
-                    self._head_positions.setdefault(sid, 2048)
-            except Exception as e:
-                print(f"Warning: Could not connect to head on {left_arm_head_usb}: {e}")
-                self.head_bus = None
-                self._head_positions = {}
+
 
     @property
     def arm_enabled(self) -> bool:
@@ -294,45 +265,7 @@ class ServoControler:
         except Exception:
             return {}
 
-    # Head control
 
-    def apply_head_modes(self) -> None:
-        if not self.head_bus:
-            return
-        for sid in self._head_ids:
-            self.head_bus.write("Operating_Mode", sid, OperatingMode.POSITION.value)
-        self.head_bus.enable_torque()
-
-    def turn_head_yaw(self, degrees: float) -> Dict[int, float]:
-        if not self.head_bus:
-            return {}
-        payload = {HEAD_SERVO_MAP["yaw"]: float(degrees)}
-        self.head_bus.sync_write("Goal_Position", payload)
-        self._head_positions.update(payload)
-        return payload
-
-    def turn_head_pitch(self, degrees: float) -> Dict[int, float]:
-        if not self.head_bus:
-            return {}
-        payload = {HEAD_SERVO_MAP["pitch"]: float(degrees)}
-        self.head_bus.sync_write("Goal_Position", payload)
-        self._head_positions.update(payload)
-        return payload
-
-    def get_head_position(self) -> Dict[int, float]:
-        if not self.head_bus:
-            return {}
-        return self.head_bus.sync_read("Present_Position", list(self._head_ids))
-    
-    def turn_head_to_vla_position(self, pitch_deg=45) -> str:
-        self.turn_head_pitch(pitch_deg)
-        self.turn_head_yaw(0)
-        time.sleep(0.9)
-
-    def reset_head_position(self) -> str:
-        self.turn_head_pitch(22)
-        self.turn_head_yaw(0)
-        time.sleep(0.9)
 
     # Arm control
 
@@ -410,15 +343,6 @@ class ServoControler:
 
     # Stall Detection
 
-    def get_head_loads(self) -> Dict[int, int]:
-        """Read the current load (0-1000) from head motors."""
-        if not self.head_bus:
-            return {}
-        try:
-            return self.head_bus.sync_read("Present_Load", list(self._head_ids))
-        except Exception:
-            return {}
-
     def get_arm_loads(self) -> Dict[int, int]:
         """Read the current load (0-1000) from arm motors."""
         if not self._arm_enabled:
@@ -440,13 +364,6 @@ class ServoControler:
         """
         warnings = []
         
-        # Check Head
-        head_loads = self.get_head_loads()
-        for mid, load in head_loads.items():
-            if abs(load) > threshold:
-                warnings.append(f"Head Motor {mid} stalled (Load: {load})")
-                self._write_with_retry(self.head_bus, "Torque_Enable", mid, 0)
-
         # Check Arm
         if self._arm_enabled:
             arm_loads = self.get_arm_loads()
@@ -465,8 +382,6 @@ class ServoControler:
         self._wheels_stop()
         if self.wheel_bus:
             self.wheel_bus.disconnect()
-        if self.head_bus:
-            self.head_bus.disconnect()
 
     def __del__(self) -> None:
         if hasattr(self, "wheel_bus") and self.wheel_bus and self.wheel_bus.is_connected:

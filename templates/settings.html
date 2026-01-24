@@ -57,14 +57,6 @@
                     <input type="text" id="cfg_WHEEL_USB_manual" class="manual-input" placeholder="/dev/ttyACM0">
                 </div>
 
-                <div class="form-group">
-                    <label>Head Controller USB</label>
-                    <div class="port-row">
-                        <select id="cfg_HEAD_USB"></select>
-                        <button type="button" class="manual-btn" onclick="toggleManual('HEAD_USB')">✏️</button>
-                    </div>
-                    <input type="text" id="cfg_HEAD_USB_manual" class="manual-input" placeholder="/dev/ttyACM1">
-                </div>
             </div>
 
             <!-- Web Server -->
@@ -77,50 +69,7 @@
                 </div>
             </div>
 
-            <!-- Head Homing Position (ACT) -->
-            <div class="settings-card">
-                <h3>🎯 ACT Head Homing</h3>
-                <p style="color:#888; font-size:0.85em; margin-bottom:15px;">Head moves here before ACT recording or
-                    policy execution.</p>
 
-                <div class="form-group">
-                    <label>Yaw (degrees)</label>
-                    <input type="number" id="cfg_HEAD_HOMING_YAW" min="-180" max="180" step="1">
-                </div>
-
-                <div class="form-group">
-                    <label>Pitch (degrees)</label>
-                    <input type="number" id="cfg_HEAD_HOMING_PITCH" min="-90" max="90" step="1">
-
-                </div>
-
-                <button class="btn btn-secondary" onclick="setCurrentHeadPosition('ACT')"
-                    style="width:100%; margin-top:10px;">
-                    📍 Set Current Position
-                </button>
-            </div>
-
-            <!-- Head Homing Position (AI Navigation) -->
-            <div class="settings-card">
-                <h3>🧭 AI Navigation Head Homing</h3>
-                <p style="color:#888; font-size:0.85em; margin-bottom:15px;">Head moves here when AI navigation starts.
-                </p>
-
-                <div class="form-group">
-                    <label>Yaw (degrees)</label>
-                    <input type="number" id="cfg_HEAD_NAV_HOMING_YAW" min="-180" max="180" step="1">
-                </div>
-
-                <div class="form-group">
-                    <label>Pitch (degrees)</label>
-                    <input type="number" id="cfg_HEAD_NAV_HOMING_PITCH" min="-90" max="90" step="1">
-                </div>
-
-                <button class="btn btn-secondary" onclick="setCurrentHeadPosition('NAV')"
-                    style="width:100%; margin-top:10px;">
-                    📍 Set Current Position
-                </button>
-            </div>
 
             <!-- Lidar Sensor -->
             <div class="settings-card">
@@ -296,10 +245,6 @@
             <div class="form-group">
                 <label>Movement Loop Interval (s)</label>
                 <input type="number" id="cfg_MOVEMENT_LOOP_INTERVAL" step="0.01" min="0.01" max="1">
-            </div>
-            <div class="form-group">
-                <label>Head Update Interval (ms)</label>
-                <input type="number" id="cfg_HEAD_UPDATE_INTERVAL" min="10" max="500">
             </div>
             <div class="form-group">
                 <label>Arm Update Interval (ms)</label>
@@ -670,25 +615,5 @@
         checkAuthStatus();
     }
 
-    async function setCurrentHeadPosition(mode) {
-        try {
-            const res = await fetch('/head_position');
-            const data = await res.json();
-            if (data.yaw !== undefined && data.pitch !== undefined) {
-                if (mode === 'NAV') {
-                    document.getElementById('cfg_HEAD_NAV_HOMING_YAW').value = Math.round(data.yaw);
-                    document.getElementById('cfg_HEAD_NAV_HOMING_PITCH').value = Math.round(data.pitch);
-                } else {
-                    document.getElementById('cfg_HEAD_HOMING_YAW').value = Math.round(data.yaw);
-                    document.getElementById('cfg_HEAD_HOMING_PITCH').value = Math.round(data.pitch);
-                }
-                showToast('Head position captured!');
-            } else {
-                showToast('Failed to read head position');
-            }
-        } catch (e) {
-            showToast('Error: ' + e);
-        }
-    }
 </script>
 {% endblock %}

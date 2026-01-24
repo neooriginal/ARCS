@@ -29,9 +29,7 @@ class RobotState:
         self.lock = threading.Lock()
         self.last_error = None
         
-        # Head position
-        self.head_yaw = 0
-        self.head_pitch = 0
+
         
         # Control mode: 'drive' or 'arm'
         self.control_mode = 'drive'

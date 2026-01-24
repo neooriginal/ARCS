@@ -55,7 +55,7 @@
 
             <div class="click-prompt" id="drive-prompt">
                 <h2>🖱️ Click to Drive</h2>
-                <p>Mouse controls head • WASD moves robot</p>
+                <p>WASD moves robot • QE to slide</p>
             </div>
 
             <!-- Status overlay -->
@@ -64,15 +64,6 @@
                 <span class="status-text" id="status-text">Loading...</span>
             </div>
 
-            <!-- Body direction compass -->
-            <div class="body-compass">
-                <div class="compass-ring">
-                    <span class="compass-n">▲</span>
-                    <div class="compass-arrow" id="compass-arrow"></div>
-                    <div class="compass-center"></div>
-                </div>
-                <span class="compass-label">Body →</span>
-            </div>
         </div>
     </div>
 
@@ -167,14 +158,6 @@
             size: 100
         });
 
-        const headManager = nipplejs.create({
-            zone: document.getElementById('joystick-right'),
-            mode: 'static',
-            position: { right: '80px', bottom: '160px' },
-            color: 'magenta',
-            size: 100
-        });
-
         driveManager.on('move', (evt, data) => {
             if (!data.vector) return;
 
@@ -199,30 +182,6 @@
                 keysPressed.d = false;
                 if (typeof sendMovement === 'function') sendMovement();
             }
-        });
-
-        let headInterval;
-        headManager.on('move', (evt, data) => {
-            if (!data.vector) return;
-
-            clearInterval(headInterval);
-            headInterval = setInterval(() => {
-                if (typeof currentYaw !== 'undefined' && typeof currentPitch !== 'undefined') {
-                    const sensitivity = 2.0;
-                    const deltaYaw = data.vector.x * sensitivity;
-                    const deltaPitch = -data.vector.y * sensitivity;
-
-                    currentYaw = Math.max(YAW_MIN, Math.min(YAW_MAX, currentYaw + deltaYaw));
-                    currentPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, currentPitch + deltaPitch));
-
-                    if (typeof updateCompass === 'function') updateCompass();
-                    if (typeof scheduleHeadUpdate === 'function') scheduleHeadUpdate();
-                }
-            }, 33); // ~30fps
-        });
-
-        headManager.on('end', () => {
-            clearInterval(headInterval);
         });
 
         const gripBtn = document.getElementById('btn-mobile-gripper');

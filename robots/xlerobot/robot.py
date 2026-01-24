@@ -16,13 +16,11 @@ class XLeRobot(BaseRobot):
     def __init__(
         self,
         wheel_usb: str,
-        head_usb: str,
         *,
         enable_arm: bool = False,
         arm_calibration_id: str = "xlerobot_arm",
     ) -> None:
         self._wheel_usb = wheel_usb
-        self._head_usb = head_usb
         self._enable_arm = enable_arm
         self._arm_calibration_id = arm_calibration_id
         self._controller: Optional[ServoControler] = None
@@ -36,17 +34,12 @@ class XLeRobot(BaseRobot):
         return True
 
     @property
-    def has_head(self) -> bool:
-        return self._controller is not None and self._controller.head_bus is not None
-
-    @property
     def has_arm(self) -> bool:
         return self._controller is not None and self._controller.arm_enabled
 
     def connect(self) -> None:
         self._controller = ServoControler(
             self._wheel_usb,
-            self._head_usb,
             enable_arm=self._enable_arm,
             arm_calibration_id=self._arm_calibration_id,
         )
@@ -71,23 +64,7 @@ class XLeRobot(BaseRobot):
             return self._controller.get_wheel_loads()
         return {}
 
-    # --- Head ---
 
-    def move_head(self, yaw: float, pitch: float) -> None:
-        if self._controller:
-            self._controller.turn_head_yaw(yaw)
-            self._controller.turn_head_pitch(pitch)
-
-    def get_head_position(self) -> Dict[str, float]:
-        if not self._controller:
-            return {}
-        raw = self._controller.get_head_position()
-        return {"yaw": raw.get(7, 0.0), "pitch": raw.get(8, 0.0)}
-
-    def get_head_loads(self) -> Dict[int, int]:
-        if self._controller:
-            return self._controller.get_head_loads()
-        return {}
 
     # --- Arm ---
 

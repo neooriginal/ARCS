@@ -321,48 +321,7 @@ def create_slide_right(servo_controller):
 
     return slide_right
 
-def create_look_around(servo_controller, main_camera):
-    @tool
-    def look_around() -> list:
-        """ONLY use this if you are completely stuck and need to find a new path. Looks left, center, right."""
-        # Use dynamic state
-        controller = robot_state.controller
-        camera = robot_state.camera
-        
-        if not controller or not camera:
-             return "Error: Hardware (Head/Camera) not ready."
-        
-        movement_delay = 0.8  # seconds
-        print("Looking around...")
-        controller.turn_head_yaw(-30)  # Safe left
-        time.sleep(movement_delay)
-        image_left = capture_image(camera)
-        image_left64 = base64.b64encode(image_left).decode('utf-8')
-        controller.turn_head_yaw(30)   # Safe right
-        time.sleep(movement_delay)
-        image_right = capture_image(camera)
-        image_right64 = base64.b64encode(image_right).decode('utf-8')  
-        controller.turn_head_yaw(0)    # Center
-        time.sleep(movement_delay)
-        image_center = capture_image(camera)
-        image_center64 = base64.b64encode(image_center).decode('utf-8')
 
-        return [
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{image_left64}"}
-                },
-                {
-                    "type": "image_url", 
-                    "image_url": {"url": f"data:image/jpeg;base64,{image_center64}"}
-                },
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{image_right64}"}
-                }
-            ]
-        
-    return look_around
 
 
 
@@ -434,8 +393,6 @@ def create_vla_single_arm_manipulation(
             return "Error: Robot controller not ready."
             
         print("Manipulation tool activated")
-        controller.turn_head_pitch(45)
-        controller.turn_head_yaw(0)
         
         cam = robot_state.camera
         if cam:
@@ -455,9 +412,6 @@ def create_vla_single_arm_manipulation(
         finally:
             time.sleep(1)
             # Camera re-initialization would handle this on next usage attempt or requires manual reset
-                
-            if controller:
-                controller.reset_head_position()
         
         return "Arm manipulation done"
     
