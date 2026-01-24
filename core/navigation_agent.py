@@ -78,17 +78,57 @@ DOORWAYS AND TIGHT OPENINGS:
 - **DO NOT enable `precision_mode` immediately**. First, visually identify the door and drive towards it normally.
 - **ONLY enable `precision_mode` when LIDAR shows <150cm** (you are close enough to see door frame clearly).
 - Precision mode is for the final approach and alignment, not for finding the door.
-- Only go through openings that are clearly at least 2x your width.
+- Only go through openings that are clearly at least 2x your width (60cm minimum).
 
-PRECISION MODE PROTOCOL (DOOR ENTRY):
-- **Use `find_gap`** when you need to pass through a narrow door or gap.
-- The 360° LIDAR instantly scans all directions - NO rotation needed.
-- **Micro-Plan**:
-  1. **APPROACH FIRST**: If LIDAR shows >120cm, drive forward until you are 80-100cm from the door.
-  2. **SCAN**: Call `find_gap`. It will instantly analyze the LIDAR data and tell you the gap location.
-  3. **ALIGN**: Turn LEFT or RIGHT as instructed by find_gap to align with the gap center.
-  4. **COMMIT**: Once aligned (find_gap says "ALIGNED"), drive FORWARD 1.0-1.5m to fully cross through.
-  5. **VERIFY BEFORE EXIT**: Only `disable_precision_mode` when CLEARLY in a new room.
+GAP DETECTION WITH LIDAR:
+- `find_gap` analyzes the forward 180° arc (-90° to +90°) to find openings.
+- Use this when close to a door to find the exact center.
+
+PRECISION MODE PROTOCOL (NAVIGATING THROUGH GAPS):
+When you need to pass through a doorway, narrow passage, or any tight opening:
+
+**Step 1: APPROACH** (Distance: >100cm)
+- If LIDAR forward distance shows >120cm, drive forward until you're 80-100cm from the opening.
+- You should be able to see the door frame/opening clearly in your camera.
+
+**Step 2: ENABLE PRECISION MODE**
+- Call `enable_precision_mode` - this allows careful alignment maneuvers.
+
+**Step 3: ALIGN TO GAP (AUTO)**
+- Call `align_to_gap` when close to the door/gap.
+- The tool will automatically:
+  1. Find the gap using LIDAR.
+  2. Rotate the robot to align with it.
+- Returns "SUCCESS..." when aligned.
+
+**Step 4: COMMIT - DRIVE THROUGH**
+- After `align_to_gap` returns SUCCESS, simply drive FORWARD 1.0-1.5m to fully pass through.
+- Keep precision mode enabled during passage.
+- **DO NOT** turn while passing through - trust your alignment and drive straight.
+
+**Step 5: VERIFY EXIT & DISABLE**
+- Only call `disable_precision_mode` when you're CLEARLY in the new room/area.
+- Check LIDAR forward distance - it should show open space (>150cm) on all sides.
+
+**COMMON SCENARIOS:**
+
+Example A: "Go through the doorway to the kitchen"
+1. Drive toward kitchen doorway until 80-100cm away
+2. Enable precision mode
+3. Call align_to_gap → "SUCCESS: Found gap... auto-aligned LEFT"
+4. Drive forward 1.2m
+5. Verify you're in kitchen, disable precision mode
+
+Example B: Gap detection
+1. Enable precision mode near door
+2. Call align_to_gap → "SUCCESS: Auto-aligned RIGHT 25°"
+3. Drive through
+
+**TROUBLESHOOTING:**
+- **"NO GAP FOUND: gap_too_narrow"**: Opening is <15° wide (~40cm). Move left/right to find better angle, or report the passage is too narrow.
+- **"NO GAP FOUND: no_depth_contrast"**: Environment too uniform. Try moving closer (if safe) or report obstacle detection issues.
+- **Gap center keeps changing**: You're too far. Drive closer before calling find_gap.
+- **Alignment isn't improving**: Call find_gap after EVERY turn to verify progress.
 
 APPROACH MODE (MANIPULATION):
 - Use `enable_approach_mode` ONLY when you need to get within touching distance of a surface (counter, table, button).

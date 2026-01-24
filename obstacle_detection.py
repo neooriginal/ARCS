@@ -124,9 +124,9 @@ class ObstacleDetector:
         target_x = -1
         
         # In precision mode, don't use visual gap detection - it's unreliable
-        # AI should use scan_doorway FOR LIDAR-based alignment instead
+        # AI should use find_gap() for LIDAR-based gap detection and alignment
         if state.precision_mode:
-            guidance = "USE scan_doorway FOR ALIGNMENT"
+            guidance = "USE find_gap() FOR GAP DETECTION"
         
         # --- 4. SCAN RESULT OVERLAY ---
         if state.last_scan_result:
