@@ -122,7 +122,6 @@ class ServoControler:
                 port=right_arm_wheel_usb,
                 motors=motors,
                 calibration=calibration,
-                baudrate=DEFAULT_BAUDRATE,
             )
             
             try:
@@ -150,7 +149,6 @@ class ServoControler:
                         port=right_arm_wheel_usb,
                         motors=motors,
                         calibration=None,
-                        baudrate=DEFAULT_BAUDRATE,
                     )
                     self.wheel_bus.connect()
                     self.apply_wheel_modes()
@@ -381,23 +379,11 @@ class ServoControler:
     # Cleanup
 
     def disconnect(self) -> None:
-        try:
-            self._wheels_stop()
-        except Exception:
-            pass
-            
+        self._wheels_stop()
         if self.wheel_bus:
-            try:
-                self.wheel_bus.disconnect()
-            except Exception as e:
-                # If already disconnected or never connected, this might fail.
-                # Suppress error during cleanup to avoid noisy tracebacks.
-                pass
-            self.wheel_bus = None
+            self.wheel_bus.disconnect()
 
     def __del__(self) -> None:
-        # Check if attribute exists to avoid errors if __init__ failed early
-        if hasattr(self, "wheel_bus") and self.wheel_bus:
-            # We skip checking is_connected because it might be unreliable during partial failure
+        if hasattr(self, "wheel_bus") and self.wheel_bus and self.wheel_bus.is_connected:
             self.disconnect()
 
