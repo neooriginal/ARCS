@@ -14,45 +14,49 @@ from lerobot.motors.feetech.feetech import FeetechMotorsBus
 
 def scan_ports():
     ports = sorted(glob.glob('/dev/ttyACM*') + glob.glob('/dev/robot_acm*'))
-    print(f"Scanning ports: {ports}")
+    baudrates = [1000000, 115200, 57600, 500000, 230400]
     
     for port in ports:
         print(f"\nChecking port: {port}")
-        try:
-            # Initialize with NO motors to avoid immediate connect() checks
-            # We will manually open the port
-            bus = FeetechMotorsBus(port=port, motors={})
-            
-            # Manually open packet handler without full bus validation
-            # The FeetechMotorsBus has a port_handler, not packet_handler for opening
-            if hasattr(bus, 'port_handler'):
-                bus.port_handler.openPort()
-                bus.port_handler.setBaudRate(1000000) # Hardcoded default for XLeRobot/Feetech
-            else:
-                # Fallback if structure is different
-                print("  -> Unknown bus structure, trying standard connect...")
-                bus.connect()
-            
-            print("  -> Port opened. Scanning IDs 1-20...")
-            found = []
-            for mid in range(1, 21):
-                try:
-                    # Try to ping via read
-                    model = bus.read("Model_Number", mid)
-                    if model is not None:
-                        found.append(f"ID {mid} (Model {model})")
-                except Exception:
-                    pass
-            
-            if found:
-                print(f"  -> FOUND MOTORS: {found}")
-            else:
-                print("  -> No motors responded.")
+        
+        for baud in baudrates:
+            print(f"  Testing baudrate: {baud}...")
+            bus = None
+            try:
+                # Initialize with empty motors dict
+                bus = FeetechMotorsBus(port=port, motors={})
                 
-            bus.disconnect()
-            
-        except Exception as e:
-            print(f"  -> Scan failed: {e}")
+                if hasattr(bus, 'port_handler'):
+                    bus.port_handler.openPort()
+                    bus.port_handler.setBaudRate(baud)
+                else:
+                    # Fallback
+                    bus.connect()
+
+                # Scan
+                found = []
+                for mid in range(1, 21):
+                    try:
+                        model = bus.read("Model_Number", mid)
+                        if model is not None:
+                            found.append(f"ID {mid} (Model {model})")
+                    except:
+                        pass
+                
+                if found:
+                    print(f"  -> [SUCCESS] FOUND MOTORS at {baud}: {found}")
+                    bus.disconnect()
+                    break # Stop trying other baudrates for this port
+                else:
+                    pass # silent if nothing found
+                    
+                bus.disconnect()
+                
+            except Exception as e:
+                # print(f"    Error at {baud}: {e}")
+                pass
+        else:
+            print("  -> No motors responded on any baudrate.")
 
 if __name__ == "__main__":
     scan_ports()
