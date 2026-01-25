@@ -549,33 +549,44 @@ def create_align_to_gap():
         TOLERANCE_DEG = 3.0
         ROTATION_INCREMENT_DEG = 15
         
+        print("[ALIGN] Starting alignment sequence...")
+        
         original_speed = None
         if robot_state.controller:
             original_speed = robot_state.controller.get_speed()
             robot_state.controller.set_speed(5000)
+            print(f"[ALIGN] Speed reduced to 5000 (from {original_speed})")
         
         try:
             for iteration in range(MAX_ITERATIONS):
+                print(f"[ALIGN] === Iteration {iteration+1}/{MAX_ITERATIONS} ===")
                 gap_info = lidar.find_gap_in_range(-90, 90)
                 robot_state.last_scan_result = gap_info
                 
                 if not gap_info['found']:
                     reason = gap_info.get('reason', 'unknown')
+                    print(f"[ALIGN] ERROR: Gap lost. Reason: {reason}")
                     return f"Gap lost during alignment (iteration {iteration}). Reason: {reason}"
                 
                 center_angle = gap_info['center_angle']
                 width = gap_info['width_deg']
                 
+                print(f"[ALIGN] Gap detected: center={center_angle:.1f}°, width={width:.1f}°")
+                
                 if abs(center_angle) < TOLERANCE_DEG:
+                    print(f"[ALIGN] SUCCESS: Aligned within tolerance ({abs(center_angle):.1f}° < {TOLERANCE_DEG}°)")
                     return f"ALIGNED: Gap center at {center_angle:.1f}° (width {width:.1f}°). Ready to proceed."
                 
                 rotation_angle = min(ROTATION_INCREMENT_DEG, abs(center_angle))
                 direction = "LEFT" if center_angle > 0 else "RIGHT"
                 
+                print(f"[ALIGN] Decision: center_angle={center_angle:.1f}° → Turn {direction} by {rotation_angle:.0f}°")
+                print(f"[ALIGN] Logic check: center_angle > 0? {center_angle > 0} → {'LEFT' if center_angle > 0 else 'RIGHT'}")
+                
                 MIN_DURATION = 0.15
                 duration = max(MIN_DURATION, rotation_angle / 60.0)
                 
-                print(f"[ALIGN] Iter {iteration+1}: Error={center_angle:.1f}°, Rotating {direction} {rotation_angle:.0f}° for {duration:.2f}s")
+                print(f"[ALIGN] Executing: {direction} rotation for {duration:.2f}s")
                 
                 robot_state.movement = {
                     'forward': False,
@@ -589,19 +600,24 @@ def create_align_to_gap():
                 robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
                 
                 if not completed:
+                    print("[ALIGN] EMERGENCY STOP detected")
                     return "EMERGENCY STOP during alignment."
                 
+                print("[ALIGN] Rotation complete, waiting 0.2s to settle...")
                 time.sleep(0.2)
             
+            print(f"[ALIGN] Max iterations ({MAX_ITERATIONS}) reached. Performing final scan...")
             final_gap = lidar.find_gap_in_range(-90, 90)
             robot_state.last_scan_result = final_gap
             final_error = final_gap['center_angle'] if final_gap['found'] else 999
             
+            print(f"[ALIGN] Final error: {final_error:.1f}°")
             return f"Max iterations reached. Final error: {final_error:.1f}°. Close enough - proceed carefully."
             
         finally:
             robot_state.precision_mode = previous_mode
             if original_speed is not None and robot_state.controller:
                 robot_state.controller.set_speed(original_speed)
+                print(f"[ALIGN] Speed restored to {original_speed}")
 
     return align_to_gap
