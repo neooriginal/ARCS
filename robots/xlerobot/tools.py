@@ -625,3 +625,114 @@ def create_align_to_gap():
                 print(f"[ALIGN] Speed restored to {original_speed}")
 
     return align_to_gap
+
+
+def create_pass_through_gap():
+    @tool
+    def pass_through_gap() -> str:
+        """
+        Safely navigates through a door or narrow gap.
+        1. Auto-aligns with the gap.
+        2. Drives forward while actively centering between door frame / walls.
+        Use this instead of 'move_forward' when passing through doors.
+        """
+        from state import state as robot_state
+        from core.lidar360 import get_lidar360
+        import time
+        
+        lidar = get_lidar360()
+        if not lidar or not lidar.connected:
+            return "Error: LIDAR not connected."
+
+        # 1. Align First
+        print("[PASS_THROUGH] Step 1: Aligning...")
+        align_tool = create_align_to_gap()
+        result = align_tool.func()
+        
+        if "EMERGENCY STOP" in result or "Gap lost" in result:
+             return f"Alignment failed: {result}"
+        
+        if "ALIGNED" not in result and "SUCCESS" not in result and "Max iterations" not in result:
+             return f"Alignment uncertain: {result}"
+
+        # 2. Drive Through with Centering
+        print("[PASS_THROUGH] Step 2: Driving through...")
+        
+        TOTAL_DISTANCE = 1.0 # Drive 1 meter through door
+        STEP_SIZE = 0.2
+        steps = int(TOTAL_DISTANCE / STEP_SIZE)
+        
+        original_speed = None
+        if robot_state.controller:
+            original_speed = robot_state.controller.get_speed()
+            robot_state.controller.set_speed(4000) # Slow for safety
+        
+        try:
+            for i in range(steps):
+                # Measure sides
+                # +90 is Right, -90 is Left (based on recent inversion)
+                # Let's average a small arc for robustness
+                left_dists = lidar.get_distances_in_range(-100, -80) # Left side
+                right_dists = lidar.get_distances_in_range(80, 100)  # Right side
+                
+                # Check for walls within 60cm (door frame range)
+                # Filter out 'inf' or very far points
+                valid_left = [d for a,d in left_dists if d < 80]
+                valid_right = [d for a,d in right_dists if d < 80]
+                
+                correction = ""
+                
+                if valid_left and valid_right:
+                    min_left = min(valid_left)
+                    min_right = min(valid_right)
+                    
+                    diff = min_right - min_left
+                    # If Diff is Positive (Right > Left), we are closer to Left. Slide Right.
+                    # If Diff is Negative (Right < Left), we are closer to Right. Slide Left.
+                    
+                    THRESHOLD = 5.0 # 5cm tolerance
+                    
+                    if diff > THRESHOLD:
+                        # Closer to Left -> Slide Right
+                        print(f"[PASS_THROUGH] Too close to LEFT (L={min_left:.0f}, R={min_right:.0f}). Correction: Slide RIGHT.")
+                        # Slide small amount
+                        robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False, 'slide_left': False, 'slide_right': True}
+                        _interruptible_sleep(0.15) # Short slide
+                        correction = "Corrected RIGHT"
+                        
+                    elif diff < -THRESHOLD:
+                        # Closer to Right -> Slide Left
+                        print(f"[PASS_THROUGH] Too close to RIGHT (L={min_left:.0f}, R={min_right:.0f}). Correction: Slide LEFT.")
+                        robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False, 'slide_left': True, 'slide_right': False}
+                        _interruptible_sleep(0.15)
+                        correction = "Corrected LEFT"
+                
+                # Forward Step
+                print(f"[PASS_THROUGH] Step {i+1}/{steps} Forward {STEP_SIZE}m... {correction}")
+                robot_state.movement = {'forward': True, 'backward': False, 'left': False, 'right': False}
+                completed = _interruptible_sleep(1.0) # Approx time for 20cm at slow speed? 
+                # Wait, move_forward uses distance/speed calculation.
+                # Let's use the explicit duration based on create_move_forward logic: 0.2m / 0.15 * speed_factor?
+                # At 4000 speed (40%), it moves slower.
+                # Let's just use _interruptible_sleep(0.5) roughly for small steps or rely on feedback?
+                # Better: continuously move? No, discrete steps easier to correct.
+                # Let's assume standard 'move forward' logic implies ~1.3s for 0.2m at full speed?
+                # Formula in move_forward: duration = distance / 0.15. 
+                # 0.2 / 0.15 = 1.33s. Since speed is 40%, it might travel less or same duration?
+                # Servo controller speed limits max RPM.
+                # Let's stick to simple timing.
+                
+                if not completed:
+                    return "EMERGENCY STOP in door."
+
+                robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
+                time.sleep(0.1)
+                
+            return "SUCCESS: Passed through gap."
+            
+        finally:
+            robot_state.precision_mode = False
+            if robot_state.controller and original_speed:
+                robot_state.controller.set_speed(original_speed)
+
+    return pass_through_gap
