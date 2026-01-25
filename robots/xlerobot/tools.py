@@ -545,6 +545,10 @@ def create_align_to_gap():
         previous_mode = robot_state.precision_mode
         robot_state.precision_mode = True
         
+        # Slow down for precision alignment
+        if robot_state.controller:
+            robot_state.controller.set_speed(2000) # 20% speed
+        
         max_attempts = 3
         attempt = 0
         final_error = 0
@@ -562,16 +566,16 @@ def create_align_to_gap():
                 center_angle = gap_info['center_angle']
                 final_error = center_angle
                 
-                # 2. Check alignment (Tolerance: 2 degrees)
-                if abs(center_angle) < 2.0:
+                # 2. Check alignment (Tolerance: 3 degrees)
+                if abs(center_angle) < 3.0:
                     return f"SUCCESS: Aligned to gap (Error: {center_angle:.1f}°). Ready to drive forward."
                 
                 # 3. Calculate Correction
-                print(f"[TOOL] align_to_gap: Correction attempt {attempt+1}: {center_angle:.1f}°")
+                print(f"[TOOL] align_to_gap: Correction attempt {attempt+1}: {center_angle:.1f}° (Slow Mode)")
                 
-                # Fine tuning logic: reduce duration clamp for small angles
-                MIN_DURATION = 0.05 if abs(center_angle) < 10 else 0.15
-                duration = abs(center_angle) / 60.0
+                # Slower turn rate calculation (approx 15 deg/sec at 20% speed)
+                MIN_DURATION = 0.1
+                duration = abs(center_angle) / 15.0 
                 duration = max(duration, MIN_DURATION)
                 
                 direction = "LEFT" if center_angle > 0 else "RIGHT"
@@ -588,7 +592,10 @@ def create_align_to_gap():
                 
                 # Stop & Stabilize
                 robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
-                time.sleep(0.2) # Allow robot to settle before re-scanning
+                
+                # CRITICAL: Wait for LIDAR to complete full fresh scan after movement stops
+                # Lidar spins at ~10Hz, but we want to be overly safe to avoid "hunting"
+                time.sleep(1.5) 
                 
                 if not completed:
                     return "EMERGENCY STOP during alignment."
@@ -597,6 +604,9 @@ def create_align_to_gap():
                 
         finally:
             robot_state.precision_mode = previous_mode
+            # Restore speed
+            if robot_state.controller:
+                robot_state.controller.set_speed(10000)
             
         return f"PARTIAL SUCCESS: Finished alignment loop. Final Error: {final_error:.1f}°. Gap is ahead."
 
