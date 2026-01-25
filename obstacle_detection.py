@@ -391,6 +391,10 @@ class ObstacleDetector:
         if len(dists) == 0:
             return
             
+        # Convert to numpy arrays for vector ops
+        angles = np.array(angles)
+        dists = np.array(dists)
+            
         # Scaling
         # Angles: -25 to +25 mapped to 10 to w-10
         # Dists: 0 to 200cm mapped to box_h to 0 (inverted)

@@ -308,13 +308,19 @@ class Lidar360:
         
         center_angle = (best_start + best_end) / 2
         
+        # Extract raw profile for visualization
+        # Unzip the (angle, dist) tuples
+        raw_angles = [d[0] for d in distances]
+        raw_dists = [d[1] for d in distances]
+
         return {
             'found': True,
             'center_angle': center_angle,
             'width_deg': best_width,
             'left_edge_angle': best_start,
             'right_edge_angle': best_end,
-            'threshold': threshold
+            'threshold': threshold,
+            'raw_profile': (raw_angles, raw_dists)
         }
 
 
