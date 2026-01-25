@@ -51,9 +51,7 @@ class ObstacleDetector:
         return None
         
     def process(self, frame):
-        """
         """Process frame for safety checks and obstacle detection."""
-        """
         if frame is None:
             return ["STOP"], None, {}
             
