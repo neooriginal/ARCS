@@ -265,13 +265,12 @@ class Lidar360:
         
         # Calculate depth threshold dynamically
         dist_values = [d for _, d in distances]
-        p20 = sorted(dist_values)[len(dist_values) // 5]
-        p80 = sorted(dist_values)[len(dist_values) * 4 // 5]
+        dist_values.sort()
+        p20 = dist_values[len(dist_values) // 5]
         
-        if (p80 - p20) < 20:
-            return {'found': False, 'reason': 'no_depth_contrast'}
-        
-        threshold = (p20 + p80) / 2
+        # Use relative threshold based on nearest obstacles (walls)
+        # Prevents far backgrounds from masking valid mid-range gaps
+        threshold = max(min_gap_depth_cm, p20 + 50)
         
         # Find gap segments and smooth noise
         raw_gap_mask = [d > threshold and d > min_gap_depth_cm for _, d in distances]
