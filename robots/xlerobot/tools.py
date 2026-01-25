@@ -517,9 +517,9 @@ def create_find_gap():
         if abs(center) < 5:
             alignment = "ALIGNED - Gap is directly ahead! Drive forward to pass through."
         elif center > 0:
-            alignment = f"Turn LEFT {abs(center):.0f}° to align with gap center."
-        else:
             alignment = f"Turn RIGHT {abs(center):.0f}° to align with gap center."
+        else:
+            alignment = f"Turn LEFT {abs(center):.0f}° to align with gap center."
         
         return f"GAP FOUND: Center at {center:.1f}°, width {width:.1f}°. {alignment}"
 
@@ -532,7 +532,10 @@ def create_align_to_gap():
         """
         Scans for a gap using LIDAR and AUTOMATICALLY rotates the robot to face the center.
         Uses closed-loop feedback for reliable alignment.
-        Returns the result of the alignment.
+        
+        IMPORTANT: This tool performs the complete alignment sequence. 
+        If it returns "ALIGNED", DO NOT call find_gap() or turn() manually. 
+        Proceed directly to move_forward().
         """
         import time
         from state import state as robot_state
@@ -575,13 +578,14 @@ def create_align_to_gap():
                 
                 if abs(center_angle) < TOLERANCE_DEG:
                     print(f"[ALIGN] SUCCESS: Aligned within tolerance ({abs(center_angle):.1f}° < {TOLERANCE_DEG}°)")
-                    return f"ALIGNED: Gap center at {center_angle:.1f}° (width {width:.1f}°). Ready to proceed."
+                    return f"ALIGNED: Gap center at {center_angle:.1f}° (width {width:.1f}°). ALIGNMENT COMPLETE - MOVE FORWARD."
                 
                 rotation_angle = min(ROTATION_INCREMENT_DEG, abs(center_angle))
-                direction = "LEFT" if center_angle > 0 else "RIGHT"
+                
+                # INVERTED LOGIC based on user feedback: +Angle seems to be RIGHT
+                direction = "RIGHT" if center_angle > 0 else "LEFT"
                 
                 print(f"[ALIGN] Decision: center_angle={center_angle:.1f}° → Turn {direction} by {rotation_angle:.0f}°")
-                print(f"[ALIGN] Logic check: center_angle > 0? {center_angle > 0} → {'LEFT' if center_angle > 0 else 'RIGHT'}")
                 
                 MIN_DURATION = 0.15
                 duration = max(MIN_DURATION, rotation_angle / 60.0)
