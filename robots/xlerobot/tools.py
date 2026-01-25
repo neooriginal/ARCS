@@ -558,7 +558,6 @@ def create_align_to_gap():
             robot_state.controller.set_speed(5000)
         
         try:
-        try:
             for iteration in range(MAX_ITERATIONS):
                 gap_info = lidar.find_gap_in_range(-90, 90)
                 robot_state.last_scan_result = gap_info
