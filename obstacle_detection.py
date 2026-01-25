@@ -75,31 +75,33 @@ class ObstacleDetector:
             self.distance_history.append(distance)
             avg_distance = sum(self.distance_history) / len(self.distance_history)
             
-            # Use approach distance if active
-            current_stop_dist = self.approach_stop_distance if state.approach_mode else self.stop_distance
+            # Specific safety thresholds (cm)
+            STOP_FWD = self.approach_stop_distance if state.approach_mode else 15
+            STOP_BACK = 25
+            STOP_SIDE = 25
             
             # --- 360° LIDAR SAFETY BUBBLE ---
             if lidar and lidar.connected:
                 fwd_min = lidar.get_min_distance_in_range(-30, 30)
-                if fwd_min is not None and fwd_min < current_stop_dist:
+                if fwd_min is not None and fwd_min < STOP_FWD:
                     instant_blocked.add("FORWARD")
-                elif avg_distance < current_stop_dist:
+                elif avg_distance < STOP_FWD:
                     instant_blocked.add("FORWARD")
                     
                 back_min = lidar.get_min_distance_in_range(150, 210)
-                if back_min is not None and back_min < current_stop_dist:
+                if back_min is not None and back_min < STOP_BACK:
                     instant_blocked.add("BACKWARD")
                     
                 left_min = lidar.get_min_distance_in_range(60, 120)
-                if left_min is not None and left_min < 35:
+                if left_min is not None and left_min < STOP_SIDE:
                     instant_blocked.add("LEFT")
                 
                 right_min = lidar.get_min_distance_in_range(240, 300)
-                if right_min is not None and right_min < 35:
+                if right_min is not None and right_min < STOP_SIDE:
                     instant_blocked.add("RIGHT")
             else:
-                # Fallback to single point if 360 not ready
-                if avg_distance < current_stop_dist:
+                # Fallback
+                if avg_distance < STOP_FWD:
                     instant_blocked.add("FORWARD")
             
             self._draw_proximity_overlay(overlay, avg_distance, w, h)
