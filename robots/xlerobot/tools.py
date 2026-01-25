@@ -531,7 +531,7 @@ def create_align_to_gap():
     def align_to_gap() -> str:
         """
         Scans for a gap using LIDAR and AUTOMATICALLY rotates the robot to face the center.
-        Use this when close to a door/gap to quickly align before driving through.
+        Uses closed-loop feedback for reliable alignment.
         Returns the result of the alignment.
         """
         import time
@@ -542,55 +542,66 @@ def create_align_to_gap():
         if not lidar or not lidar.connected:
             return "Error: 360° LIDAR not available."
             
-        # 1. Scan for gap
         previous_mode = robot_state.precision_mode
         robot_state.precision_mode = True
         
-        # Analyze forward arc (±90°)
-        gap_info = lidar.find_gap_in_range(-90, 90)
+        MAX_ITERATIONS = 8
+        TOLERANCE_DEG = 3.0
+        ROTATION_INCREMENT_DEG = 15
         
-        robot_state.last_scan_result = gap_info
+        original_speed = None
+        if robot_state.controller:
+            original_speed = robot_state.controller.get_speed()
+            robot_state.controller.set_speed(5000)
         
-        if not gap_info['found']:
+        try:
+            for iteration in range(MAX_ITERATIONS):
+                gap_info = lidar.find_gap_in_range(-90, 90)
+                robot_state.last_scan_result = gap_info
+                
+                if not gap_info['found']:
+                    reason = gap_info.get('reason', 'unknown')
+                    return f"Gap lost during alignment (iteration {iteration}). Reason: {reason}"
+                
+                center_angle = gap_info['center_angle']
+                width = gap_info['width_deg']
+                
+                if abs(center_angle) < TOLERANCE_DEG:
+                    return f"ALIGNED: Gap center at {center_angle:.1f}° (width {width:.1f}°). Ready to proceed."
+                
+                rotation_angle = min(ROTATION_INCREMENT_DEG, abs(center_angle))
+                direction = "LEFT" if center_angle > 0 else "RIGHT"
+                
+                MIN_DURATION = 0.15
+                duration = max(MIN_DURATION, rotation_angle / 60.0)
+                
+                print(f"[ALIGN] Iter {iteration+1}: Error={center_angle:.1f}°, Rotating {direction} {rotation_angle:.0f}° for {duration:.2f}s")
+                
+                robot_state.movement = {
+                    'forward': False,
+                    'backward': False,
+                    'left': (direction == "LEFT"),
+                    'right': (direction == "RIGHT")
+                }
+                
+                completed = _interruptible_sleep(duration)
+                
+                robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
+                
+                if not completed:
+                    return "EMERGENCY STOP during alignment."
+                
+                time.sleep(0.2)
+            
+            final_gap = lidar.find_gap_in_range(-90, 90)
+            robot_state.last_scan_result = final_gap
+            final_error = final_gap['center_angle'] if final_gap['found'] else 999
+            
+            return f"Max iterations reached. Final error: {final_error:.1f}°. Close enough - proceed carefully."
+            
+        finally:
             robot_state.precision_mode = previous_mode
-            reason = gap_info.get('reason', 'unknown')
-            return f"NO GAP FOUND. Reason: {reason}. Try moving left/right manually."
-            
-        center_angle = gap_info['center_angle']
-        width = gap_info['width_deg']
-        
-        # 2. Check alignment
-        if abs(center_angle) < 5:
-            robot_state.precision_mode = previous_mode
-            return f"ALREADY ALIGNED (Error {center_angle:.1f}°). Gap is efficiently ahead. Drive forward."
-            
-        # 3. Auto-Rotate
-        # Calculate duration based on ~60 deg/sec (same as turn_left tool)
-        MIN_DURATION = 0.15
-        duration = abs(center_angle) / 60.0
-        duration = max(duration, MIN_DURATION)
-        
-        direction = "LEFT" if center_angle > 0 else "RIGHT"
-        
-        print(f"[TOOL] align_to_gap: Turning {direction} {abs(center_angle):.1f}° (Duration: {duration:.2f}s)")
-        
-        # Execute turn
-        robot_state.movement = {
-            'forward': False, 
-            'backward': False, 
-            'left': (direction == "LEFT"), 
-            'right': (direction == "RIGHT")
-        }
-        
-        completed = _interruptible_sleep(duration)
-        
-        # Stop
-        robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
-        robot_state.precision_mode = previous_mode
-        
-        if not completed:
-            return "EMERGENCY STOP during auto-alignment."
-            
-        return f"SUCCESS: Found gap at {center_angle:.1f}° and auto-aligned {direction}. You should now be facing the gap (width {width:.1f}°). Drive forward."
+            if original_speed is not None and robot_state.controller:
+                robot_state.controller.set_speed(original_speed)
 
     return align_to_gap
