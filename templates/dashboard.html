@@ -165,6 +165,9 @@
 
 <script src="{{ url_for('static', filename='js/lidar_visualizer.js') }}"></script>
 <script>
+    // Initialize Lidar Visualizer
+    const lidarViz = new LidarVisualizer('lidar-radar-mini', { maxDist: 400 });
+
     // Poll for status updates on the dashboard (System Status)
     setInterval(async () => {
         try {
