@@ -552,45 +552,32 @@ def create_align_to_gap():
         TOLERANCE_DEG = 3.0
         ROTATION_INCREMENT_DEG = 15
         
-        print("[ALIGN] Starting alignment sequence...")
-        
         original_speed = None
         if robot_state.controller:
             original_speed = robot_state.controller.get_speed()
             robot_state.controller.set_speed(5000)
-            print(f"[ALIGN] Speed reduced to 5000 (from {original_speed})")
         
         try:
+        try:
             for iteration in range(MAX_ITERATIONS):
-                print(f"[ALIGN] === Iteration {iteration+1}/{MAX_ITERATIONS} ===")
                 gap_info = lidar.find_gap_in_range(-90, 90)
                 robot_state.last_scan_result = gap_info
                 
                 if not gap_info['found']:
                     reason = gap_info.get('reason', 'unknown')
-                    print(f"[ALIGN] ERROR: Gap lost. Reason: {reason}")
-                    return f"Gap lost during alignment (iteration {iteration}). Reason: {reason}"
+                    return f"Gap lost during alignment. Reason: {reason}"
                 
                 center_angle = gap_info['center_angle']
-                width = gap_info['width_deg']
-                
-                print(f"[ALIGN] Gap detected: center={center_angle:.1f}°, width={width:.1f}°")
                 
                 if abs(center_angle) < TOLERANCE_DEG:
-                    print(f"[ALIGN] SUCCESS: Aligned within tolerance ({abs(center_angle):.1f}° < {TOLERANCE_DEG}°)")
-                    return f"ALIGNED: Gap center at {center_angle:.1f}° (width {width:.1f}°). ALIGNMENT COMPLETE - MOVE FORWARD."
+                    return f"ALIGNED: Gap center at {center_angle:.1f}°. Ready to proceed."
                 
                 rotation_angle = min(ROTATION_INCREMENT_DEG, abs(center_angle))
                 
-                # INVERTED LOGIC based on user feedback: +Angle seems to be RIGHT
                 direction = "RIGHT" if center_angle > 0 else "LEFT"
-                
-                print(f"[ALIGN] Decision: center_angle={center_angle:.1f}° → Turn {direction} by {rotation_angle:.0f}°")
                 
                 MIN_DURATION = 0.15
                 duration = max(MIN_DURATION, rotation_angle / 60.0)
-                
-                print(f"[ALIGN] Executing: {direction} rotation for {duration:.2f}s")
                 
                 robot_state.movement = {
                     'forward': False,
@@ -604,25 +591,20 @@ def create_align_to_gap():
                 robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False}
                 
                 if not completed:
-                    print("[ALIGN] EMERGENCY STOP detected")
                     return "EMERGENCY STOP during alignment."
                 
-                print("[ALIGN] Rotation complete, waiting 0.2s to settle...")
                 time.sleep(0.2)
             
-            print(f"[ALIGN] Max iterations ({MAX_ITERATIONS}) reached. Performing final scan...")
             final_gap = lidar.find_gap_in_range(-90, 90)
             robot_state.last_scan_result = final_gap
             final_error = final_gap['center_angle'] if final_gap['found'] else 999
             
-            print(f"[ALIGN] Final error: {final_error:.1f}°")
             return f"Max iterations reached. Final error: {final_error:.1f}°. Close enough - proceed carefully."
             
         finally:
             robot_state.precision_mode = previous_mode
             if original_speed is not None and robot_state.controller:
                 robot_state.controller.set_speed(original_speed)
-                print(f"[ALIGN] Speed restored to {original_speed}")
 
     return align_to_gap
 
@@ -656,71 +638,39 @@ def create_pass_through_gap():
              return f"Alignment uncertain: {result}"
 
         # 2. Drive Through with Centering
-        print("[PASS_THROUGH] Step 2: Driving through...")
-        
-        TOTAL_DISTANCE = 1.0 # Drive 1 meter through door
+        TOTAL_DISTANCE = 1.5 
         STEP_SIZE = 0.2
         steps = int(TOTAL_DISTANCE / STEP_SIZE)
         
         original_speed = None
         if robot_state.controller:
             original_speed = robot_state.controller.get_speed()
-            robot_state.controller.set_speed(4000) # Slow for safety
+            robot_state.controller.set_speed(4000) 
         
         try:
             for i in range(steps):
-                # Measure sides
-                # +90 is Right, -90 is Left (based on recent inversion)
-                # Let's average a small arc for robustness
-                left_dists = lidar.get_distances_in_range(-100, -80) # Left side
-                right_dists = lidar.get_distances_in_range(80, 100)  # Right side
+                left_dists = lidar.get_distances_in_range(-100, -80) 
+                right_dists = lidar.get_distances_in_range(80, 100) 
                 
-                # Check for walls within 60cm (door frame range)
-                # Filter out 'inf' or very far points
                 valid_left = [d for a,d in left_dists if d < 80]
                 valid_right = [d for a,d in right_dists if d < 80]
-                
-                correction = ""
                 
                 if valid_left and valid_right:
                     min_left = min(valid_left)
                     min_right = min(valid_right)
-                    
                     diff = min_right - min_left
-                    # If Diff is Positive (Right > Left), we are closer to Left. Slide Right.
-                    # If Diff is Negative (Right < Left), we are closer to Right. Slide Left.
-                    
-                    THRESHOLD = 5.0 # 5cm tolerance
+                    THRESHOLD = 5.0 
                     
                     if diff > THRESHOLD:
-                        # Closer to Left -> Slide Right
-                        print(f"[PASS_THROUGH] Too close to LEFT (L={min_left:.0f}, R={min_right:.0f}). Correction: Slide RIGHT.")
-                        # Slide small amount
                         robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False, 'slide_left': False, 'slide_right': True}
-                        _interruptible_sleep(0.15) # Short slide
-                        correction = "Corrected RIGHT"
+                        _interruptible_sleep(0.15)
                         
                     elif diff < -THRESHOLD:
-                        # Closer to Right -> Slide Left
-                        print(f"[PASS_THROUGH] Too close to RIGHT (L={min_left:.0f}, R={min_right:.0f}). Correction: Slide LEFT.")
                         robot_state.movement = {'forward': False, 'backward': False, 'left': False, 'right': False, 'slide_left': True, 'slide_right': False}
                         _interruptible_sleep(0.15)
-                        correction = "Corrected LEFT"
                 
-                # Forward Step
-                print(f"[PASS_THROUGH] Step {i+1}/{steps} Forward {STEP_SIZE}m... {correction}")
                 robot_state.movement = {'forward': True, 'backward': False, 'left': False, 'right': False}
-                completed = _interruptible_sleep(1.0) # Approx time for 20cm at slow speed? 
-                # Wait, move_forward uses distance/speed calculation.
-                # Let's use the explicit duration based on create_move_forward logic: 0.2m / 0.15 * speed_factor?
-                # At 4000 speed (40%), it moves slower.
-                # Let's just use _interruptible_sleep(0.5) roughly for small steps or rely on feedback?
-                # Better: continuously move? No, discrete steps easier to correct.
-                # Let's assume standard 'move forward' logic implies ~1.3s for 0.2m at full speed?
-                # Formula in move_forward: duration = distance / 0.15. 
-                # 0.2 / 0.15 = 1.33s. Since speed is 40%, it might travel less or same duration?
-                # Servo controller speed limits max RPM.
-                # Let's stick to simple timing.
+                completed = _interruptible_sleep(1.0)
                 
                 if not completed:
                     return "EMERGENCY STOP in door."

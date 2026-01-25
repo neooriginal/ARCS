@@ -135,8 +135,8 @@ class ObstacleDetector:
         if state.precision_mode:
             guidance = "USE find_gap() FOR GAP DETECTION"
         
-        # --- 4. SCAN RESULT OVERLAY ---
-        if state.last_scan_result:
+        # --- 4. SCAN RESULT OVERLAY (Only in Precision Mode) ---
+        if state.last_scan_result and state.precision_mode:
             self._draw_scan_result(overlay, state.last_scan_result, w, h)
         
         self._draw_mode_status(overlay, w, h)
