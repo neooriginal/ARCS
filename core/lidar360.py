@@ -273,8 +273,29 @@ class Lidar360:
         
         threshold = (p20 + p80) / 2
         
-        # Find gap segments (far distances)
-        is_gap = [(a, d > threshold and d > min_gap_depth_cm) for a, d in distances]
+        # Find gap segments and smooth noise
+        raw_gap_mask = [d > threshold and d > min_gap_depth_cm for _, d in distances]
+        
+        noise_fill_limit = 3 
+        smoothed_mask = raw_gap_mask[:]
+        
+        i = 0
+        while i < len(smoothed_mask):
+            if not smoothed_mask[i]:
+                j = i + 1
+                while j < len(smoothed_mask) and not smoothed_mask[j]:
+                    j += 1
+                
+                if j - i <= noise_fill_limit:
+                    for k in range(i, j):
+                        smoothed_mask[k] = True
+                
+                i = j
+            else:
+                i += 1
+
+        # Use smoothed mask to identify segments
+        is_gap = [(distances[i][0], smoothed_mask[i]) for i in range(len(distances))]
         
         # Find longest gap segment
         best_start = None

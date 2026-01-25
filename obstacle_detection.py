@@ -52,10 +52,7 @@ class ObstacleDetector:
         
     def process(self, frame):
         """
-        Process frame.
-        1. Read LIDAR for safety (Stop/Go).
-        2. Analyze image for "Gap" (Guidance).
-        3. Analyze low-image for "Ground/Low Obstacles".
+        """Process frame for safety checks and obstacle detection."""
         """
         if frame is None:
             return ["STOP"], None, {}
@@ -65,8 +62,7 @@ class ObstacleDetector:
             if state.frame_id == self.last_frame_id:
                 return self.cached_result
         
-        # 360° LIDAR SAFETY CHECK (STRICT)
-        # This overrides everything. If a wall is close, movement is physically blocked.
+        # 360° LIDAR Safety Check
         distance = state.lidar_distance
         lidar = state.lidar360
         h, w = frame.shape[:2]
@@ -86,26 +82,20 @@ class ObstacleDetector:
             
             # --- 360° LIDAR SAFETY BUBBLE ---
             if lidar and lidar.connected:
-                # 1. FORWARD: Check frontal arc (-30° to +30°)
-                # More robust than single point
                 fwd_min = lidar.get_min_distance_in_range(-30, 30)
                 if fwd_min is not None and fwd_min < current_stop_dist:
                     instant_blocked.add("FORWARD")
-                elif avg_distance < current_stop_dist: # Fallback to single point if necessary
+                elif avg_distance < current_stop_dist:
                     instant_blocked.add("FORWARD")
                     
-                # 2. BACKWARD: Check rear arc (150° to 210°)
-                # Prevent backing into walls
                 back_min = lidar.get_min_distance_in_range(150, 210)
                 if back_min is not None and back_min < current_stop_dist:
                     instant_blocked.add("BACKWARD")
                     
-                # 3. LEFT: Check left side (60° to 120°)
                 left_min = lidar.get_min_distance_in_range(60, 120)
-                if left_min is not None and left_min < 35: # 35cm side clearance
+                if left_min is not None and left_min < 35:
                     instant_blocked.add("LEFT")
                 
-                # 4. RIGHT: Check right side (240° to 300°)
                 right_min = lidar.get_min_distance_in_range(240, 300)
                 if right_min is not None and right_min < 35:
                     instant_blocked.add("RIGHT")
@@ -179,10 +169,7 @@ class ObstacleDetector:
         """
         h, w = frame.shape[:2]
         
-        # FIXED HEAD: Camera is ~1m high looking straight.
-        # Horizon is roughly center. Floor is lower half.
-        # We only check the LOWER 40% of the image to find objects on ground.
-        # Ignoring top 60% prevents seeing walls/furniture at eye level as obstacles.
+        # ROI: Lower 40% of image
         roi_y = int(h * 0.60) 
         roi = frame[roi_y:h, :]
         
@@ -281,9 +268,8 @@ class ObstacleDetector:
         kernel_size = 60
         scores_smooth = np.convolve(col_means, np.ones(kernel_size)/kernel_size, mode='same')
         
-        # RESTRICT SEARCH TO CENTER 40% of frame to avoid false detections at edges
-        # This prevents detecting door frame edges/shadows as "gaps"
-        margin = int(w * 0.3)  # 30% margin on each side
+        # Restrict search to center 40%
+        margin = int(w * 0.3)
         center_scores = scores_smooth.copy()
         center_scores[:margin] = 255  # High = not a gap
         center_scores[-margin:] = 255
