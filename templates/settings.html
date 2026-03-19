@@ -427,12 +427,22 @@
             const res = await fetch('/api/bms/scan', { method: 'POST' });
             const data = await res.json();
             const sel = document.getElementById('bms-addr-select');
-            sel.innerHTML = '<option value="">— Select device —</option>';
+
             if (data.devices && data.devices.length > 0) {
+                const allMatched = data.devices.every(d => d.matched);
+                sel.innerHTML = allMatched
+                    ? '<option value="">— JBD BMS devices found —</option>'
+                    : '<option value="">— All nearby devices (no JBD found) —</option>';
+
                 data.devices.forEach(d => {
                     const opt = document.createElement('option');
                     opt.value = d.address;
-                    opt.textContent = `${d.name} (${d.address})`;
+                    if (d.matched) {
+                        opt.textContent = `✅ ${d.name} (${d.address})`;
+                    } else {
+                        opt.textContent = `${d.name} (${d.address})`;
+                        opt.style.color = '#888';
+                    }
                     sel.appendChild(opt);
                 });
             } else {

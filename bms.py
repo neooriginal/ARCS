@@ -267,14 +267,36 @@ def init_bms() -> bool:
 
 
 async def scan_bms_devices(timeout: float = 5.0) -> list[dict]:
-    """Scan for nearby BLE devices — used by the settings scan button."""
+    """Scan for nearby BLE devices — used by the settings scan button.
+
+    Returns devices ordered by signal strength. Devices that advertise the JBD
+    BMS service UUID are flagged with matched=True so the UI can highlight them.
+    If no JBD devices are found, all visible devices are returned so the user
+    can still select manually.
+    """
     try:
         from bleak import BleakScanner
-        devices = await BleakScanner.discover(timeout=timeout)
-        return [
-            {"address": d.address, "name": d.name or "Unknown"}
-            for d in sorted(devices, key=lambda x: x.rssi, reverse=True)
-        ]
+
+        devices = await BleakScanner.discover(timeout=timeout, return_adv=True)
+
+        results = []
+        for device, adv in devices.values():
+            service_uuids = [str(u).lower() for u in (adv.service_uuids or [])]
+            matched = SERVICE_UUID in service_uuids
+            results.append({
+                "address": device.address,
+                "name": device.name or "Unknown",
+                "rssi": adv.rssi,
+                "matched": matched,
+            })
+
+        # Sort: matched devices first, then by signal strength
+        results.sort(key=lambda x: (not x["matched"], -(x["rssi"] or -999)))
+
+        # If any matched, only return matched devices
+        matched_only = [r for r in results if r["matched"]]
+        return matched_only if matched_only else results
+
     except Exception as e:
         logger.warning(f"[BMS] Scan failed: {e}")
         return []
