@@ -20,7 +20,14 @@ DEFAULTS = {
     # Hardware ports
     "CAMERA_PORT": "/dev/video2",
     "CAMERA_RIGHT_PORT": "/dev/video0",
+    "CAMERA_DOWN_PORT": "/dev/video4",
+    "CAMERA_FWD_PORT": "/dev/video6",
     "WHEEL_USB": "/dev/robot_acm0",
+    "ACTUATOR_USB": "/dev/ttyACM1",
+
+    # BMS
+    "BMS_BT_ADDRESS": "",
+    "BMS_POLL_INTERVAL": 30,
 
     
     # Robot type (see robots/ folder for available types)

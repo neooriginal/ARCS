@@ -163,16 +163,19 @@
             <!-- Battery BMS -->
             <div class="settings-card">
                 <h3>🔋 Battery (BMS)</h3>
-                <p style="color:#888; font-size:0.85em; margin-bottom:15px;">JBD DH04SA01 via Bluetooth LE. Set the device address to enable battery monitoring.</p>
+                <p style="color:#888; font-size:0.85em; margin-bottom:15px;">JBD DH04SA01 via Bluetooth LE. Set the
+                    device address to enable battery monitoring.</p>
 
                 <div class="form-group">
                     <label>BT Address</label>
                     <div style="display:flex; gap:8px; align-items:center;">
-                        <select id="bms-addr-select" style="flex:1; background:#1a1a1a; border:1px solid #444; border-radius:4px; color:white; padding:6px 8px; font-size:0.85em;"
+                        <select id="bms-addr-select"
+                            style="flex:1; background:#1a1a1a; border:1px solid #444; border-radius:4px; color:white; padding:6px 8px; font-size:0.85em;"
                             onchange="document.getElementById('cfg_BMS_BT_ADDRESS').value = this.value; markDirty();">
                             <option value="">— Enter manually or scan —</option>
                         </select>
-                        <button type="button" class="btn btn-secondary" style="padding:6px 12px; font-size:0.8em; white-space:nowrap;" onclick="bmsScan(this)">
+                        <button type="button" class="btn btn-secondary"
+                            style="padding:6px 12px; font-size:0.8em; white-space:nowrap;" onclick="bmsScan(this)">
                             🔍 Scan
                         </button>
                     </div>
@@ -187,11 +190,16 @@
                 </div>
 
                 <!-- Live BMS Status -->
-                <div id="bms-settings-status" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:12px; margin-top:8px;">
-                    <div style="font-size:0.75rem; color:#666; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Live Status</div>
+                <div id="bms-settings-status"
+                    style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:12px; margin-top:8px;">
+                    <div
+                        style="font-size:0.75rem; color:#666; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">
+                        Live Status</div>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.8rem;">
-                        <div><span style="color:#666;">State: </span><span id="bms-s-conn" style="color:#aaa;">—</span></div>
-                        <div><span style="color:#666;">SOC: </span><span id="bms-s-soc" style="color:#aaa;">—</span></div>
+                        <div><span style="color:#666;">State: </span><span id="bms-s-conn" style="color:#aaa;">—</span>
+                        </div>
+                        <div><span style="color:#666;">SOC: </span><span id="bms-s-soc" style="color:#aaa;">—</span>
+                        </div>
                         <div><span style="color:#666;">Voltage: </span><span id="bms-s-volt">—</span></div>
                         <div><span style="color:#666;">Current: </span><span id="bms-s-curr">—</span></div>
                         <div><span style="color:#666;">Temp: </span><span id="bms-s-temp">—</span></div>
@@ -211,7 +219,8 @@
 
             <div class="settings-card">
                 <h3>🔧 Linear Actuator</h3>
-                <p style="color:#888; font-size:0.85em; margin-bottom:15px;">Raspberry Pi Pico USB bridge controlling a linear actuator.</p>
+                <p style="color:#888; font-size:0.85em; margin-bottom:15px;">Raspberry Pi Pico USB bridge controlling a
+                    linear actuator.</p>
                 <div class="form-group">
                     <label>USB Port</label>
                     <div class="port-row">
@@ -400,6 +409,7 @@
     let defaults = {};
     let ports = { serial: [], video: [] };
     let originalWebPort = null;
+    let bmsCharging = false;
 
     document.addEventListener('DOMContentLoaded', async () => {
         await loadPorts();
@@ -443,6 +453,8 @@
             if (!res.ok) return;
             const d = await res.json();
 
+            bmsCharging = d.charging ?? false;
+
             const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
             set('bms-s-conn', d.connected ? '✅ Connected' : '❌ Disconnected');
             set('bms-s-soc', d.soc !== null ? d.soc + '%' : '—');
@@ -457,6 +469,23 @@
                 else errEl.style.display = 'none';
             }
         } catch (e) { /* silent */ }
+    }
+
+    async function bmsToggleCharging() {
+        const btn = document.getElementById('bms-s-charge-btn');
+        if (btn) btn.disabled = true;
+        try {
+            await fetch('/api/bms/charging', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: !bmsCharging })
+            });
+            await bmsSettingsUpdate();
+        } catch (e) {
+            console.error('[BMS] Toggle charging failed', e);
+        } finally {
+            if (btn) btn.disabled = false;
+        }
     }
 
 
