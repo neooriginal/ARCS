@@ -428,7 +428,9 @@
             const data = await res.json();
             const sel = document.getElementById('bms-addr-select');
 
-            if (data.devices && data.devices.length > 0) {
+            if (data.error) {
+                sel.innerHTML = `<option value="">⚠ Error: ${data.error}</option>`;
+            } else if (data.devices && data.devices.length > 0) {
                 const allMatched = data.devices.every(d => d.matched);
                 sel.innerHTML = allMatched
                     ? '<option value="">— JBD BMS devices found —</option>'
@@ -446,11 +448,11 @@
                     sel.appendChild(opt);
                 });
             } else {
-                sel.innerHTML = '<option value="">No devices found</option>';
+                sel.innerHTML = '<option value="">No devices found — is the BMS powered on?</option>';
             }
-            if (data.error) console.warn('[BMS Scan]', data.error);
         } catch (e) {
-            console.error('[BMS Scan] failed', e);
+            const sel = document.getElementById('bms-addr-select');
+            sel.innerHTML = `<option value="">⚠ Scan failed: ${e.message}</option>`;
         } finally {
             btn.textContent = origText;
             btn.disabled = false;

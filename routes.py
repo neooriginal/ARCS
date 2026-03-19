@@ -625,7 +625,7 @@ def bms_scan():
         loop.close()
         return jsonify({'devices': devices})
     except Exception as e:
-        return jsonify({'devices': [], 'error': str(e)}), 500
+        return jsonify({'devices': [], 'error': str(e)})
 
 # Wheel Speed Routes
 
