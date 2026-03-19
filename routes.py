@@ -36,8 +36,6 @@ PUBLIC_PATHS = [
     '/login',
     '/api/auth/',
     '/static/',
-    '/display',
-    '/display/state',
 ]
 
 
@@ -169,12 +167,10 @@ def auth_logout():
 
 
 @bp.route('/')
-
 def index():
     return render_template('dashboard.html')
 
 @bp.route('/remote')
-
 def remote():
     return render_template('remote.html')
 

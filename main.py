@@ -175,39 +175,11 @@ def _deferred_init() -> None:
     logger.info("Hardware initialization complete")
 
 
-def _open_display_browser() -> None:
-    if os.getenv('AUTO_OPEN_DISPLAY', 'true').lower() != 'true':
-        return
-
-    time.sleep(2)
-    display_url = f'http://localhost:{WEB_PORT}/display'
-    env = os.environ.copy()
-    env['DISPLAY'] = ':0'
-
-    for browser_cmd in [
-        ['chromium-browser', '--kiosk', '--noerrdialogs', '--disable-infobars', display_url],
-        ['firefox', '--kiosk', display_url]
-    ]:
-        try:
-            subprocess.Popen(
-                browser_cmd,
-                env=env,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            logger.info(f"Display opened on main screen using {browser_cmd[0]}")
-            return
-        except FileNotFoundError:
-            continue
-
-    logger.warning("Could not auto-open display (no browser found)")
-
 def main() -> None:
     signal.signal(signal.SIGINT, cleanup)
     signal.signal(signal.SIGTERM, cleanup)
 
     threading.Thread(target=_deferred_init, daemon=True).start()
-    threading.Thread(target=_open_display_browser, daemon=True).start()
 
     app = create_app()
 
