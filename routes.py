@@ -576,7 +576,56 @@ def actuator_status():
     return jsonify({'connected': connected, 'telemetry': telemetry})
 
 
+# BMS Routes
 
+@bp.route('/api/bms/status')
+def bms_status():
+    return jsonify({
+        'connected': state.bms_connected,
+        'soc': state.bms_soc,
+        'voltage': state.bms_voltage,
+        'current': state.bms_current,
+        'temp': state.bms_temp,
+        'temps': state.bms_temps,
+        'cells': state.bms_cells,
+        'cycles': state.bms_cycles,
+        'remain_cap': state.bms_remain_cap,
+        'charging': state.bms_charging,
+        'discharging': state.bms_discharging,
+        'error': state.bms_error,
+        'last_update': state.bms_last_update,
+    })
+
+
+@bp.route('/api/bms/charging', methods=['POST'])
+def bms_set_charging():
+    if not state.bms_connected or not state.bms_client:
+        return jsonify({'status': 'error', 'error': 'BMS not connected'}), 400
+
+    data = request.json or {}
+    enabled = bool(data.get('enabled', True))
+
+    try:
+        ok = state.bms_client.set_charging(enabled)
+        if ok:
+            state.bms_charging = enabled
+            return jsonify({'status': 'ok', 'charging': enabled})
+        return jsonify({'status': 'error', 'error': 'Command failed'}), 500
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+
+@bp.route('/api/bms/scan', methods=['POST'])
+def bms_scan():
+    import asyncio
+    try:
+        from bms import scan_bms_devices
+        loop = asyncio.new_event_loop()
+        devices = loop.run_until_complete(scan_bms_devices(timeout=5.0))
+        loop.close()
+        return jsonify({'devices': devices})
+    except Exception as e:
+        return jsonify({'devices': [], 'error': str(e)}), 500
 
 # Wheel Speed Routes
 

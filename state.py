@@ -17,6 +17,22 @@ class RobotState:
         self.controller = None
         self.actuator = None
         self.actuator_connected = False
+
+        # BMS (JBD DH04SA01 via BLE)
+        self.bms_client = None
+        self.bms_connected = False
+        self.bms_soc = None           # State of charge 0-100%
+        self.bms_voltage = None       # Pack voltage V
+        self.bms_current = None       # Current A (+charge, -discharge)
+        self.bms_temp = None          # Primary temp sensor °C
+        self.bms_temps = []           # All temp sensors °C
+        self.bms_cells = []           # Cell voltages V
+        self.bms_cycles = None        # Cycle count
+        self.bms_remain_cap = None    # Remaining capacity Ah
+        self.bms_charging = False     # Charge MOSFET active
+        self.bms_discharging = True   # Discharge MOSFET active
+        self.bms_error = None
+        self.bms_last_update = None
         self.latest_frame = None
         self.latest_frame_right = None
         self.latest_frame_down = None

@@ -70,6 +70,44 @@
                 </a>
             </nav>
 
+            <!-- Battery (BMS) Widget -->
+            <div id="bms-widget" style="margin: 0 12px 12px; display: none;">
+                <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px 14px;">
+
+                    <!-- Header row -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 9px;">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <!-- Battery icon -->
+                            <div id="bms-icon" style="position: relative; width: 26px; height: 13px; border: 1.5px solid #555; border-radius: 2px; overflow: hidden;">
+                                <div style="position: absolute; right: -4px; top: 50%; transform: translateY(-50%); width: 3px; height: 6px; background: #555; border-radius: 0 1px 1px 0;"></div>
+                                <div id="bms-fill" style="position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: #4caf50; transition: width 0.5s, background 0.5s; border-radius: 1px;"></div>
+                            </div>
+                            <span id="bms-pct" style="font-size: 0.75rem; font-weight: 700; color: #ccc;">—</span>
+                            <span id="bms-charge-icon" style="font-size: 0.7rem; display: none;">⚡</span>
+                        </div>
+                        <button id="bms-charge-btn"
+                            onclick="bmsToggleCharging()"
+                            title="Toggle charging MOSFET"
+                            style="font-size: 0.6rem; padding: 3px 7px; background: rgba(0,242,255,0.1); border: 1px solid rgba(0,242,255,0.25); border-radius: 4px; color: #aaa; cursor: pointer; transition: all 0.15s;">
+                            Charge
+                        </button>
+                    </div>
+
+                    <!-- Fill bar -->
+                    <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; margin-bottom: 7px;">
+                        <div id="bms-bar" style="height: 100%; width: 0%; background: #4caf50; transition: width 0.5s, background 0.5s; border-radius: 2px;"></div>
+                    </div>
+
+                    <!-- Detail row -->
+                    <div id="bms-details" style="display: flex; gap: 8px; font-size: 0.6rem; color: #666;">
+                        <span id="bms-voltage">—</span>
+                        <span id="bms-current">—</span>
+                        <span id="bms-temp">—</span>
+                    </div>
+                    <div id="bms-error-row" style="font-size: 0.6rem; color: #e57373; margin-top: 4px; display: none;"></div>
+                </div>
+            </div>
+
             <div class="sidebar-footer">
                 <div style="display: flex; gap: 12px;">
                     <a href="/settings" class="nav-item {{ 'active' if request.path == '/settings' else '' }}"
@@ -128,6 +166,90 @@
         }
     </script>
     {% block scripts %}{% endblock %}
+
+    <script>
+        // BMS Battery Widget
+        let _bmsCharging = false;
+
+        function _bmsColor(soc) {
+            if (soc > 50) return '#4caf50';
+            if (soc > 20) return '#ffb300';
+            return '#ef5350';
+        }
+
+        async function bmsUpdate() {
+            try {
+                const res = await fetch('/api/bms/status');
+                if (!res.ok) return;
+                const d = await res.json();
+
+                const widget = document.getElementById('bms-widget');
+                if (!widget) return;
+
+                widget.style.display = 'block';
+                _bmsCharging = d.charging;
+
+                const soc = d.soc ?? null;
+                const color = soc !== null ? _bmsColor(soc) : '#555';
+
+                // icon fill
+                const fill = document.getElementById('bms-fill');
+                const bar = document.getElementById('bms-bar');
+                if (fill) { fill.style.width = soc !== null ? soc + '%' : '0%'; fill.style.background = color; }
+                if (bar)  { bar.style.width  = soc !== null ? soc + '%' : '0%'; bar.style.background = color; }
+
+                const pct = document.getElementById('bms-pct');
+                if (pct) pct.textContent = soc !== null ? soc + '%' : (d.connected ? '—' : 'off');
+                if (pct) pct.style.color = color;
+
+                const chIcon = document.getElementById('bms-charge-icon');
+                if (chIcon) chIcon.style.display = d.charging ? 'inline' : 'none';
+
+                const btn = document.getElementById('bms-charge-btn');
+                if (btn) {
+                    btn.style.background = d.charging
+                        ? 'rgba(0,242,255,0.2)'
+                        : 'rgba(255,255,255,0.05)';
+                    btn.style.borderColor = d.charging
+                        ? 'rgba(0,242,255,0.5)'
+                        : 'rgba(255,255,255,0.1)';
+                    btn.style.color = d.charging ? 'var(--primary)' : '#aaa';
+                    btn.textContent = d.charging ? '⚡ Charging' : 'Charge off';
+                }
+
+                if (document.getElementById('bms-voltage'))
+                    document.getElementById('bms-voltage').textContent = d.voltage !== null ? d.voltage + 'V' : '';
+                if (document.getElementById('bms-current'))
+                    document.getElementById('bms-current').textContent = d.current !== null ? d.current + 'A' : '';
+                if (document.getElementById('bms-temp'))
+                    document.getElementById('bms-temp').textContent = d.temp !== null ? d.temp + '°C' : '';
+
+                const errRow = document.getElementById('bms-error-row');
+                if (errRow) {
+                    if (d.error && !d.connected) {
+                        errRow.style.display = 'block';
+                        errRow.textContent = '⚠ ' + d.error;
+                    } else {
+                        errRow.style.display = 'none';
+                    }
+                }
+            } catch (e) { /* silent */ }
+        }
+
+        async function bmsToggleCharging() {
+            try {
+                const res = await fetch('/api/bms/charging', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: !_bmsCharging })
+                });
+                if (res.ok) await bmsUpdate();
+            } catch (e) { console.warn('BMS charge toggle failed', e); }
+        }
+
+        bmsUpdate();
+        setInterval(bmsUpdate, 10000);
+    </script>
 </body>
 
 </html>

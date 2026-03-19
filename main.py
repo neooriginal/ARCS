@@ -171,8 +171,19 @@ def _deferred_init() -> None:
     except Exception as e:
         logger.warning(f"Actuator: Init failed - {e}")
 
+    # Initialize BMS via BLE (optional)
+    try:
+        from bms import init_bms
+        if init_bms():
+            logger.info("BMS: Connecting via BLE...")
+        else:
+            logger.info("BMS: Not configured or unavailable")
+    except Exception as e:
+        logger.warning(f"BMS: Init failed - {e}")
+
     tts.speak("System ready")
     logger.info("Hardware initialization complete")
+
 
 
 def main() -> None:

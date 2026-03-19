@@ -41,3 +41,6 @@ qrcode[pil]
 pybullet>=3.2.0
 scipy>=1.10.0
 flask-socketio>=5.3.0
+
+# Bluetooth LE (for BMS communication)
+bleak>=0.21.0
