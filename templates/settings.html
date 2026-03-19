@@ -29,7 +29,7 @@
                 <h3>🔌 Hardware</h3>
 
                 <div class="form-group">
-                    <label>Main Camera</label>
+                    <label>Right Arm Camera</label>
                     <div class="port-row">
                         <select id="cfg_CAMERA_PORT"></select>
                         <button type="button" class="manual-btn" onclick="toggleManual('CAMERA_PORT')">✏️</button>
@@ -39,12 +39,32 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Right Hand Camera</label>
+                    <label>Left Arm Camera</label>
                     <div class="port-row">
                         <select id="cfg_CAMERA_RIGHT_PORT"></select>
                         <button type="button" class="manual-btn" onclick="toggleManual('CAMERA_RIGHT_PORT')">✏️</button>
                     </div>
                     <input type="text" id="cfg_CAMERA_RIGHT_PORT_manual" class="manual-input"
+                        placeholder="/dev/video0 or index">
+                </div>
+
+                <div class="form-group">
+                    <label>Down Camera</label>
+                    <div class="port-row">
+                        <select id="cfg_CAMERA_DOWN_PORT"></select>
+                        <button type="button" class="manual-btn" onclick="toggleManual('CAMERA_DOWN_PORT')">✏️</button>
+                    </div>
+                    <input type="text" id="cfg_CAMERA_DOWN_PORT_manual" class="manual-input"
+                        placeholder="/dev/video0 or index">
+                </div>
+
+                <div class="form-group">
+                    <label>Forward Depth Camera <span style="font-size:0.75em;color:#666;">(stereo)</span></label>
+                    <div class="port-row">
+                        <select id="cfg_CAMERA_FWD_PORT"></select>
+                        <button type="button" class="manual-btn" onclick="toggleManual('CAMERA_FWD_PORT')">✏️</button>
+                    </div>
+                    <input type="text" id="cfg_CAMERA_FWD_PORT_manual" class="manual-input"
                         placeholder="/dev/video0 or index">
                 </div>
 
@@ -137,6 +157,20 @@
                         </button>
                     </div>
                     <div class="hint">Required for AI Agent navigation and reasoning.</div>
+                </div>
+            </div>
+
+            <!-- Linear Actuator -->
+            <div class="settings-card">
+                <h3>🔧 Linear Actuator</h3>
+                <p style="color:#888; font-size:0.85em; margin-bottom:15px;">Raspberry Pi Pico USB bridge controlling a linear actuator.</p>
+                <div class="form-group">
+                    <label>USB Port</label>
+                    <div class="port-row">
+                        <select id="cfg_ACTUATOR_USB"></select>
+                        <button type="button" class="manual-btn" onclick="toggleManual('ACTUATOR_USB')">✏️</button>
+                    </div>
+                    <input type="text" id="cfg_ACTUATOR_USB_manual" class="manual-input" placeholder="/dev/ttyACM1">
                 </div>
             </div>
 
@@ -412,7 +446,7 @@
         el.innerHTML = '';
 
         const isVideo = key.includes('CAMERA');
-        const isSerial = key.includes('USB') || key === 'LIDAR_PORT';
+        const isSerial = key.includes('USB') || key === 'LIDAR_PORT' || key === 'ACTUATOR_USB';
 
         const list = isVideo ? ports.video : (isSerial ? ports.serial : []);
 

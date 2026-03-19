@@ -139,10 +139,65 @@
             </div>
         </div>
     </div>
+
+    <!-- Actuator Panel -->
+    <div class="panel" id="actuator-panel"
+        style="min-width: 220px; max-width: 280px; flex-shrink: 0;">
+        <div class="panel-header">
+            <span class="panel-icon">🔧</span>
+            <span class="panel-title">Actuator</span>
+            <div class="status-dot" id="actuator-status-dot" style="width:8px;height:8px;"></div>
+        </div>
+        <div style="padding: 20px; display: flex; flex-direction: column; gap: 14px; height: 100%;">
+
+            <!-- Speed slider -->
+            <div>
+                <label style="font-size:0.75rem; color:#aaa; display:flex; justify-content:space-between; margin-bottom:6px;">
+                    Speed <span id="actuator-speed-val" style="color:white;font-weight:700;">100</span>
+                </label>
+                <input type="range" id="actuator-speed" min="1" max="100" value="100"
+                    style="width:100%; accent-color: var(--primary);"
+                    oninput="document.getElementById('actuator-speed-val').textContent=this.value">
+            </div>
+
+            <!-- Extend -->
+            <button id="actuator-extend-btn"
+                style="background: linear-gradient(135deg, rgba(0,242,255,0.15), rgba(0,242,255,0.05)); border: 1px solid rgba(0,242,255,0.3); border-radius: 8px; color: var(--primary); font-size:0.9rem; padding: 14px; font-weight: 700; cursor: pointer; transition: all 0.15s; letter-spacing:0.5px;"
+                onmousedown="actuatorMove('extend')"
+                onmouseup="actuatorMove('stop')"
+                ontouchstart="actuatorMove('extend')"
+                ontouchend="actuatorMove('stop')">
+                ↑ EXTEND
+            </button>
+
+            <!-- Stop -->
+            <button id="actuator-stop-btn"
+                style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #aaa; font-size:0.85rem; padding: 10px; cursor: pointer; transition: all 0.15s;"
+                onclick="actuatorMove('stop')">
+                ■ STOP
+            </button>
+
+            <!-- Retract -->
+            <button id="actuator-retract-btn"
+                style="background: linear-gradient(135deg, rgba(255,80,80,0.15), rgba(255,80,80,0.05)); border: 1px solid rgba(255,80,80,0.3); border-radius: 8px; color: #ff7070; font-size:0.9rem; padding: 14px; font-weight: 700; cursor: pointer; transition: all 0.15s; letter-spacing:0.5px;"
+                onmousedown="actuatorMove('retract')"
+                onmouseup="actuatorMove('stop')"
+                ontouchstart="actuatorMove('retract')"
+                ontouchend="actuatorMove('stop')">
+                ↓ RETRACT
+            </button>
+
+            <div id="actuator-feedback"
+                style="font-size:0.7rem; color:#666; text-align:center; min-height:16px;"></div>
+        </div>
+    </div>
+
+
 </div>
 
 <div class="debug-panel" id="debug-panel"></div>
 {% endblock %}
+
 
 {% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
@@ -212,5 +267,31 @@
             if (currentMode !== 'drive' && typeof setMode === 'function') setMode('drive');
         });
     });
+
+    async function actuatorMove(direction) {
+        const speed = parseInt(document.getElementById('actuator-speed')?.value || 100);
+        const fb = document.getElementById('actuator-feedback');
+        try {
+            const res = await fetch('/actuator/move', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ direction, speed })
+            });
+            const data = await res.json();
+            if (fb) fb.textContent = data.status === 'ok' ? direction.toUpperCase() : (data.error || 'Error');
+        } catch (e) {
+            if (fb) fb.textContent = 'Connection error';
+        }
+    }
+
+    // Poll actuator status every 2s
+    setInterval(async () => {
+        try {
+            const res = await fetch('/actuator/status');
+            const data = await res.json();
+            const dot = document.getElementById('actuator-status-dot');
+            if (dot) dot.className = 'status-dot ' + (data.connected ? 'active' : 'error');
+        } catch (e) {}
+    }, 2000);
 </script>
 {% endblock %}

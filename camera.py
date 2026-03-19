@@ -1,6 +1,7 @@
 """
 ARCS - Camera Module
-Handles camera initialization and MJPEG streaming.
+Handles camera initialization and MJPEG streaming for all 4 cameras:
+  - Main (right arm), Right (left arm), Down (2D nadir), Fwd (depth/stereo)
 """
 
 import time
@@ -19,7 +20,8 @@ STREAM_WIDTH = get_config("STREAM_WIDTH")
 STREAM_HEIGHT = get_config("STREAM_HEIGHT")
 STREAM_JPEG_QUALITY = get_config("STREAM_JPEG_QUALITY")
 CAMERA_RIGHT_PORT = get_config("CAMERA_RIGHT_PORT")
-
+CAMERA_DOWN_PORT = get_config("CAMERA_DOWN_PORT")
+CAMERA_FWD_PORT = get_config("CAMERA_FWD_PORT")
 
 
 def _connect_camera_device(port, width, height, fps=30):
@@ -29,15 +31,14 @@ def _connect_camera_device(port, width, height, fps=30):
             camera = cv2.VideoCapture(port, cv2.CAP_V4L2)
         except Exception:
             camera = cv2.VideoCapture(port)
-            
+
         camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
         camera.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         camera.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         camera.set(cv2.CAP_PROP_FPS, fps)
         camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        
+
         if camera.isOpened():
-            # Drain stale frames
             for _ in range(5):
                 camera.grab()
             print("✓")
@@ -45,7 +46,7 @@ def _connect_camera_device(port, width, height, fps=30):
         else:
             print("✗")
             return None
-            
+
     except Exception as e:
         print(f"⚠ ({e})")
         return None
@@ -61,25 +62,39 @@ def init_camera() -> bool:
                 threading.Thread(target=_capture_loop, daemon=True).start()
 
         if state.camera_right and state.camera_right.isOpened():
-             print(f"📷 Camera Right ({CAMERA_RIGHT_PORT})... ✓ (Already open)")
+            print(f"📷 Camera Left Arm ({CAMERA_RIGHT_PORT})... ✓ (Already open)")
         else:
             if CAMERA_RIGHT_PORT:
                 state.camera_right = _connect_camera_device(CAMERA_RIGHT_PORT, CAMERA_WIDTH, CAMERA_HEIGHT)
                 if state.camera_right:
                     threading.Thread(target=_capture_loop_right, daemon=True).start()
 
+        if state.camera_down and state.camera_down.isOpened():
+            print(f"📷 Camera Down ({CAMERA_DOWN_PORT})... ✓ (Already open)")
+        else:
+            if CAMERA_DOWN_PORT:
+                state.camera_down = _connect_camera_device(CAMERA_DOWN_PORT, CAMERA_WIDTH, CAMERA_HEIGHT)
+                if state.camera_down:
+                    threading.Thread(target=_capture_loop_down, daemon=True).start()
+
+        if state.camera_fwd and state.camera_fwd.isOpened():
+            print(f"📷 Camera Fwd Depth ({CAMERA_FWD_PORT})... ✓ (Already open)")
+        else:
+            if CAMERA_FWD_PORT:
+                state.camera_fwd = _connect_camera_device(CAMERA_FWD_PORT, CAMERA_WIDTH, CAMERA_HEIGHT)
+                if state.camera_fwd:
+                    threading.Thread(target=_capture_loop_fwd, daemon=True).start()
+
         return True
 
     except Exception as e:
         print(f"✗ Failed: {e}")
         state.last_error = f"Camera init failed: {e}"
-        # We return True because partial failure (e.g. right camera) shouldn't block app? 
-        # Original returned False if MAIN camera failed.
         return state.camera is not None
 
 
+# --- Synchronization primitives ---
 
-# Frame synchronization
 frame_condition = threading.Condition()
 encoded_frame = None
 current_frame_id = 0
@@ -88,43 +103,61 @@ frame_condition_right = threading.Condition()
 encoded_frame_right = None
 current_frame_id_right = 0
 
+frame_condition_down = threading.Condition()
+encoded_frame_down = None
+current_frame_id_down = 0
+
+frame_condition_fwd = threading.Condition()
+encoded_frame_fwd = None
+current_frame_id_fwd = 0
+
+
+def _encode_and_notify(frame, condition, frame_ref_setter, id_setter):
+    stream_frame = cv2.resize(frame, (STREAM_WIDTH, STREAM_HEIGHT), interpolation=cv2.INTER_LINEAR)
+    _, buffer = cv2.imencode('.jpg', stream_frame, [
+        cv2.IMWRITE_JPEG_QUALITY, STREAM_JPEG_QUALITY,
+        cv2.IMWRITE_JPEG_OPTIMIZE, 0
+    ])
+    with condition:
+        frame_ref_setter(buffer.tobytes())
+        id_setter()
+        condition.notify_all()
+
+
+def _make_blank(label: str):
+    frame = np.zeros((STREAM_HEIGHT, STREAM_WIDTH, 3), np.uint8)
+    cv2.putText(frame, label, (20, STREAM_HEIGHT // 2),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    _, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, STREAM_JPEG_QUALITY])
+    return buf.tobytes()
+
+
+# --- Capture loops ---
 
 def _capture_loop():
     global encoded_frame, current_frame_id
-    print("[Camera] Capture thread started")
-    
-    # Pre-allocate blank frame for fallback
-    blank_frame = np.zeros((STREAM_HEIGHT, STREAM_WIDTH, 3), np.uint8)
-    cv2.putText(blank_frame, "WAITING...", (20, STREAM_HEIGHT//2), 
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-    _, blank_buffer = cv2.imencode('.jpg', blank_frame, [cv2.IMWRITE_JPEG_QUALITY, STREAM_JPEG_QUALITY])
-    blank_bytes = blank_buffer.tobytes()
-    
+    print("[Camera] Right arm capture thread started")
+    blank = _make_blank("WAITING...")
     with frame_condition:
-        encoded_frame = blank_bytes
+        encoded_frame = blank
         frame_condition.notify_all()
 
     while state.running and state.camera and state.camera.isOpened():
         try:
-            # Non-blocking capture: grab() + retrieve() instead of read()
             grabbed = state.camera.grab()
             if grabbed:
                 ret, frame = state.camera.retrieve()
             else:
-                ret = False
-                frame = None
-            
+                ret, frame = False, None
+
             if ret and frame is not None:
                 state.latest_frame = frame
                 state.frame_id += 1
-                
-                # Resize and encode for streaming
                 stream_frame = cv2.resize(frame, (STREAM_WIDTH, STREAM_HEIGHT), interpolation=cv2.INTER_LINEAR)
                 _, buffer = cv2.imencode('.jpg', stream_frame, [
                     cv2.IMWRITE_JPEG_QUALITY, STREAM_JPEG_QUALITY,
                     cv2.IMWRITE_JPEG_OPTIMIZE, 0
                 ])
-                
                 with frame_condition:
                     encoded_frame = buffer.tobytes()
                     current_frame_id = state.frame_id
@@ -134,45 +167,33 @@ def _capture_loop():
         except Exception as e:
             print(f"[Camera] Thread error: {e}")
             time.sleep(0.1)
-    print("[Camera] Capture thread stopped")
+    print("[Camera] Right arm capture thread stopped")
 
 
 def _capture_loop_right():
     global encoded_frame_right, current_frame_id_right
-    print("[Camera] Right capture thread started")
-    
-    # Pre-allocate blank frame
-    blank_frame = np.zeros((STREAM_HEIGHT, STREAM_WIDTH, 3), np.uint8)
-    cv2.putText(blank_frame, "WAITING...", (20, STREAM_HEIGHT//2), 
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-    _, blank_buffer = cv2.imencode('.jpg', blank_frame, [cv2.IMWRITE_JPEG_QUALITY, STREAM_JPEG_QUALITY])
-    blank_bytes = blank_buffer.tobytes()
-    
+    print("[Camera] Left arm capture thread started")
+    blank = _make_blank("WAITING...")
     with frame_condition_right:
-        encoded_frame_right = blank_bytes
+        encoded_frame_right = blank
         frame_condition_right.notify_all()
 
     while state.running and state.camera_right and state.camera_right.isOpened():
         try:
-            # Non-blocking capture
             grabbed = state.camera_right.grab()
             if grabbed:
                 ret, frame = state.camera_right.retrieve()
             else:
-                ret = False
-                frame = None
-            
+                ret, frame = False, None
+
             if ret and frame is not None:
                 state.latest_frame_right = frame
                 state.frame_id_right += 1
-                
-                # Resize and encode
                 stream_frame = cv2.resize(frame, (STREAM_WIDTH, STREAM_HEIGHT), interpolation=cv2.INTER_LINEAR)
                 _, buffer = cv2.imencode('.jpg', stream_frame, [
                     cv2.IMWRITE_JPEG_QUALITY, STREAM_JPEG_QUALITY,
                     cv2.IMWRITE_JPEG_OPTIMIZE, 0
                 ])
-                
                 with frame_condition_right:
                     encoded_frame_right = buffer.tobytes()
                     current_frame_id_right = state.frame_id_right
@@ -180,130 +201,214 @@ def _capture_loop_right():
             else:
                 time.sleep(0.01)
         except Exception as e:
-            print(f"[Camera] Right thread error: {e}")
+            print(f"[Camera] Left arm thread error: {e}")
             time.sleep(0.1)
-    print("[Camera] Right capture thread stopped")
+    print("[Camera] Left arm capture thread stopped")
+
+
+def _capture_loop_down():
+    global encoded_frame_down, current_frame_id_down
+    print("[Camera] Down capture thread started")
+    blank = _make_blank("WAITING...")
+    with frame_condition_down:
+        encoded_frame_down = blank
+        frame_condition_down.notify_all()
+
+    while state.running and state.camera_down and state.camera_down.isOpened():
+        try:
+            grabbed = state.camera_down.grab()
+            if grabbed:
+                ret, frame = state.camera_down.retrieve()
+            else:
+                ret, frame = False, None
+
+            if ret and frame is not None:
+                state.latest_frame_down = frame
+                state.frame_id_down += 1
+                stream_frame = cv2.resize(frame, (STREAM_WIDTH, STREAM_HEIGHT), interpolation=cv2.INTER_LINEAR)
+                _, buffer = cv2.imencode('.jpg', stream_frame, [
+                    cv2.IMWRITE_JPEG_QUALITY, STREAM_JPEG_QUALITY,
+                    cv2.IMWRITE_JPEG_OPTIMIZE, 0
+                ])
+                with frame_condition_down:
+                    encoded_frame_down = buffer.tobytes()
+                    current_frame_id_down = state.frame_id_down
+                    frame_condition_down.notify_all()
+            else:
+                time.sleep(0.01)
+        except Exception as e:
+            print(f"[Camera] Down thread error: {e}")
+            time.sleep(0.1)
+    print("[Camera] Down capture thread stopped")
+
+
+def _capture_loop_fwd():
+    global encoded_frame_fwd, current_frame_id_fwd
+    print("[Camera] Fwd depth capture thread started")
+    blank = _make_blank("WAITING...")
+    with frame_condition_fwd:
+        encoded_frame_fwd = blank
+        frame_condition_fwd.notify_all()
+
+    while state.running and state.camera_fwd and state.camera_fwd.isOpened():
+        try:
+            grabbed = state.camera_fwd.grab()
+            if grabbed:
+                ret, frame = state.camera_fwd.retrieve()
+            else:
+                ret, frame = False, None
+
+            if ret and frame is not None:
+                state.latest_frame_fwd = frame
+                state.frame_id_fwd += 1
+                stream_frame = cv2.resize(frame, (STREAM_WIDTH, STREAM_HEIGHT), interpolation=cv2.INTER_LINEAR)
+                _, buffer = cv2.imencode('.jpg', stream_frame, [
+                    cv2.IMWRITE_JPEG_QUALITY, STREAM_JPEG_QUALITY,
+                    cv2.IMWRITE_JPEG_OPTIMIZE, 0
+                ])
+                with frame_condition_fwd:
+                    encoded_frame_fwd = buffer.tobytes()
+                    current_frame_id_fwd = state.frame_id_fwd
+                    frame_condition_fwd.notify_all()
+            else:
+                time.sleep(0.01)
+        except Exception as e:
+            print(f"[Camera] Fwd thread error: {e}")
+            time.sleep(0.1)
+    print("[Camera] Fwd depth capture thread stopped")
+
+
+# --- Frame generators ---
+
+def _make_error_frame(label: str):
+    frame = np.zeros((STREAM_HEIGHT, STREAM_WIDTH, 3), np.uint8)
+    cv2.putText(frame, label, (20, STREAM_HEIGHT // 2),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+    _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, STREAM_JPEG_QUALITY])
+    return buffer.tobytes()
+
+
+def _generator(camera_attr, condition_obj, encoded_ref, frame_id_ref, error_label):
+    error_bytes = _make_error_frame(error_label)
+    current = encoded_ref[0] if encoded_ref[0] else error_bytes
+    last_id = 0
+
+    yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + current + b'\r\n')
+
+    while state.running:
+        cam = getattr(state, camera_attr)
+        if cam is None or not cam.isOpened():
+            time.sleep(1)
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + error_bytes + b'\r\n')
+            continue
+
+        with condition_obj:
+            condition_obj.wait(timeout=0.1)
+            if frame_id_ref[0] == last_id:
+                continue
+            current = encoded_ref[0]
+            last_id = frame_id_ref[0]
+
+        if current:
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + current + b'\r\n')
 
 
 def generate_frames():
     global encoded_frame, current_frame_id
-    
-    current_frame = encoded_frame
-    last_sent_frame_id = 0
-    
-    # Create fallback frames
-    blank_frame = np.zeros((STREAM_HEIGHT, STREAM_WIDTH, 3), np.uint8)
-    cv2.putText(blank_frame, "STARTING...", (20, STREAM_HEIGHT//2), 
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-    _, buffer_starting = cv2.imencode('.jpg', blank_frame, [cv2.IMWRITE_JPEG_QUALITY, STREAM_JPEG_QUALITY])
-    starting_bytes = buffer_starting.tobytes()
-
-    error_frame = np.zeros((STREAM_HEIGHT, STREAM_WIDTH, 3), np.uint8)
-    cv2.putText(error_frame, "NO SIGNAL", (20, STREAM_HEIGHT//2), 
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-    _, buffer_error = cv2.imencode('.jpg', error_frame, [cv2.IMWRITE_JPEG_QUALITY, STREAM_JPEG_QUALITY])
-    error_bytes = buffer_error.tobytes()
-
-    # Initial frame
-    current_frame = encoded_frame if encoded_frame else starting_bytes
-
-    yield (b'--frame\r\n'
-           b'Content-Type: image/jpeg\r\n\r\n' + current_frame + b'\r\n')
-    
+    error = _make_error_frame("NO SIGNAL")
+    last_id = 0
+    cur = encoded_frame if encoded_frame else error
+    yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + cur + b'\r\n')
     while state.running:
-        # Check if camera exists
         if state.camera is None or not state.camera.isOpened():
-             time.sleep(1)
-             yield (b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\n\r\n' + error_bytes + b'\r\n')
-             continue
-
+            time.sleep(1)
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + error + b'\r\n')
+            continue
         with frame_condition:
-            notified = frame_condition.wait(timeout=0.1)
-            
-            if not notified:
-                # Timeout implies no new frames coming -> might be stuck
-                pass
-
-            if current_frame_id == last_sent_frame_id:
-                # No new frame yet
+            frame_condition.wait(timeout=0.1)
+            if current_frame_id == last_id:
                 continue
-            
-            current_frame = encoded_frame
-            last_sent_frame_id = current_frame_id
-
-        if current_frame:
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + current_frame + b'\r\n')
+            cur = encoded_frame
+            last_id = current_frame_id
+        if cur:
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + cur + b'\r\n')
 
 
 def generate_frames_right():
     global encoded_frame_right, current_frame_id_right
-    
-    current_frame = encoded_frame_right
-    last_sent_frame_id = 0
-    
-    # Create fallback frames
-    blank_frame = np.zeros((STREAM_HEIGHT, STREAM_WIDTH, 3), np.uint8)
-    cv2.putText(blank_frame, "STARTING...", (20, STREAM_HEIGHT//2), 
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-    _, buffer_starting = cv2.imencode('.jpg', blank_frame, [cv2.IMWRITE_JPEG_QUALITY, STREAM_JPEG_QUALITY])
-    starting_bytes = buffer_starting.tobytes()
-
-    error_frame = np.zeros((STREAM_HEIGHT, STREAM_WIDTH, 3), np.uint8)
-    cv2.putText(error_frame, "NO SIGNAL (RIGHT)", (20, STREAM_HEIGHT//2), 
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-    _, buffer_error = cv2.imencode('.jpg', error_frame, [cv2.IMWRITE_JPEG_QUALITY, STREAM_JPEG_QUALITY])
-    error_bytes = buffer_error.tobytes()
-
-    # Initial frame
-    current_frame = encoded_frame_right if encoded_frame_right else starting_bytes
-
-    yield (b'--frame\r\n'
-           b'Content-Type: image/jpeg\r\n\r\n' + current_frame + b'\r\n')
-    
+    error = _make_error_frame("NO SIGNAL (LEFT ARM)")
+    last_id = 0
+    cur = encoded_frame_right if encoded_frame_right else error
+    yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + cur + b'\r\n')
     while state.running:
-        # Check if right camera exists
         if state.camera_right is None or not state.camera_right.isOpened():
-             time.sleep(1)
-             yield (b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\n\r\n' + error_bytes + b'\r\n')
-             continue
-
+            time.sleep(1)
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + error + b'\r\n')
+            continue
         with frame_condition_right:
-            notified = frame_condition_right.wait(timeout=0.1)
-            
-            if not notified:
-                pass
-            
-            if current_frame_id_right == last_sent_frame_id:
+            frame_condition_right.wait(timeout=0.1)
+            if current_frame_id_right == last_id:
                 continue
-            
-            current_frame = encoded_frame_right
-            last_sent_frame_id = current_frame_id_right
-
-        if current_frame:
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + current_frame + b'\r\n')
+            cur = encoded_frame_right
+            last_id = current_frame_id_right
+        if cur:
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + cur + b'\r\n')
 
 
+def generate_frames_down():
+    global encoded_frame_down, current_frame_id_down
+    error = _make_error_frame("NO SIGNAL (DOWN)")
+    last_id = 0
+    cur = encoded_frame_down if encoded_frame_down else error
+    yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + cur + b'\r\n')
+    while state.running:
+        if state.camera_down is None or not state.camera_down.isOpened():
+            time.sleep(1)
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + error + b'\r\n')
+            continue
+        with frame_condition_down:
+            frame_condition_down.wait(timeout=0.1)
+            if current_frame_id_down == last_id:
+                continue
+            cur = encoded_frame_down
+            last_id = current_frame_id_down
+        if cur:
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + cur + b'\r\n')
 
+
+def generate_frames_fwd():
+    global encoded_frame_fwd, current_frame_id_fwd
+    error = _make_error_frame("NO SIGNAL (FWD DEPTH)")
+    last_id = 0
+    cur = encoded_frame_fwd if encoded_frame_fwd else error
+    yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + cur + b'\r\n')
+    while state.running:
+        if state.camera_fwd is None or not state.camera_fwd.isOpened():
+            time.sleep(1)
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + error + b'\r\n')
+            continue
+        with frame_condition_fwd:
+            frame_condition_fwd.wait(timeout=0.1)
+            if current_frame_id_fwd == last_id:
+                continue
+            cur = encoded_frame_fwd
+            last_id = current_frame_id_fwd
+        if cur:
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + cur + b'\r\n')
 
 
 def release_camera():
-    """Release camera resources."""
-    if state.camera:
-        try:
-            state.camera.release()
-            print("✓ Camera released")
-        except Exception as e:
-            print(f"✗ Camera cleanup error: {e}")
-    state.camera = None
-    
-    if state.camera_right:
-        try:
-            state.camera_right.release()
-            print("✓ Right camera released")
-        except Exception as e:
-            print(f"✗ Right camera cleanup error: {e}")
-    state.camera_right = None
+    for attr, label in [
+        ('camera', 'Right arm camera'),
+        ('camera_right', 'Left arm camera'),
+        ('camera_down', 'Down camera'),
+        ('camera_fwd', 'Fwd depth camera'),
+    ]:
+        cam = getattr(state, attr)
+        if cam:
+            try:
+                cam.release()
+                print(f"✓ {label} released")
+            except Exception as e:
+                print(f"✗ {label} cleanup error: {e}")
+        setattr(state, attr, None)

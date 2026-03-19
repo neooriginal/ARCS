@@ -29,6 +29,11 @@
                 <span style="font-weight: 500;">Right Arm</span>
                 <span id="status-arm" class="status-dot"></span>
             </div>
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid rgba(255,255,255,0.02);">
+                <span style="font-weight: 500;">Actuator</span>
+                <span id="status-actuator" class="status-dot"></span>
+            </div>
 
             <!-- Sensors Section -->
             <div
@@ -67,13 +72,23 @@
 
             <div
                 style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid rgba(255,255,255,0.02);">
-                <span style="font-weight: 500;">Main Camera</span>
+                <span style="font-weight: 500;">Right Arm Cam</span>
                 <span id="status-camera-main" class="status-dot"></span>
             </div>
             <div
                 style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid rgba(255,255,255,0.02);">
-                <span style="font-weight: 500;">Right Arm Cam</span>
+                <span style="font-weight: 500;">Left Arm Cam</span>
                 <span id="status-camera-right" class="status-dot"></span>
+            </div>
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid rgba(255,255,255,0.02);">
+                <span style="font-weight: 500;">Down Cam</span>
+                <span id="status-camera-down" class="status-dot"></span>
+            </div>
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid rgba(255,255,255,0.02);">
+                <span style="font-weight: 500;">Fwd Depth Cam</span>
+                <span id="status-camera-fwd" class="status-dot"></span>
             </div>
 
             <!-- System Section -->
@@ -136,16 +151,45 @@
         </div>
     </div>
 
-    <!-- Live Camera Feed -->
+    <!-- Camera Feeds -->
     <div class="control-card" style="grid-column: span 2;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h3 style="color: var(--text-secondary); font-size: 0.85rem; letter-spacing: 1.5px; font-weight: 600;">
                 VISUAL UPLINK</h3>
             <div id="status-uplink" class="status-dot" style="width: 8px; height: 8px;"></div>
         </div>
-        <div
-            style="background: #000; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); aspect-ratio: 16/9;">
-            <img src="/video_feed" style="width: 100%; height: 100%; object-fit: cover;" alt="Live Feed">
+
+        <!-- Main (Right Arm) feed -->
+        <div style="margin-bottom: 16px;">
+            <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Right Arm</div>
+            <div style="background: #000; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); aspect-ratio: 16/9;">
+                <img src="/video_feed" style="width: 100%; height: 100%; object-fit: cover;" alt="Right Arm Feed">
+            </div>
+        </div>
+
+        <!-- Forward depth (stereo) + Down cam side by side -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+
+            <!-- Forward depth camera: split-eye overlay -->
+            <div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Fwd Depth (Stereo)</div>
+                <div style="position: relative; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); aspect-ratio: 16/9;">
+                    <img src="/video_feed_fwd" style="width: 100%; height: 100%; object-fit: cover;" alt="Forward Depth Feed">
+                    <!-- Center divider -->
+                    <div style="position: absolute; top: 0; left: 50%; width: 1px; height: 100%; background: rgba(0,242,255,0.3); pointer-events: none;"></div>
+                    <!-- L / R labels -->
+                    <div style="position: absolute; top: 6px; left: 8px; font-size: 0.6rem; color: rgba(0,242,255,0.7); font-weight: 700; letter-spacing: 1px; pointer-events: none;">L</div>
+                    <div style="position: absolute; top: 6px; right: 8px; font-size: 0.6rem; color: rgba(0,242,255,0.7); font-weight: 700; letter-spacing: 1px; pointer-events: none;">R</div>
+                </div>
+            </div>
+
+            <!-- Down camera -->
+            <div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Down</div>
+                <div style="background: #000; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); aspect-ratio: 16/9;">
+                    <img src="/video_feed_down" style="width: 100%; height: 100%; object-fit: cover;" alt="Down Camera Feed">
+                </div>
+            </div>
         </div>
     </div>
 
@@ -184,6 +228,7 @@
 
             setStatus('status-wheels', data.wheels_connected);
             setStatus('status-arm', data.arm_connected);
+            setStatus('status-actuator', data.actuator_connected);
             setStatus('status-lidar', data.lidar_connected);
 
             // Draw LIDAR radar and update directional distances
@@ -192,8 +237,10 @@
 
             setStatus('status-camera-main', data.camera_main_connected);
             setStatus('status-camera-right', data.camera_right_connected);
+            setStatus('status-camera-down', data.camera_down_connected);
+            setStatus('status-camera-fwd', data.camera_fwd_connected);
 
-            setStatus('status-uplink', data.camera_main_connected); // Link uplink to main camera
+            setStatus('status-uplink', data.camera_main_connected);
 
             const modeEl = document.getElementById('status-mode');
             if (modeEl) modeEl.textContent = (data.control_mode || 'IDLE').toUpperCase();

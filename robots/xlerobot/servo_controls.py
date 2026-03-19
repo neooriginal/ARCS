@@ -16,14 +16,18 @@ DEFAULT_SPEED = 10_000
 LINEAR_MPS = 0.25
 ANGULAR_DPS = 90.0
 
+
+# 4-wheel square omni layout: 7=FL, 8=FR, 9=RL, 10=RR
+# Signs assume standard mecanum mounting (motors diagonal to each other mirror-mounted)
 ACTION_MAP = {
-    "up": {7: 1.0, 8: 0.0, 9: -1.0},
-    "down": {7: -1.0, 8: 0.0, 9: 1.0},
-    "left": {7: 1.0, 8: 1.0, 9: 1.0},
-    "right": {7: -1.0, 8: -1.0, 9: -1.0},
-    "slide_left": {7: 0.15, 8: -1.0, 9: 0.15},
-    "slide_right": {7: -0.15, 8: 1.0, 9: -0.15},
+    "up":          {7:  1.0, 8: -1.0, 9:  1.0, 10: -1.0},
+    "down":        {7: -1.0, 8:  1.0, 9: -1.0, 10:  1.0},
+    "left":        {7:  1.0, 8:  1.0, 9:  1.0, 10:  1.0},
+    "right":       {7: -1.0, 8: -1.0, 9: -1.0, 10: -1.0},
+    "slide_left":  {7: -1.0, 8:  1.0, 9:  1.0, 10: -1.0},
+    "slide_right": {7:  1.0, 8: -1.0, 9: -1.0, 10:  1.0},
 }
+
 
 ARM_SERVO_MAP = {
     "shoulder_pan": 1,
@@ -77,6 +81,7 @@ class ServoControler:
                 7: Motor(7, "sts3215", MotorNormMode.RANGE_M100_100),
                 8: Motor(8, "sts3215", MotorNormMode.RANGE_M100_100),
                 9: Motor(9, "sts3215", MotorNormMode.RANGE_M100_100),
+                10: Motor(10, "sts3215", MotorNormMode.RANGE_M100_100),
             }
             
             calibration = None
@@ -144,6 +149,7 @@ class ServoControler:
                         7: Motor(7, "sts3215", MotorNormMode.RANGE_M100_100),
                         8: Motor(8, "sts3215", MotorNormMode.RANGE_M100_100),
                         9: Motor(9, "sts3215", MotorNormMode.RANGE_M100_100),
+                        10: Motor(10, "sts3215", MotorNormMode.RANGE_M100_100),
                     }
                     self.wheel_bus = FeetechMotorsBus(
                         port=right_arm_wheel_usb,

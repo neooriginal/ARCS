@@ -161,8 +161,19 @@ def _deferred_init() -> None:
     except Exception as e:
         logger.warning(f"Lidar360: Init failed - {e}")
 
+    # Initialize linear actuator (optional)
+    try:
+        from actuator import init_actuator
+        if init_actuator():
+            logger.info("Actuator: Connected")
+        else:
+            logger.info("Actuator: Not configured or unavailable")
+    except Exception as e:
+        logger.warning(f"Actuator: Init failed - {e}")
+
     tts.speak("System ready")
     logger.info("Hardware initialization complete")
+
 
 def _open_display_browser() -> None:
     if os.getenv('AUTO_OPEN_DISPLAY', 'true').lower() != 'true':

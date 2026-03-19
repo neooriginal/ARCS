@@ -13,7 +13,7 @@ from flask import Blueprint, Response, jsonify, request, render_template, redire
 from functools import wraps
 
 from state import state
-from camera import generate_frames, generate_frames_right
+from camera import generate_frames, generate_frames_right, generate_frames_down, generate_frames_fwd
 from movement import execute_movement
 from arm import arm_controller
 import tts
@@ -294,6 +294,16 @@ def video_feed_right():
     return Response(generate_frames_right(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
+@bp.route('/video_feed_down')
+def video_feed_down():
+    return Response(generate_frames_down(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
+@bp.route('/video_feed_fwd')
+def video_feed_fwd():
+    return Response(generate_frames_fwd(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
 @bp.route('/api/logs')
 def get_logs():
     """Get system logs, optionally filtered by timestamp."""
@@ -540,6 +550,38 @@ def tts_speak():
     return jsonify({'status': 'error', 'error': 'No text provided'}), 400
 
 
+# Actuator Routes
+
+@bp.route('/actuator/move', methods=['POST'])
+def actuator_move():
+    if not state.actuator_connected or not state.actuator:
+        return jsonify({'status': 'error', 'error': 'Actuator not connected'}), 400
+
+    data = request.json or {}
+    direction = data.get('direction', 'stop')
+    speed = int(data.get('speed', 100))
+
+    try:
+        if direction == 'extend':
+            state.actuator.extend(speed)
+        elif direction == 'retract':
+            state.actuator.retract(speed)
+        else:
+            state.actuator.stop()
+        return jsonify({'status': 'ok', 'direction': direction, 'speed': speed})
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+
+@bp.route('/actuator/status')
+def actuator_status():
+    connected = state.actuator_connected and state.actuator is not None
+    telemetry = state.actuator.get_telemetry() if connected else {}
+    return jsonify({'connected': connected, 'telemetry': telemetry})
+
+
+
+
 # Wheel Speed Routes
 
 @bp.route('/wheels/speed', methods=['POST'])
@@ -585,10 +627,15 @@ def display_state():
         'wheels_connected': state.controller is not None,
         'arm_connected': state.arm_connected,
         
-        # Detailed Camera Status
-        'camera_connected': state.camera is not None and state.camera.isOpened() if state.camera else False, # Keep for backward compatibility
+        # Camera Status
+        'camera_connected': state.camera is not None and state.camera.isOpened() if state.camera else False,
         'camera_main_connected': state.camera is not None and state.camera.isOpened() if state.camera else False,
         'camera_right_connected': state.camera_right is not None and state.camera_right.isOpened() if state.camera_right else False,
+        'camera_down_connected': state.camera_down is not None and state.camera_down.isOpened() if state.camera_down else False,
+        'camera_fwd_connected': state.camera_fwd is not None and state.camera_fwd.isOpened() if state.camera_fwd else False,
+
+        # Actuator Status
+        'actuator_connected': state.actuator_connected,
         
         # Lidar Status
         'lidar_connected': state.lidar360 is not None and state.lidar360.connected if state.lidar360 else False,
