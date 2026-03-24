@@ -5,8 +5,9 @@ from __future__ import annotations
 import time
 import json
 import threading
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Dict, Mapping, Optional
+from typing import Dict, Iterable, Mapping, Optional
 from lerobot.motors import Motor, MotorCalibration, MotorNormMode
 from lerobot.motors.feetech import FeetechMotorsBus, OperatingMode
 
@@ -46,6 +47,229 @@ ARM_LIMITS = {
     "wrist_roll": (-150, 150),
     "gripper": (-65, 95),
 }
+
+ARM_JOINT_ORDER = tuple(ARM_SERVO_MAP.keys())
+WHEEL_SERVO_IDS = tuple(sorted(next(iter(ACTION_MAP.values())).keys()))
+SERVO_MODEL = "sts3215"
+
+
+def _make_probe_motors(motor_ids: Iterable[int]) -> Dict[int, Motor]:
+    return {
+        int(motor_id): Motor(int(motor_id), SERVO_MODEL, MotorNormMode.RANGE_M100_100)
+        for motor_id in sorted({int(motor_id) for motor_id in motor_ids})
+    }
+
+
+def _wrapped_position_delta(start: int, end: int, modulus: int = 4096) -> int:
+    delta = abs(int(end) - int(start)) % modulus
+    return min(delta, modulus - delta)
+
+
+@contextmanager
+def _calibration_bus(
+    port: str,
+    motor_ids: Iterable[int],
+    baudrate: int = DEFAULT_BAUDRATE,
+    controller: Optional["ServoControler"] = None,
+):
+    motor_ids = sorted({int(motor_id) for motor_id in motor_ids})
+    if not motor_ids:
+        raise ValueError("At least one motor ID is required")
+
+    if (
+        controller
+        and controller.right_arm_wheel_usb == port
+        and controller.wheel_bus is not None
+        and controller.wheel_bus.is_connected
+    ):
+        bus = controller.wheel_bus
+        with controller._bus_lock:
+            original_motors = dict(bus.motors)
+            original_baudrate = None
+            try:
+                original_baudrate = bus.get_baudrate()
+            except Exception:
+                pass
+            bus.motors = _make_probe_motors(set(original_motors) | set(motor_ids))
+            try:
+                if baudrate and original_baudrate != baudrate:
+                    bus.set_baudrate(baudrate)
+                yield bus
+            finally:
+                if original_baudrate and original_baudrate != baudrate:
+                    try:
+                        bus.set_baudrate(original_baudrate)
+                    except Exception:
+                        pass
+                bus.motors = original_motors
+        return
+
+    bus = FeetechMotorsBus(port=port, motors=_make_probe_motors(motor_ids), calibration=None)
+    bus.connect()
+    try:
+        if baudrate:
+            bus.set_baudrate(baudrate)
+        yield bus
+    finally:
+        bus.disconnect()
+
+
+def scan_servo_bus(
+    port: str,
+    *,
+    controller: Optional["ServoControler"] = None,
+) -> Dict[str, object]:
+    if not port:
+        raise ValueError("Servo port is required")
+
+    if (
+        controller
+        and controller.right_arm_wheel_usb == port
+        and controller.wheel_bus is not None
+        and controller.wheel_bus.is_connected
+    ):
+        with controller._bus_lock:
+            ids_models = controller.wheel_bus.broadcast_ping() or {}
+            baudrate = controller.wheel_bus.get_baudrate()
+        baudrate_ids = {int(baudrate): sorted(int(motor_id) for motor_id in ids_models)}
+    else:
+        raw_scan = FeetechMotorsBus.scan_port(port)
+        baudrate_ids = {
+            int(baudrate): sorted(int(motor_id) for motor_id in motor_ids)
+            for baudrate, motor_ids in raw_scan.items()
+        }
+
+    if not baudrate_ids:
+        return {
+            "baudrate_map": {},
+            "recommended_baudrate": DEFAULT_BAUDRATE,
+            "all_ids": [],
+            "arm_candidate_ids": [],
+        }
+
+    recommended_baudrate = DEFAULT_BAUDRATE
+    if recommended_baudrate not in baudrate_ids:
+        recommended_baudrate = max(baudrate_ids.items(), key=lambda item: len(item[1]))[0]
+
+    all_ids = sorted({motor_id for ids in baudrate_ids.values() for motor_id in ids})
+    return {
+        "baudrate_map": baudrate_ids,
+        "recommended_baudrate": int(recommended_baudrate),
+        "all_ids": all_ids,
+        "arm_candidate_ids": [motor_id for motor_id in all_ids if motor_id not in WHEEL_SERVO_IDS],
+    }
+
+
+def identify_servo_by_movement(
+    port: str,
+    candidate_ids: Iterable[int],
+    *,
+    baudrate: int = DEFAULT_BAUDRATE,
+    controller: Optional["ServoControler"] = None,
+    sample_seconds: float = 3.0,
+    settle_seconds: float = 0.5,
+    poll_interval: float = 0.08,
+    movement_threshold: int = 40,
+) -> Dict[str, object]:
+    candidate_ids = sorted({int(motor_id) for motor_id in candidate_ids})
+    if not candidate_ids:
+        raise ValueError("No candidate IDs provided")
+
+    with _calibration_bus(port, candidate_ids, baudrate=baudrate, controller=controller) as bus:
+        bus.disable_torque(candidate_ids)
+        try:
+            time.sleep(max(0.0, settle_seconds))
+            baseline = bus.sync_read("Present_Position", candidate_ids, normalize=False)
+            movement_scores = {motor_id: 0 for motor_id in candidate_ids}
+
+            started_at = time.time()
+            while time.time() - started_at < max(0.5, sample_seconds):
+                positions = bus.sync_read("Present_Position", candidate_ids, normalize=False)
+                for motor_id in candidate_ids:
+                    start = baseline.get(motor_id)
+                    current = positions.get(motor_id)
+                    if start is None or current is None:
+                        continue
+                    movement_scores[motor_id] = max(
+                        movement_scores[motor_id],
+                        _wrapped_position_delta(start, current),
+                    )
+                time.sleep(max(0.02, poll_interval))
+        finally:
+            try:
+                bus.enable_torque(candidate_ids)
+            except Exception:
+                pass
+
+    detected_id, detected_score = max(movement_scores.items(), key=lambda item: item[1])
+    if detected_score < movement_threshold:
+        raise RuntimeError(
+            f"No motor moved enough to identify confidently. Highest movement was ID {detected_id} at {detected_score} ticks."
+        )
+
+    return {
+        "detected_id": int(detected_id),
+        "movement_scores": movement_scores,
+        "movement_threshold": int(movement_threshold),
+    }
+
+
+def assign_arm_servo_ids(
+    port: str,
+    joint_to_current_id: Mapping[str, int],
+    *,
+    baudrate: int = DEFAULT_BAUDRATE,
+    controller: Optional["ServoControler"] = None,
+) -> Dict[str, object]:
+    missing = [joint for joint in ARM_JOINT_ORDER if joint not in joint_to_current_id]
+    if missing:
+        raise ValueError(f"Missing assignments for: {', '.join(missing)}")
+
+    normalized_mapping = {
+        joint: int(joint_to_current_id[joint])
+        for joint in ARM_JOINT_ORDER
+    }
+    current_ids = list(normalized_mapping.values())
+    if len(set(current_ids)) != len(current_ids):
+        raise ValueError("Each joint must map to a unique motor ID")
+
+    target_ids = {joint: ARM_SERVO_MAP[joint] for joint in ARM_JOINT_ORDER}
+    all_reserved_ids = set(current_ids) | set(target_ids.values()) | set(WHEEL_SERVO_IDS)
+    free_temp_ids = [motor_id for motor_id in range(250, 19, -1) if motor_id not in all_reserved_ids]
+    if len(free_temp_ids) < len(ARM_JOINT_ORDER):
+        raise RuntimeError("Not enough temporary IDs available to remap motors safely")
+
+    rename_plan = []
+    for index, joint in enumerate(ARM_JOINT_ORDER):
+        current_id = normalized_mapping[joint]
+        target_id = target_ids[joint]
+        temp_id = free_temp_ids[index]
+        rename_plan.append((joint, current_id, temp_id, target_id))
+
+    with _calibration_bus(
+        port,
+        list(current_ids) + [temp_id for _, _, temp_id, _ in rename_plan],
+        baudrate=baudrate,
+        controller=controller,
+    ) as bus:
+        for _, current_id, temp_id, _ in rename_plan:
+            if current_id == temp_id:
+                continue
+            bus.disable_torque(current_id)
+            bus.write("ID", current_id, temp_id)
+            bus.motors.pop(current_id, None)
+            bus.motors[temp_id] = Motor(temp_id, SERVO_MODEL, MotorNormMode.RANGE_M100_100)
+
+        for _, _, temp_id, target_id in rename_plan:
+            bus.disable_torque(temp_id)
+            bus.write("ID", temp_id, target_id)
+            bus.motors.pop(temp_id, None)
+            bus.motors[target_id] = Motor(target_id, SERVO_MODEL, MotorNormMode.RANGE_M100_100)
+
+    return {
+        "assigned_ids": target_ids,
+        "source_mapping": normalized_mapping,
+    }
 
 
 
@@ -392,4 +616,3 @@ class ServoControler:
     def __del__(self) -> None:
         if hasattr(self, "wheel_bus") and self.wheel_bus and self.wheel_bus.is_connected:
             self.disconnect()
-

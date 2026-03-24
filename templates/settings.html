@@ -231,6 +231,21 @@
                 </div>
             </div>
 
+            <div class="settings-card">
+                <h3>🦾 Arm ID Wizard</h3>
+                <p style="color:#888; font-size:0.85em; margin-bottom:15px;">Identify assembled-arm servos by gently moving one joint at a time, then bulk-assign the standard arm IDs.</p>
+                <div style="display:flex; gap:8px; margin-bottom:12px;">
+                    <button type="button" class="btn btn-secondary" onclick="scanArmCalibration()">1. Scan Bus</button>
+                    <button type="button" class="btn btn-primary" onclick="assignArmCalibration()">3. Assign IDs</button>
+                </div>
+                <div id="arm-calibration-status" style="font-size:0.82em; color:#aaa; margin-bottom:12px;">
+                    Scan the bus first. Then click each joint row and gently move only that joint for a few seconds.
+                </div>
+                <div id="arm-calibration-meta" style="font-size:0.78em; color:#777; margin-bottom:12px;"></div>
+                <div id="arm-calibration-joints" style="display:grid; gap:8px;"></div>
+                <div id="arm-calibration-scan" style="font-size:0.78em; color:#777; margin-top:12px;"></div>
+            </div>
+
             <!-- Account Settings -->
             <div class="settings-card">
                 <h3>🔐 Account</h3>
@@ -410,6 +425,21 @@
     let ports = { serial: [], video: [] };
     let originalWebPort = null;
     let bmsCharging = false;
+    const armJointOrder = ['shoulder_pan', 'shoulder_lift', 'elbow_flex', 'wrist_flex', 'wrist_roll', 'gripper'];
+    const armJointLabels = {
+        shoulder_pan: 'Shoulder Pan',
+        shoulder_lift: 'Shoulder Lift',
+        elbow_flex: 'Elbow Flex',
+        wrist_flex: 'Wrist Flex',
+        wrist_roll: 'Wrist Roll',
+        gripper: 'Gripper',
+    };
+    let armCalibrationState = {
+        port: '',
+        baudrate: 1000000,
+        candidateIds: [],
+        mapping: {},
+    };
 
     document.addEventListener('DOMContentLoaded', async () => {
         await loadPorts();
@@ -499,6 +529,162 @@
             if (btn) btn.disabled = false;
         }
     }
+
+    function currentWheelPort() {
+        const manual = document.getElementById('cfg_WHEEL_USB_manual');
+        if (manual && manual.classList.contains('visible') && manual.value.trim()) {
+            return manual.value.trim();
+        }
+        const select = document.getElementById('cfg_WHEEL_USB');
+        return select ? select.value.trim() : '';
+    }
+
+    function setArmCalibrationStatus(message, color = '#aaa') {
+        const el = document.getElementById('arm-calibration-status');
+        if (el) {
+            el.textContent = message;
+            el.style.color = color;
+        }
+    }
+
+    function renderArmCalibration() {
+        const container = document.getElementById('arm-calibration-joints');
+        if (!container) return;
+
+        container.innerHTML = armJointOrder.map(joint => {
+            const assignedId = armCalibrationState.mapping[joint];
+            return `
+                <div style="display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px; align-items:center; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:10px;">
+                    <div>
+                        <div style="font-weight:600;">${armJointLabels[joint]}</div>
+                        <div style="font-size:0.78em; color:#777;">Target ID ${armJointOrder.indexOf(joint) + 1}${assignedId ? ` • detected ID ${assignedId}` : ''}</div>
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="identifyArmJoint('${joint}')">2. Identify</button>
+                    <div style="min-width:78px; text-align:right; color:${assignedId ? '#00ff9d' : '#777'};">${assignedId ? `ID ${assignedId}` : 'Pending'}</div>
+                </div>
+            `;
+        }).join('');
+
+        const meta = document.getElementById('arm-calibration-meta');
+        if (meta) {
+            meta.textContent = armCalibrationState.port
+                ? `Port: ${armCalibrationState.port} • Baud: ${armCalibrationState.baudrate} • Arm candidates: ${armCalibrationState.candidateIds.join(', ') || 'none'}`
+                : 'Port: not selected';
+        }
+
+        const scan = document.getElementById('arm-calibration-scan');
+        if (scan) {
+            scan.textContent = armCalibrationState.candidateIds.length
+                ? `Detected arm candidates: ${armCalibrationState.candidateIds.join(', ')}`
+                : 'No arm candidates detected yet.';
+        }
+    }
+
+    async function scanArmCalibration() {
+        const port = currentWheelPort();
+        if (!port) {
+            setArmCalibrationStatus('Select the wheel/arm USB port first.', '#ff7878');
+            return;
+        }
+
+        setArmCalibrationStatus('Scanning servo bus...', '#00e5ff');
+        try {
+            const res = await fetch('/api/arm-calibration/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ port })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Scan failed');
+            }
+
+            armCalibrationState = {
+                port,
+                baudrate: data.recommended_baudrate || 1000000,
+                candidateIds: data.arm_candidate_ids || [],
+                mapping: {},
+            };
+            renderArmCalibration();
+            setArmCalibrationStatus(
+                armCalibrationState.candidateIds.length
+                    ? 'Scan complete. Click Identify on a joint, then move only that joint for about 3 seconds.'
+                    : 'Scan finished, but no arm candidates were found.',
+                armCalibrationState.candidateIds.length ? '#00ff9d' : '#ffb366'
+            );
+        } catch (e) {
+            setArmCalibrationStatus(`Scan failed: ${e.message}`, '#ff7878');
+        }
+    }
+
+    async function identifyArmJoint(joint) {
+        if (!armCalibrationState.port || !armCalibrationState.candidateIds.length) {
+            setArmCalibrationStatus('Run Scan Bus first so the wizard knows which motors are available.', '#ff7878');
+            return;
+        }
+
+        setArmCalibrationStatus(`Move only ${armJointLabels[joint]} now. Sampling motion for 3 seconds...`, '#00e5ff');
+        try {
+            const res = await fetch('/api/arm-calibration/identify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    port: armCalibrationState.port,
+                    baudrate: armCalibrationState.baudrate,
+                    candidate_ids: armCalibrationState.candidateIds,
+                    sample_seconds: 3.0,
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Identify failed');
+            }
+
+            const detectedId = Number(data.detected_id);
+            const existingJoint = armJointOrder.find(name => armCalibrationState.mapping[name] === detectedId && name !== joint);
+            if (existingJoint) {
+                delete armCalibrationState.mapping[existingJoint];
+            }
+            armCalibrationState.mapping[joint] = detectedId;
+            renderArmCalibration();
+            setArmCalibrationStatus(`${armJointLabels[joint]} matched to detected motor ID ${detectedId}.`, '#00ff9d');
+        } catch (e) {
+            setArmCalibrationStatus(`Identify failed: ${e.message}`, '#ff7878');
+        }
+    }
+
+    async function assignArmCalibration() {
+        const missing = armJointOrder.filter(joint => !armCalibrationState.mapping[joint]);
+        if (missing.length) {
+            setArmCalibrationStatus(`Identify every joint first. Still missing: ${missing.map(joint => armJointLabels[joint]).join(', ')}`, '#ff7878');
+            return;
+        }
+
+        setArmCalibrationStatus('Assigning canonical arm IDs. Please do not move the arm...', '#00e5ff');
+        try {
+            const res = await fetch('/api/arm-calibration/assign', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    port: armCalibrationState.port,
+                    baudrate: armCalibrationState.baudrate,
+                    mapping: armCalibrationState.mapping,
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Assign failed');
+            }
+
+            setArmCalibrationStatus(data.message || 'Arm IDs assigned successfully.', '#00ff9d');
+            showToast('Arm IDs assigned');
+            renderArmCalibration();
+        } catch (e) {
+            setArmCalibrationStatus(`Assign failed: ${e.message}`, '#ff7878');
+        }
+    }
+
+    renderArmCalibration();
 
 
 

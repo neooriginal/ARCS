@@ -57,6 +57,16 @@ lerobot-calibrate --robot.type=so101_follower --robot.port=/dev/robot_acm0 --rob
 > [!TIP]
 > Use `ls /dev/tty*` to find your specific USB port if `/dev/robot_acm0` doesn't work.
 
+### Faster ID Assignment on an Assembled Arm
+
+If the arm servos do not already use IDs `1-6`, open **Settings** and use the **Arm ID Wizard**:
+
+1. Click **Scan Bus** to find every servo on the shared wheel/arm bus.
+2. Click **Identify** for a joint, then gently move only that joint for a few seconds.
+3. Repeat for all six joints, then click **Assign IDs**.
+
+The wizard temporarily releases torque, detects which servo moved the most, and then remaps all arm IDs in one safe pass using temporary IDs to avoid collisions. This avoids disconnecting each servo one-by-one just to assign IDs.
+
 ## 🚀 Running the System
 
 ```bash

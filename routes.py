@@ -22,6 +22,12 @@ from core.dataset_recorder import DatasetRecorder
 from core.training_manager import training_manager
 from core.policy_executor import policy_executor
 from core.config_manager import config_manager
+from robots.xlerobot.servo_controls import (
+    ARM_JOINT_ORDER,
+    assign_arm_servo_ids,
+    identify_servo_by_movement,
+    scan_servo_bus,
+)
 from core.auth import (
     hash_password, verify_password, generate_token, verify_token,
     is_auth_configured, require_auth
@@ -1197,4 +1203,91 @@ def list_ports():
     
     return jsonify(result)
 
+
+@bp.route('/api/arm-calibration/scan', methods=['POST'])
+def arm_calibration_scan():
+    data = request.json or {}
+    port = (data.get('port') or config_manager.get('WHEEL_USB', '')).strip()
+    if not port:
+        return jsonify({'error': 'Wheel controller USB port is required'}), 400
+
+    controller = state.controller if getattr(state.controller, 'right_arm_wheel_usb', None) == port else None
+    try:
+        result = scan_servo_bus(port, controller=controller)
+        return jsonify({
+            'status': 'ok',
+            'port': port,
+            **result,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/api/arm-calibration/identify', methods=['POST'])
+def arm_calibration_identify():
+    data = request.json or {}
+    port = (data.get('port') or config_manager.get('WHEEL_USB', '')).strip()
+    if not port:
+        return jsonify({'error': 'Wheel controller USB port is required'}), 400
+
+    try:
+        candidate_ids = [int(motor_id) for motor_id in data.get('candidate_ids', [])]
+        baudrate = int(data.get('baudrate') or 1000000)
+        sample_seconds = float(data.get('sample_seconds') or 3.0)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid baudrate, duration, or candidate IDs'}), 400
+
+    if not candidate_ids:
+        return jsonify({'error': 'No candidate motor IDs provided'}), 400
+
+    controller = state.controller if getattr(state.controller, 'right_arm_wheel_usb', None) == port else None
+    try:
+        result = identify_servo_by_movement(
+            port,
+            candidate_ids,
+            baudrate=baudrate,
+            controller=controller,
+            sample_seconds=sample_seconds,
+        )
+        return jsonify({'status': 'ok', **result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/api/arm-calibration/assign', methods=['POST'])
+def arm_calibration_assign():
+    data = request.json or {}
+    port = (data.get('port') or config_manager.get('WHEEL_USB', '')).strip()
+    if not port:
+        return jsonify({'error': 'Wheel controller USB port is required'}), 400
+
+    mapping = data.get('mapping') or {}
+    if not isinstance(mapping, dict):
+        return jsonify({'error': 'Mapping must be an object'}), 400
+
+    missing = [joint for joint in ARM_JOINT_ORDER if joint not in mapping]
+    if missing:
+        return jsonify({'error': f"Missing joints: {', '.join(missing)}"}), 400
+
+    try:
+        baudrate = int(data.get('baudrate') or 1000000)
+        normalized_mapping = {joint: int(mapping[joint]) for joint in ARM_JOINT_ORDER}
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Mapping values and baudrate must be integers'}), 400
+
+    controller = state.controller if getattr(state.controller, 'right_arm_wheel_usb', None) == port else None
+    try:
+        result = assign_arm_servo_ids(
+            port,
+            normalized_mapping,
+            baudrate=baudrate,
+            controller=controller,
+        )
+        return jsonify({
+            'status': 'ok',
+            'message': 'Arm IDs assigned. Restart the robot connection before driving the arm again.',
+            **result,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
